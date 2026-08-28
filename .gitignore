@@ -1,0 +1,18 @@
+# Virtual environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Local system & database secrets
+.env
+uploads/
+backups/
+
+# PyCharm configuration
+.idea/
+.vscode/
+
+# OS metadata
+.DS_Store
+Thumbs.db
