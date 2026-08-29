@@ -27,7 +27,18 @@ logo_b64 = get_base64_image("assets/formlabs_logo.png")
 
 st.set_page_config(page_title="Factory Live TV | Formlabs SCADA", page_icon="📺", layout="wide")
 
-st.set_page_config(page_title="Factory Live TV | Formlabs SCADA", page_icon="📺", layout="wide")
+st.markdown("""
+<style>
+    /* Aggressively hide native multi-page navigation to minimize load flash */
+    [data-testid="stSidebarNav"], 
+    [data-testid="stSidebarNav"] > ul {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 import extra_streamlit_components as stx
 cookie_manager = stx.CookieManager(key="tv_cookies")
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
@@ -183,6 +194,7 @@ with st.sidebar:
 
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
+                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")
@@ -219,17 +231,23 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Catch missing cookie errors gracefully
+        # 1. Save the current theme before wiping the session
+        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
+
         try:
+            # 2. Forcing an expired date is much more reliable than just .delete()
+            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
             cookie_manager.delete("formlabs_mes_token")
         except Exception:
             pass
 
-        # 2. Clear authentication and session state
-        st.session_state["authenticated"] = False
+        # 3. Clear memory
         st.session_state.clear()
 
-        # 3. Force immediate redirect to the Home login page
+        # 4. Restore the theme and set a Hard Lockout flag!
+        st.session_state["preferred_theme"] = saved_theme
+        st.session_state["explicitly_logged_out"] = True
+
         st.switch_page("Home.py")
         time.sleep(0.5)
         st.rerun()

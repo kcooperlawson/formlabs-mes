@@ -30,6 +30,18 @@ logo_b64 = get_base64_image("assets/formlabs_logo.png")
 st.set_page_config(page_title="Live Reactor Fleet SCADA | Formlabs MES", page_icon="🛢️", layout="wide")
 st.logo("assets/formlabs_logo.png")
 
+st.markdown("""
+<style>
+    /* Aggressively hide native multi-page navigation to minimize load flash */
+    [data-testid="stSidebarNav"], 
+    [data-testid="stSidebarNav"] > ul {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ===================== DYNAMIC THEME INJECTION =====================
 try:
     from themes import THEMES
@@ -158,6 +170,21 @@ with st.sidebar:
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
+    # --- CUSTOM ROUTER (NEW) ---
+    st.markdown("#### 🗺️ Navigation")
+    st.page_link("Home.py", label="Live SCADA", icon="⚡")
+    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
+    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
+    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
+    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
+
+    # Only show IT Admin to actual admins
+    if st.session_state.get("user_role") == "admin":
+        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+
+    st.markdown("---")
+    # ---------------------------
+
     # UNIFIED SETTINGS POPOVER
     with st.popover("⚙️ Account & Preferences", use_container_width=True):
         set_tab1, set_tab2, set_tab3 = st.tabs(["🔑 Security", "🎨 Theme & Avatar", "💡 Feedback"])
@@ -213,6 +240,7 @@ with st.sidebar:
                     update_user_avatar(st.session_state["user_id"], new_avatar)
                     st.success("✅ Avatar updated!")
                     time.sleep(1)
+                    cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                     st.rerun()
 
         # TAB 3: FEEDBACK & CHANGELOG
@@ -237,17 +265,23 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Catch missing cookie errors gracefully
+        # 1. Save the current theme before wiping the session
+        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
+
         try:
+            # 2. Forcing an expired date is much more reliable than just .delete()
+            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
             cookie_manager.delete("formlabs_mes_token")
         except Exception:
             pass
 
-        # 2. Clear authentication and session state
-        st.session_state["authenticated"] = False
+        # 3. Clear memory
         st.session_state.clear()
 
-        # 3. Force immediate redirect to the Home login page
+        # 4. Restore the theme and set a Hard Lockout flag!
+        st.session_state["preferred_theme"] = saved_theme
+        st.session_state["explicitly_logged_out"] = True
+
         st.switch_page("Home.py")
         time.sleep(0.5)
         st.rerun()
@@ -277,7 +311,7 @@ if not specs_df.empty:
 all_resins = ["None"] + sorted(specs_df["resin_name"].unique().tolist()) if not specs_df.empty else ["None"]
 all_pumps = ["None"] + get_active_pumps()
 
-if st.session_state.get("user_role") == "manager":
+if st.session_state.get("user_role") in ["manager", "admin"]:
     with st.expander("⚙️ Manage Permanent Reactor Fleet", expanded=False):
         c1, c2 = st.columns([1.5, 2.5])
         with c1:

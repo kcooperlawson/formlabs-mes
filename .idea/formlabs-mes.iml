@@ -4,8 +4,10 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/backups" />
+      <excludeFolder url="file://$MODULE_DIR$/uploads" />
     </content>
-    <orderEntry type="jdk" jdkName="~\Documents\formlabsMES\formlabs-mes\.venv" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="~\Desktop\fromlabs-mes3.5.2\venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

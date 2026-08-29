@@ -61,6 +61,20 @@ logo_b64 = get_base64_image("assets/formlabs_logo.png")
 
 st.set_page_config(page_title="Operator Terminal | Formlabs MES", page_icon="📝", layout="wide")
 
+st.markdown("""
+<style>
+    /* Aggressively hide native multi-page navigation to minimize load flash */
+    [data-testid="stSidebarNav"], 
+    [data-testid="stSidebarNav"] > ul {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.logo("assets/formlabs_logo.png")
+
 # ===================== DYNAMIC THEME INJECTION =====================
 try:
     from themes import THEMES
@@ -174,11 +188,26 @@ else:
 st.markdown("---")
 
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
+# ===================== SIDEBAR: PROFILE & SETTINGS =====================
 with st.sidebar:
     st.markdown("---")
     st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
+
+    # --- CUSTOM ROUTER MENU ---
+    st.markdown("#### 🗺️ Navigation")
+    st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
+    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝", use_container_width=True)
+    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
+    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️", use_container_width=True)
+    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
+
+    if st.session_state.get("user_role") == "admin":
+        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
+
+    st.markdown("---")
+    # --------------------------
 
     # UNIFIED SETTINGS POPOVER
     with st.popover("⚙️ Account & Preferences", use_container_width=True):
@@ -223,6 +252,7 @@ with st.sidebar:
 
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
+                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")
@@ -259,17 +289,23 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Catch missing cookie errors gracefully
+        # 1. Save the current theme before wiping the session
+        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
+
         try:
+            # 2. Forcing an expired date is much more reliable than just .delete()
+            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
             cookie_manager.delete("formlabs_mes_token")
         except Exception:
             pass
 
-        # 2. Clear authentication and session state
-        st.session_state["authenticated"] = False
+        # 3. Clear memory
         st.session_state.clear()
 
-        # 3. Force immediate redirect to the Home login page
+        # 4. Restore the theme and set a Hard Lockout flag!
+        st.session_state["preferred_theme"] = saved_theme
+        st.session_state["explicitly_logged_out"] = True
+
         st.switch_page("Home.py")
         time.sleep(0.5)
         st.rerun()

@@ -16,6 +16,20 @@ from database import (
 
 st.set_page_config(page_title="IT Admin Console | Formlabs MES", page_icon="🛡️", layout="wide")
 
+st.logo("assets/formlabs_logo.png")
+
+st.markdown("""
+<style>
+    /* Aggressively hide native multi-page navigation to minimize load flash */
+    [data-testid="stSidebarNav"], 
+    [data-testid="stSidebarNav"] > ul {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 try:
     from themes import THEMES
 except ImportError:
@@ -99,8 +113,24 @@ if not st.session_state.get("authenticated", False):
             st.stop()
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 🛡️ {st.session_state.get('user_name', 'IT Admin')}")
-    st.caption(f"Role: `IT ADMIN` | Shift: `{st.session_state.get('user_shift', 'Shift 1')}`")
+    st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
+    st.caption(
+        f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
+
+    # --- CUSTOM ROUTER (NEW) ---
+    st.markdown("#### 🗺️ Navigation")
+    st.page_link("Home.py", label="Live SCADA", icon="⚡")
+    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
+    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
+    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
+    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
+
+    # Only show IT Admin to actual admins
+    if st.session_state.get("user_role") == "admin":
+        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+
+    st.markdown("---")
+    # ---------------------------
 
     # UNIFIED SETTINGS POPOVER
     with st.popover("⚙️ Account & Preferences", use_container_width=True):
@@ -141,6 +171,7 @@ with st.sidebar:
             if chosen_t != current_t:
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
+                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
         # TAB 3: FEEDBACK
@@ -167,12 +198,27 @@ with st.sidebar:
         except FileNotFoundError:
             st.caption("⚠️ CHANGELOG.md file not found in root directory.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Log Out & Clear Device", type="primary", use_container_width=True):
-        cookie_manager.delete("formlabs_mes_token")
+    if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
+        # 1. Save the current theme before wiping the session
+        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
+
+        try:
+            # 2. Forcing an expired date is much more reliable than just .delete()
+            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
+            cookie_manager.delete("formlabs_mes_token")
+        except Exception:
+            pass
+
+        # 3. Clear memory
         st.session_state.clear()
-        time.sleep(0.5)
+
+        # 4. Restore the theme and set a Hard Lockout flag!
+        st.session_state["preferred_theme"] = saved_theme
+        st.session_state["explicitly_logged_out"] = True
+
         st.switch_page("Home.py")
+        time.sleep(0.5)
+        st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
 

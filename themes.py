@@ -4,6 +4,20 @@
 BASE_UI_CSS = """
 <style>
 
+        /* Force zero height and absolute invisibility on the multi-page container */
+[data-testid="stSidebarNav"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    max-height: 0px !important;
+    overflow: hidden !important;
+}
+
+        /* COMPLETELY DISABLE NATIVE SIDEBAR NAVIGATION */
+[data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
     /* HIDE TV DASHBOARD FROM NATIVE SIDEBAR MENU */
     [data-testid="stSidebarNav"] a[href*="Tv_Dashboard"],
     [data-testid="stSidebarNav"] li:has(a[href*="Tv_Dashboard"]) {

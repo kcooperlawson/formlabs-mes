@@ -1,19 +1,12 @@
 import sys
 import os
 import time
-from datetime import datetime, timedelta
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from dotenv import load_dotenv
-
-load_dotenv()
 import streamlit as st
-import base64
-import extra_streamlit_components as stx
+from database import get_all_users_df, create_user, update_user_pin
 
-st.set_page_config(page_title="Manager Work Order Dispatch & Cockpit | Formlabs MES", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Staff Roster | Formlabs MES", page_icon="👥", layout="wide")
 
 st.markdown("""
 <style>
@@ -27,67 +20,50 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ===================== DYNAMIC THEME INJECTION =====================
 try:
     from themes import THEMES
 except ImportError:
     THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Default Dark"), THEMES["Default Dark"]), unsafe_allow_html=True)
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
-if active_theme not in THEMES:
-    active_theme = "Default Dark"
-
-st.markdown(THEMES[active_theme], unsafe_allow_html=True)
-st.logo("assets/formlabs_logo.png")
-
-# --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-cookie_manager = stx.CookieManager(key="mgr_cookies")
-
-if "auth_check_passed" not in st.session_state:
-    st.session_state["auth_check_passed"] = False
-
-if not st.session_state.get("authenticated", False):
-    cached_token = cookie_manager.get(cookie="formlabs_mes_token")
-
-    if cached_token is not None:
-        from database import get_all_users_df
-        df_users = get_all_users_df()
-        user_match = df_users[df_users["username"] == cached_token]
-
-        if not user_match.empty:
-            user_data = user_match.iloc[0]
-            st.session_state["authenticated"] = True
-            st.session_state["user_id"] = int(user_data["id"])
-            st.session_state["user_role"] = user_data["role"]
-            st.session_state["user_name"] = user_data["full_name"]
-            st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
-            st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
-            st.rerun()
-    else:
-        if not st.session_state["auth_check_passed"]:
-            st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
-            st.rerun()
-        else:
-            st.warning("🔒 Session Expired. Please log in.")
-            st.switch_page("Home.py")
-            st.stop()
-
-if st.session_state.get("user_role") not in ["manager", "admin"]:
+if not st.session_state.get("authenticated", False) or st.session_state.get("user_role") not in ["manager", "admin"]:
     st.error("🔒 Access Denied: Restricted to Plant Management.")
     st.stop()
 
-def get_base64_image(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    except FileNotFoundError:
-        return ""
+# ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
+import extra_streamlit_components as stx
+import time
 
-logo_b64 = get_base64_image("assets/formlabs_logo.png")
+# Initialize cookie manager for the logout function
+cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
+current_role = st.session_state.get("user_role", "operator")
 
-# ===================== SIDEBAR: PROFILE & SETTINGS =====================
+# --- TOP NAVIGATION BAR ---
+st.markdown("<br>", unsafe_allow_html=True)
+if current_role == "admin":
+    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
+    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
+    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
+    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
+    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
+    with nav_6: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
+elif current_role == "manager":
+    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
+    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
+    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
+    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
+    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
+else:
+    nav_1, nav_2, nav_3 = st.columns(3, gap="small")
+    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
+    with nav_2: st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
+    with nav_3: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+
+st.markdown("---")
+
+# --- SIDEBAR: PROFILE & SETTINGS ---
 with st.sidebar:
     st.markdown("---")
     st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
@@ -122,12 +98,7 @@ with st.sidebar:
 
                 if st.form_submit_button("💾 Save Credentials", type="primary", use_container_width=True):
                     from database import update_user_credentials
-                    success, msg = update_user_credentials(
-                        user_id=st.session_state["user_id"],
-                        new_username=acc_user,
-                        new_pin=acc_pin,
-                        new_fullname=acc_name
-                    )
+                    success, msg = update_user_credentials(st.session_state["user_id"], acc_user, acc_pin, acc_name)
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
@@ -172,7 +143,8 @@ with st.sidebar:
                         st.success("✅ Submitted to IT Admin!")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.session_state.get("user_role") in ["admin", "manager"]:
+
+    if current_role in ["admin", "manager"]:
         st.page_link("pages/Tv_Dashboard.py", label="Launch TV Mode", icon="📺", use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -198,51 +170,51 @@ with st.sidebar:
         time.sleep(0.5)
         st.rerun()
 
-# ===================== ROLE-BASED TOP NAVIGATION =====================
-current_role = st.session_state.get("user_role", "operator")
+st.subheader("👥 Floor Personnel Administration (Manager Access)")
+st.info("💡 **Security Notice:** Managers can provision and manage Floor Personnel. IT Admins manage management accounts and terminations.")
+
+df_users = get_all_users_df()
+u_col1, u_col2 = st.columns((1, 2.5))
+
+with u_col1:
+    st.markdown("#### ➕ Provision Floor Personnel")
+    with st.form("mgr_create_user_form", clear_on_submit=True):
+        new_fullname = st.text_input("Full Name")
+        new_email = st.text_input("Work Email")
+        new_username = st.text_input("Username / ID")
+        new_pin = st.text_input("PIN / Password", type="password")
+        new_role = st.selectbox("Role", ("Operator", "Packer"))
+        new_shift = st.selectbox("Assigned Shift", ("Shift 1", "Shift 2", "Floater"))
+        new_target = st.number_input("Target Rate (L/h)", value=400.0, step=10.0)
+
+        if st.form_submit_button("Create Personnel", type="primary", use_container_width=True):
+            if create_user(new_username, new_email, new_pin, new_fullname, new_role.lower(), float(new_target), new_shift):
+                st.success("✅ Account created successfully!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("❌ Username or email already exists.")
+
+with u_col2:
+    st.markdown("#### 📋 Floor Roster")
+    if not df_users.empty:
+        floor_df = df_users[df_users["role"].isin(["operator", "packer"])]
+        if not floor_df.empty:
+            st.markdown(f'<div style="overflow-x: auto;">{floor_df[["id", "full_name", "username", "role", "shift"]].to_html(index=False)}</div>', unsafe_allow_html=True)
+        else:
+            st.caption("No floor personnel found.")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
 
-st.markdown("---")
-
-st.markdown(f"""
-<div style="display:flex; align-items:center; margin-bottom: 5px;">
-    <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain; margin-right: 15px;">
-    <h1 style="margin:0; padding:0; font-size: 2.2rem;">📊 Plant Manager Operations & Work Order Dispatch</h1>
-</div>
-""", unsafe_allow_html=True)
-st.caption("Select a Management Module below to access isolated operations.")
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ===================== GHOST PAGE LAUNCHPAD =====================
-col1, col2, col3 = st.columns(3, gap="medium")
-
-with col1:
-    st.page_link("pages/Mgr_Assigned_Runs.py", label="🎯 Work Orders & Assigned Runs", use_container_width=True)
-    st.page_link("pages/Mgr_Resin_Canvas.py", label="⚖️ Master Resin Specifications", use_container_width=True)
-    st.page_link("pages/Mgr_Scrap_Intel.py", label="📊 Scrap & Yield Intelligence", use_container_width=True)
-
-with col2:
-    st.page_link("pages/Mgr_Cleanliness.py", label="📸 Cleanliness & Photo Audits", use_container_width=True)
-    st.page_link("pages/Mgr_Historical.py", label="📈 Historical Production Trends", use_container_width=True)
-    st.page_link("pages/Mgr_Floor_Comms.py", label="💬 Floor Communications", use_container_width=True)
-
-with col3:
-    st.page_link("pages/Mgr_Roster.py", label="👥 Floor Staff Roster", use_container_width=True)
-    st.page_link("pages/Mgr_Google_Sync.py", label="☁️ Google Cloud Sheets Sync", use_container_width=True)
-    st.page_link("pages/Mgr_Shift_Handover.py", label="📤 PDF Shift Handover", use_container_width=True)
+with st.expander("🔑 Reset Floor Operator PIN", expanded=False):
+    if not df_users.empty:
+        floor_df = df_users[df_users["role"].isin(["operator", "packer"])]
+        if not floor_df.empty:
+            target_user = st.selectbox("Select Personnel", floor_df["username"].tolist(), key="mgr_rst_usr")
+            new_temp_pin = st.text_input("New PIN", type="password", key="mgr_rst_pin")
+            if st.button("💾 Reset PIN", type="primary"):
+                user_row = floor_df[floor_df["username"] == target_user].iloc[0]
+                update_user_pin(int(user_row["id"]), new_temp_pin)
+                st.success(f"✅ PIN updated for '{target_user}'.")
+                time.sleep(1)
+                st.rerun()
