@@ -671,14 +671,7 @@ projected_total = liters_output + (blended_rate * remaining_hours)
 
 # ===================== ROLE-BASED VIEW TOGGLE =====================
 current_role = st.session_state.get("user_role", "operator")
-# --- EMERGENCY RESET BUTTON (TEMPORARY) ---
-if st.button("🚨 EMERGENCY LOGOUT & RESET APP", type="primary", use_container_width=True):
-    cookie_manager.delete("formlabs_mes_token")
-    st.session_state.clear()
-    import time
-    time.sleep(1)
-    st.rerun()
-# ------------------------------------------
+
 settings = get_plant_settings()
 packing_enabled = settings.get("enable_packing", True)
 

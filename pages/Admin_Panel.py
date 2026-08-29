@@ -99,8 +99,65 @@ if not st.session_state.get("authenticated", False):
             st.stop()
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 🛡️ {st.session_state.get('user_name')}")
-    st.caption(f"Role: `IT ADMIN`")
+    st.markdown(f"### 🛡️ {st.session_state.get('user_name', 'IT Admin')}")
+    st.caption(f"Role: `IT ADMIN` | Shift: `{st.session_state.get('user_shift', 'Shift 1')}`")
+
+    # UNIFIED SETTINGS POPOVER
+    with st.popover("⚙️ Account & Preferences", use_container_width=True):
+        set_tab1, set_tab2, set_tab3 = st.tabs(["🔑 Security", "🎨 Theme & Avatar", "💡 Feedback"])
+
+        # TAB 1: USERNAME & PIN
+        with set_tab1:
+            st.markdown("#### Update Account Credentials")
+            with st.form("admin_user_cred_form"):
+                acc_name = st.text_input("Full Display Name", value=st.session_state.get("user_name", ""))
+                acc_user = st.text_input("Username / ID", value=st.session_state.get("username", ""))
+                acc_pin = st.text_input("New PIN / Password", type="password", placeholder="Leave blank to keep current PIN")
+
+                if st.form_submit_button("💾 Save Credentials", type="primary", use_container_width=True):
+                    from database import update_user_credentials
+                    success, msg = update_user_credentials(
+                        user_id=st.session_state["user_id"],
+                        new_username=acc_user,
+                        new_pin=acc_pin,
+                        new_fullname=acc_name
+                    )
+                    if success:
+                        st.session_state["user_name"] = acc_name.strip()
+                        st.session_state["username"] = acc_user.lower().strip()
+                        st.success(f"✅ {msg}")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {msg}")
+
+        # TAB 2: THEME & AVATAR
+        with set_tab2:
+            st.markdown("#### Interface Preferences")
+            current_t = st.session_state.get("preferred_theme", "Default Dark")
+            chosen_t = st.selectbox("System Theme", list(THEMES.keys()),
+                                    index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
+
+            if chosen_t != current_t:
+                update_user_theme(st.session_state["user_id"], chosen_t)
+                st.session_state["preferred_theme"] = chosen_t
+                st.rerun()
+
+        # TAB 3: FEEDBACK
+        with set_tab3:
+            st.markdown("#### Universal Feedback Box")
+            with st.form("admin_sug_form", clear_on_submit=True):
+                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue", "General Feedback"))
+                s_txt = st.text_area("Observation / Description")
+                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
+                    if s_txt.strip():
+                        add_suggestion(
+                            user_name=st.session_state.get("user_name", "Anonymous"),
+                            user_role=st.session_state.get("user_role", "admin"),
+                            category=s_cat,
+                            suggestion=s_txt
+                        )
+                        st.success("✅ Submitted to IT Admin Inbox!")
 
     # --- SYSTEM CHANGELOG ---
     with st.popover("📜 System Changelog", use_container_width=True):
@@ -110,44 +167,6 @@ with st.sidebar:
         except FileNotFoundError:
             st.caption("⚠️ CHANGELOG.md file not found in root directory.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("**🎨 System Theme**")
-    current = st.session_state.get("preferred_theme", "Default Dark")
-
-    chosen_theme = st.selectbox(
-        "Select Interface Theme",
-        list(THEMES.keys()),
-        index=list(THEMES.keys()).index(current) if current in THEMES else 0,
-        label_visibility="collapsed",
-        key="admin_theme_select"
-    )
-    if chosen_theme != current:
-        update_user_theme(st.session_state["user_id"], chosen_theme)
-        st.session_state["preferred_theme"] = chosen_theme
-        st.rerun()
-        # --- UNIVERSAL SUGGESTION & ISSUE BOX ---
-        with st.popover("💡 Submit Suggestion / Issue", use_container_width=True):
-            st.markdown("#### 💡 Floor Feedback & Issue Reporting")
-            st.caption("Noticed a bug, safety concern, or feature idea? Submit it directly to IT & Management.")
-            with st.form("sidebar_suggestion_form", clear_on_submit=True):
-                sug_category = st.selectbox("Category",
-                                            ("Feature Request", "App Bug / Error", "Plant Floor / Safety Issue",
-                                             "General Feedback"))
-                sug_text = st.text_area("Description / Observation",
-                                        placeholder="Describe your idea or the issue you noticed...")
-                if st.form_submit_button("🚀 Submit to IT Admin", type="primary", use_container_width=True):
-                    if sug_text.strip():
-                        from database import add_suggestion
-
-                        add_suggestion(
-                            user_name=st.session_state.get("user_name", "Anonymous"),
-                            user_role=st.session_state.get("user_role", "operator"),
-                            category=sug_category,
-                            suggestion=sug_text
-                        )
-                        st.success("✅ Feedback sent directly to IT Admin!")
-                    else:
-                        st.warning("⚠️ Please provide a description.")
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True):
         cookie_manager.delete("formlabs_mes_token")
