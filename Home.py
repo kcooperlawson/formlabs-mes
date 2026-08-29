@@ -5,6 +5,10 @@ import pandas as pd
 import streamlit as st
 import extra_streamlit_components as stx
 from dotenv import load_dotenv
+
+from db_core import ScopedSession
+from models import Reactor
+
 load_dotenv()
 from database import (
     authenticate_user,
@@ -98,7 +102,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.5.2"
+APP_VERSION = "PT-V3.6.0"
 
 st.set_page_config(
     page_title="Formlabs MES Live Dashboard",
@@ -161,7 +165,11 @@ if not st.session_state["authenticated"] and cached_token is not None:
         st.session_state["user_name"] = user_data["full_name"]
         st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
         st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-        st.rerun()
+        # --- NEW REDIRECT LOGIC ---
+        if user_data["role"] in ["operator", "packer"]:
+            st.switch_page("pages/Operator_Form.py")
+        else:
+            st.rerun()
 
 
 if not st.session_state["authenticated"]:
@@ -201,9 +209,7 @@ if not st.session_state["authenticated"]:
                                                   help="Checking this keeps you logged in for 30 days. Do not use on shared tablets.")
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                    if st.form_submit_button(
-                            "INITIALIZE SESSION", type="primary", use_container_width=True
-                    ):
+                    if st.form_submit_button("INITIALIZE SESSION", type="primary", use_container_width=True):
                         user = authenticate_user(log_user, log_pin)
                         if user:
                             # Capture theme from user profile and set theme cookie
@@ -211,14 +217,11 @@ if not st.session_state["authenticated"]:
                             cookie_manager.set("formlabs_mes_theme", user_theme,
                                                expires_at=datetime.now() + timedelta(days=30), key="set_theme_cookie")
 
-
                             # ONLY SET COOKIE IF CHECKBOX IS TICKED
                             if remember_device:
-
                                 cookie_manager.set("formlabs_mes_token", user["username"],
                                                    expires_at=datetime.now() + timedelta(days=30),
                                                    key="set_token_cookie")
-                                time.sleep(1.2)  # Give browser time to save the cookie
 
                             st.session_state["authenticated"] = True
                             st.session_state["user_id"] = user["id"]
@@ -227,82 +230,75 @@ if not st.session_state["authenticated"]:
                             st.session_state["user_shift"] = user.get("shift", "Shift 1")
                             st.session_state["preferred_theme"] = user_theme
 
-                            st.rerun()
+                            # --- NEW REDIRECT LOGIC ---
+                            if user["role"] in ["operator", "packer"]:
+                                st.switch_page("pages/Operator_Form.py")
+                            else:
+                                st.rerun()
                         else:
                             st.error("❌ Authorization Denied: Invalid Credentials.")
 
-                            with reg_tab:
-                                with st.form("register_form", clear_on_submit=True):
-                                    reg_name = st.text_input("FULL NAME")
-                                    reg_email = st.text_input("WORK EMAIL", placeholder="e.g. user@company.com")
-                                    reg_user = st.text_input("DESIRED OPERATOR ID")
-                                    reg_pin = st.text_input("CREATE SECURITY PIN", type="password")
-                                    reg_col1, reg_col2 = st.columns(2)
-                                    with reg_col1:
-                                        reg_role = st.selectbox("ASSIGNED ROLE", ("Operator", "Packer"))
-                                    with reg_col2:
-                                        reg_shift = st.selectbox(
-                                            "ASSIGNED SHIFT", ("Shift 1", "Shift 2", "Floater")
-                                        )
+            # Look how reg_tab is now properly aligned with log_tab!
+            with reg_tab:
+                with st.form("register_form", clear_on_submit=True):
+                    reg_name = st.text_input("FULL NAME")
+                    reg_email = st.text_input("WORK EMAIL", placeholder="e.g. user@company.com")
+                    reg_user = st.text_input("DESIRED OPERATOR ID")
+                    reg_pin = st.text_input("CREATE SECURITY PIN", type="password")
+                    reg_col1, reg_col2 = st.columns(2)
+                    with reg_col1:
+                        reg_role = st.selectbox("ASSIGNED ROLE", ("Operator", "Packer", "Manager", "Admin"))
+                    with reg_col2:
+                        reg_shift = st.selectbox(
+                            "ASSIGNED SHIFT", ("Shift 1", "Shift 2", "Floater")
+                        )
 
-                                    st.markdown("<br>", unsafe_allow_html=True)
-                                    if st.form_submit_button(
-                                            "REGISTER & AUTHENTICATE", type="primary", use_container_width=True
-                                    ):
-                                        if "@" not in reg_email or "." not in reg_email:
-                                            st.error("⚠️ Invalid email address format.")
-                                        elif (
-                                                reg_name.strip()
-                                                and reg_user.strip()
-                                                and reg_pin.strip()
-                                                and reg_email.strip()
-                                        ):
-                                            success = create_user(
-                                                username=reg_user,
-                                                email=reg_email,
-                                                pin=reg_pin,
-                                                full_name=reg_name,
-                                                role=reg_role.lower(),
-                                                target_lph=400.0,
-                                                shift=reg_shift,
-                                                theme="Default Dark"
-                                            )
-                                            if success:
-                                                st.success("✅ Credentials logged! You may now sign in.")
-                                            else:
-                                                st.error("❌ Operator ID or email is already registered.")
-                                        else:
-                                            st.warning("⚠️ All clearance fields are required.")
-
-                        # --- OUT OF SIGHT THEME SELECTOR ---
-                        # Now properly aligned OUTSIDE the tabs!
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        with st.expander("🎨 Login Screen Appearance", expanded=False):
-
-                            # 1. We create a dedicated function to handle the theme change instantly
-                            def update_unauth_theme():
-                                new_theme = st.session_state.unauth_theme_selector
-                                cookie_manager.set("formlabs_mes_theme", new_theme,
-                                                   expires_at=datetime.now() + timedelta(days=365),
-                                                   key="set_theme_unauth")
-                                st.session_state["preferred_theme"] = new_theme
-                                st.session_state["theme_just_changed"] = True
-                                time.sleep(0.3)
-
-
-                            # 2. We bind the selectbox to the callback function using 'on_change'
-                            st.selectbox(
-                                "Select Theme",
-                                list(THEMES.keys()),
-                                index=list(THEMES.keys()).index(active_theme) if active_theme in THEMES else 0,
-                                label_visibility="collapsed",
-                                key="unauth_theme_selector",
-                                on_change=update_unauth_theme
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.form_submit_button("REGISTER & AUTHENTICATE", type="primary", use_container_width=True):
+                        if "@" not in reg_email or "." not in reg_email:
+                            st.error("⚠️ Invalid email address format.")
+                        elif reg_name.strip() and reg_user.strip() and reg_pin.strip() and reg_email.strip():
+                            success = create_user(
+                                username=reg_user,
+                                email=reg_email,
+                                pin=reg_pin,
+                                full_name=reg_name,
+                                role=reg_role.lower(),
+                                target_lph=400.0,
+                                shift=reg_shift,
+                                theme="Default Dark"
                             )
+                            if success:
+                                st.success("✅ Credentials logged! You may now sign in.")
+                            else:
+                                st.error("❌ Operator ID or email is already registered.")
+                        else:
+                            st.warning("⚠️ All clearance fields are required.")
 
-                # --- CRITICAL FIX: STOP THE PAGE FROM RENDERING ---
-                # Now aligned to fire EVERY time the user is not authenticated!
-                st.stop()
+        # --- OUT OF SIGHT THEME SELECTOR ---
+        # Look how it's completely outside the forms and tabs now!
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("🎨 Login Screen Appearance", expanded=False):
+
+            def update_unauth_theme():
+                new_theme = st.session_state.unauth_theme_selector
+                cookie_manager.set("formlabs_mes_theme", new_theme,
+                                   expires_at=datetime.now() + timedelta(days=365),
+                                   key="set_theme_unauth")
+                st.session_state["preferred_theme"] = new_theme
+                st.session_state["theme_just_changed"] = True
+
+            st.selectbox(
+                "Select Theme",
+                list(THEMES.keys()),
+                index=list(THEMES.keys()).index(active_theme) if active_theme in THEMES else 0,
+                label_visibility="collapsed",
+                key="unauth_theme_selector",
+                on_change=update_unauth_theme
+            )
+
+        # --- CRITICAL FIX: STOP THE PAGE FROM RENDERING ---
+        st.stop()
 
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
@@ -355,20 +351,23 @@ with st.sidebar:
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
-    # --- CUSTOM ROUTER (NEW) ---
+    # --- CUSTOM ROUTER MENU ---
     st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
+    st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
+    st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
+    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️", use_container_width=True)
 
-    # Only show IT Admin to actual admins
+    # Only show Manager and Analytics to Managers/Admins
+    if st.session_state.get("user_role") in ["manager", "admin"]:
+        st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
+        st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
+
+    # Only show IT Admin to Admins
     if st.session_state.get("user_role") == "admin":
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
 
     st.markdown("---")
-    # ---------------------------
+    # --------------------------
 
     # UNIFIED SETTINGS POPOVER
     with st.popover("⚙️ Account & Preferences", use_container_width=True):
@@ -387,8 +386,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -412,8 +410,7 @@ with st.sidebar:
                 if new_avatar:
                     from database import update_user_avatar
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         with set_tab3:
@@ -452,7 +449,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 

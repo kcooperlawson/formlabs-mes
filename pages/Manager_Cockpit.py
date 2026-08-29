@@ -1,17 +1,20 @@
-import sys
 import os
-import time
-from datetime import datetime, timedelta
+import sys
+import base64
+from datetime import datetime, date, timedelta
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import pandas as pd
+import streamlit as st
+import extra_streamlit_components as stx
 from dotenv import load_dotenv
 
 load_dotenv()
-import streamlit as st
-import base64
-import extra_streamlit_components as stx
+
+# --- SYSTEM PATH ENFORCEMENT ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 
 st.set_page_config(page_title="Manager Work Order Dispatch & Cockpit | Formlabs MES", page_icon="📊", layout="wide")
 
@@ -62,12 +65,10 @@ if not st.session_state.get("authenticated", False):
             st.session_state["user_name"] = user_data["full_name"]
             st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
             st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
             st.rerun()
     else:
         if not st.session_state["auth_check_passed"]:
             st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
             st.rerun()
         else:
             st.warning("🔒 Session Expired. Please log in.")
@@ -131,8 +132,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -156,8 +156,7 @@ with st.sidebar:
                 if new_avatar:
                     from database import update_user_avatar
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         with set_tab3:
@@ -195,7 +194,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 # ===================== ROLE-BASED TOP NAVIGATION =====================

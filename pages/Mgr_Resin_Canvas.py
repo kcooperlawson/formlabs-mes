@@ -1,10 +1,14 @@
-import sys
 import os
-import time
+import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import streamlit as st
+
 import pandas as pd
+import streamlit as st
+
+# --- SYSTEM PATH ENFORCEMENT ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import get_all_resin_specs_df, add_resin_spec, bulk_update_resin_specs, delete_resin_spec
 
 st.set_page_config(page_title="Resin Specifications | Formlabs MES", page_icon="⚖️", layout="wide")
@@ -33,7 +37,7 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 import extra_streamlit_components as stx
-import time
+
 
 # Initialize cookie manager for the logout function
 cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
@@ -103,8 +107,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -128,8 +131,7 @@ with st.sidebar:
                 if new_avatar:
                     from database import update_user_avatar
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         with set_tab3:
@@ -171,7 +173,7 @@ with st.sidebar:
 
 st.subheader("⚖️ Formlabs Master Resin Specification Lookup Table")
 
-with st.expander("➕ Add New Proprietary Resin Formulation", expanded=False):
+with (st.expander("➕ Add New Proprietary Resin Formulation", expanded=False)):
     with st.form("add_new_resin_form", clear_on_submit=True):
         a_c1, a_c2, a_c3 = st.columns(3)
         with a_c1:
@@ -188,8 +190,7 @@ with st.expander("➕ Add New Proprietary Resin Formulation", expanded=False):
         if st.form_submit_button("💾 Save New Resin to Database", type="primary", use_container_width=True):
             if new_resin_name.strip():
                 if add_resin_spec(new_cart_type, new_sku, new_code, new_resin_name, new_target_g, new_min_g, new_max_g):
-                    st.success(f"✅ Successfully registered '{new_resin_name}'!")
-                    time.sleep(1)
+                    st.toast(f"✅ Successfully registered '{new_resin_name}'!")
                     st.rerun()
                 else:
                     st.error("❌ Failed to add resin. Check for duplicate names.")
@@ -258,6 +259,5 @@ with st.expander("✏️ Edit or Delete Resin Specifications"):
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button(f"🗑️ Delete {selected_spec_name}", type="primary", use_container_width=True):
                 delete_resin_spec(spec_id)
-                st.success(f"Deleted '{selected_spec_name}'!")
-                time.sleep(1)
+                st.toast(f"Deleted '{selected_spec_name}'!")
                 st.rerun()

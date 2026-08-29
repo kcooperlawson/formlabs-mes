@@ -1,6 +1,5 @@
 import sys
 import os
-import time
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -40,7 +39,6 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 import extra_streamlit_components as stx
-import time
 
 # Initialize cookie manager for the logout function
 cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
@@ -110,8 +108,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -135,8 +132,7 @@ with st.sidebar:
                 if new_avatar:
                     from database import update_user_avatar
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         with set_tab3:
@@ -175,7 +171,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 st.subheader("🎯 Fleet Production Progress & Work Order Dispatch")
@@ -274,8 +269,7 @@ with st.expander("➕ Create & Assign New Work Order", expanded=True):
                 pump_station=assigned_pump, lot_number=lot_number, notes=run_notes, status=status_code,
                 run_type=run_type_selection
             )
-            st.success(f"✅ Dispatched {selected_resin}!")
-            time.sleep(1)
+            st.toast(f"✅ Dispatched {selected_resin}!")
             st.rerun()
 
 active_tab, completed_tab = st.tabs(["🚀 Active & Queued Runs", "✅ Completed Work Orders"])
@@ -287,7 +281,7 @@ with active_tab:
     with h_col2:
         if st.button("🔄 Sync Progress with Logs", use_container_width=True):
             sync_all_runs_with_logs()
-            st.success("✅ Synchronized run progress with production logs!")
+            st.toast("✅ Synchronized run progress with production logs!")
             st.rerun()
 
     active_df = df_runs[df_runs["status"] != "Done"] if not df_runs.empty else pd.DataFrame()

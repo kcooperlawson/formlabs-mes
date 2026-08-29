@@ -1,6 +1,5 @@
 import sys
 import os
-import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 
 import streamlit as st
@@ -42,7 +41,7 @@ st.markdown("""
 import extra_streamlit_components as stx
 cookie_manager = stx.CookieManager(key="tv_cookies")
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-import extra_streamlit_components as stx
+
 
 # Initialize our double-take flag
 if "auth_check_passed" not in st.session_state:
@@ -65,13 +64,11 @@ if not st.session_state.get("authenticated", False):
             st.session_state["user_name"] = user_data["full_name"]
             st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
             st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
             st.rerun()
     else:
         # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
         if not st.session_state["auth_check_passed"]:
             st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
             st.rerun()
         else:
             # If it checked twice and STILL no cookie, they are truly logged out.
@@ -176,8 +173,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -205,8 +201,7 @@ with st.sidebar:
                     from database import update_user_avatar
 
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         # TAB 3: FEEDBACK & CHANGELOG
@@ -249,7 +244,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 
@@ -524,8 +518,6 @@ with b3:
         st.info("No Work Orders configured.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-import time
 
 # Wait 10 seconds, then force the entire script to run again from top to bottom
-time.sleep(10)
 st.rerun()

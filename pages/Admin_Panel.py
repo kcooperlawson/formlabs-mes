@@ -1,13 +1,16 @@
-import sys
 import os
-import time
-from datetime import date
+import sys
+import base64
+from datetime import datetime, date, timedelta
+
 import pandas as pd
 import streamlit as st
 import extra_streamlit_components as stx
-import base64
 
+# --- SYSTEM PATH ENFORCEMENT ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import (
     get_all_users_df, create_user, update_user_role_and_shift, update_user_pin, delete_user_by_username,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
@@ -52,7 +55,6 @@ if not st.session_state.get("authenticated", False):
                 {"authenticated": True, "user_id": int(ud["id"]), "user_role": ud["role"], "user_name": ud["full_name"],
                  "user_shift": ud.get("shift", "Shift 1"),
                  "preferred_theme": ud.get("preferred_theme", "Default Dark")})
-            time.sleep(0.5)
             st.rerun()
 
 if not st.session_state.get("authenticated", False):
@@ -73,7 +75,7 @@ def get_base64_image(image_path):
 
 logo_b64 = get_base64_image("assets/formlabs_logo.png")
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-import extra_streamlit_components as stx
+
 
 cookie_manager = stx.CookieManager(key="adm_cookies")
 
@@ -98,13 +100,11 @@ if not st.session_state.get("authenticated", False):
             st.session_state["user_name"] = user_data["full_name"]
             st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
             st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
             st.rerun()
     else:
         # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
         if not st.session_state["auth_check_passed"]:
             st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
             st.rerun()
         else:
             # If it checked twice and STILL no cookie, they are truly logged out.
@@ -156,7 +156,6 @@ with st.sidebar:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
                         st.success(f"✅ {msg}")
-                        time.sleep(1)
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -217,7 +216,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -269,8 +267,7 @@ with tab_roster:
             if st.form_submit_button("Create Account", type="primary", use_container_width=True):
                 if create_user(new_username, new_email, new_pin, new_fullname, new_role.lower(), float(new_target),
                                new_shift):
-                    st.success("✅ Account created successfully!")
-                    time.sleep(1)
+                    st.toast("✅ Account created successfully!")
                     st.rerun()
                 else:
                     st.error("❌ Username or email already exists.")
@@ -291,8 +288,7 @@ with tab_roster:
             if st.button("💾 Apply Changes", type="primary"):
                 user_row = df_users[df_users["username"] == modify_user].iloc[0]
                 update_user_role_and_shift(int(user_row["id"]), mod_role, mod_shift)
-                st.success(f"✅ Updated '{modify_user}'!")
-                time.sleep(1)
+                st.toast(f"✅ Updated '{modify_user}'!")
                 st.rerun()
 
     with st.expander("🔑 Reset User PIN", expanded=False):
@@ -302,8 +298,7 @@ with tab_roster:
             if st.button("💾 Reset PIN", type="primary"):
                 user_row = df_users[df_users["username"] == target_user].iloc[0]
                 update_user_pin(int(user_row["id"]), new_temp_pin)
-                st.success(f"✅ PIN updated for '{target_user}'.")
-                time.sleep(1)
+                st.toast(f"✅ PIN updated for '{target_user}'.")
                 st.rerun()
 
     with st.expander("⚠️ Terminate Account", expanded=False):
@@ -313,8 +308,7 @@ with tab_roster:
                 if user_to_delete == st.session_state.get("username"):
                     st.error("You cannot delete your own admin account!")
                 elif delete_user_by_username(user_to_delete):
-                    st.success(f"✅ User '{user_to_delete}' removed.")
-                    time.sleep(1)
+                    st.toast(f"✅ User '{user_to_delete}' removed.")
                     st.rerun()
 
 with tab_db:
@@ -336,8 +330,7 @@ with tab_db:
                                cartridge_type="V2", resin_type="WIP Clear", lot_number=f"WIP-CLR-{today_str}",
                                bottles=current_wip, scrap_empty=0, scrap_filled=0,
                                notes="System auto-generated packing log to clear Floor WIP.", log_type="Packing Count")
-                st.success(f"✅ Cleared {current_wip} units!")
-                time.sleep(1)
+                st.toast(f"✅ Cleared {current_wip} units!")
                 st.rerun()
         else:
             st.success("Floor WIP is already balanced at 0.")
@@ -358,8 +351,7 @@ with tab_db:
                 selected_backup = st.selectbox("Select Backup", sorted(backup_files, reverse=True))
                 if st.button("🔄 Restore Database", type="secondary", use_container_width=True):
                     if restore_database_backup(selected_backup):
-                        st.success(f"✅ Restored from `{selected_backup}`!")
-                        time.sleep(1)
+                        st.toast(f"✅ Restored from `{selected_backup}`!")
                         st.rerun()
                     else:
                         st.error("❌ Restoration failed.")
@@ -410,8 +402,7 @@ with tab_settings:
                 "handover_emails": emails
             }
             update_plant_settings(update_dict)
-            st.success("✅ Plant settings updated globally!")
-            time.sleep(1)
+            st.toast("✅ Plant settings updated globally!")
             st.rerun()
 
     st.markdown("---")
@@ -432,8 +423,7 @@ with tab_settings:
                     from database import add_reactor
 
                     add_reactor(new_r_name, new_r_cap)
-                    st.success(f"✅ Added {new_r_name}!")
-                    time.sleep(0.5)
+                    st.toast(f"✅ Added {new_r_name}!")
                     st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -466,8 +456,7 @@ with tab_settings:
                     from database import add_pump_station
 
                     add_pump_station(new_p_name)
-                    st.success(f"✅ Added {new_p_name}!")
-                    time.sleep(0.5)
+                    st.toast(f"✅ Added {new_p_name}!")
                     st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -504,8 +493,7 @@ with tab_settings:
                     from database import add_downtime_reason
 
                     add_downtime_reason(new_dt_name)
-                    st.success("✅ Added code!")
-                    time.sleep(0.5)
+                    st.toast("✅ Added code!")
                     st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -577,8 +565,7 @@ with tab_sug:
                     with btn_col1:
                         if st.button("💾 Save", key=f"save_sug_{row['id']}", use_container_width=True):
                             update_suggestion_status(row["id"], new_st, a_notes)
-                            st.success("Updated!")
-                            time.sleep(0.5)
+                            st.toast("Updated!")
                             st.rerun()
                     with btn_col2:
                         if st.button("🗑️", key=f"del_sug_{row['id']}", use_container_width=True):

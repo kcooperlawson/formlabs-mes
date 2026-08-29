@@ -6,8 +6,7 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
-import time
+from datetime import datetime, date, timedelta
 
 # --- NEW IMPORTS FOR ANIMATION ---
 from streamlit_lottie import st_lottie
@@ -121,13 +120,11 @@ if not st.session_state.get("authenticated", False):
             st.session_state["user_name"] = user_data["full_name"]
             st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
             st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
             st.rerun()
     else:
         # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
         if not st.session_state["auth_check_passed"]:
             st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
             st.rerun()
         else:
             # If it checked twice and STILL no cookie, they are truly logged out.
@@ -198,11 +195,15 @@ with st.sidebar:
     # --- CUSTOM ROUTER MENU ---
     st.markdown("#### 🗺️ Navigation")
     st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝", use_container_width=True)
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
+    st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
     st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️", use_container_width=True)
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
 
+    # Only show Manager and Analytics to Managers/Admins
+    if st.session_state.get("user_role") in ["manager", "admin"]:
+        st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
+        st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
+
+    # Only show IT Admin to Admins
     if st.session_state.get("user_role") == "admin":
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
 
@@ -234,8 +235,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -263,8 +263,7 @@ with st.sidebar:
                     from database import update_user_avatar
 
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         # TAB 3: FEEDBACK & CHANGELOG
@@ -279,7 +278,7 @@ with st.sidebar:
 
                         add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat,
                                        s_txt)
-                        st.success("✅ Submitted to IT Admin!")
+                        st.toast("✅ Submitted to IT Admin!")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -307,7 +306,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 
@@ -376,29 +374,98 @@ if current_role in ["operator", "packer"]:
         st.info(
             f"Welcome, {current_user}. Please complete your mandatory startup checklist for **{current_shift}** before accessing the production modules.")
 
-        with st.form("startup_checklist_form"):
-            st.markdown("### 📋 Daily Startup Checklist")
+        # --- NEW: Cookie Check to survive page refreshes ---
+        clean_cookie_name = f"clean_chk_{current_user.replace(' ', '')}"
 
-            # The Checklist Items
+        # If the cookie has today's date, they already submitted the photo!
+        if cookie_manager.get(clean_cookie_name) == str(date.today()):
+            st.session_state["pre_shift_clean_done"] = True
+        elif "pre_shift_clean_done" not in st.session_state:
+            st.session_state["pre_shift_clean_done"] = False
+
+        st.markdown("### 📋 Daily Startup Checklist")
+
+        # --- STEP 1: THE AUTO-CHECK (CLEANLINESS AUDIT) ---
+        if not st.session_state["pre_shift_clean_done"]:
+            with st.expander("📸 Step 1: Perform & Submit Morning Cleanliness Check", expanded=True):
+                st.caption("Submit your start-of-shift photo audit here to satisfy this requirement.")
+
+                active_pumps_list = get_active_pumps()
+                audit_station = st.selectbox("Assigned Pump / Workstation", active_pumps_list, key="pre_pump")
+                audit_notes = st.text_area("Observations", placeholder="Station clean, ready for shift.",
+                                           key="pre_notes")
+
+                photo_method = st.radio("Photo Input Method", ("Take Live Camera Photo", "Upload Image File"),
+                                        horizontal=True, key="pre_photo_rad")
+                up_photo = None
+
+                if photo_method == "Upload Image File":
+                    up_photo = st.file_uploader("Upload station photo", type=["png", "jpg", "jpeg", "webp"],
+                                                key="pre_upload")
+                else:
+                    up_photo = st.camera_input("Capture live photo", key="pre_cam")
+
+                if st.button("💾 Submit Cleanliness Report", type="primary", use_container_width=True):
+                    if up_photo is not None:
+                        add_cleanliness_audit(
+                            audit_type="Start Of Shift (Cleanliness Check)",
+                            operator_name=current_user,
+                            pump_station=audit_station,
+                            shift=current_shift,
+                            resin_type="",
+                            notes=audit_notes,
+                            is_spill=False,
+                            uploaded_file=up_photo
+                        )
+                        # Flip the flag and save the cookie for today!
+                        from datetime import timedelta
+
+                        st.session_state["pre_shift_clean_done"] = True
+                        cookie_manager.set(clean_cookie_name, str(date.today()),
+                                           expires_at=datetime.now() + timedelta(hours=12))
+
+                        st.toast("✅ Cleanliness Audit successfully recorded!")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ A photo is required for the pre-shift audit.")
+        else:
+            # The Auto-Check Success State!
+            st.toast("✅ **Step 1: Morning Cleanliness Check — LOGGED & COMPLETED**")
+
+        # --- STEP 2: MANUAL CHECKS & FINAL UNLOCK ---
+        with st.form("startup_checklist_form"):
+            st.markdown("#### Step 2: Final Verification")
+
+            # 1. Universal QR Check
             qr_check = st.checkbox("📱 I have scanned the daily station QR Code and submitted the external checksheet.")
-            clean_check = st.checkbox("🧹 I have performed the Morning Cleanliness Check on my assigned workspace.")
-            mat_check = st.checkbox(
-                "📦 I have verified all labels, boxes, and necessary materials are staged for my run. (Placeholder)")
+
+            # 2. Dynamic Material Check based on Role
+            if current_role == "packer":
+                mat_text = "📦 I have verified all labels, boxes, and necessary materials are staged for my pack-out run."
+            else:
+                mat_text = "🛒 I have verified all bins of empty cartridges and receiving carts for filled bottles are staged for my run."
+
+            mat_check = st.checkbox(mat_text)
 
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("✅ Submit Validation & Unlock Terminal", type="primary", use_container_width=True):
-                # Verify ALL boxes are checked
-                if qr_check and clean_check and mat_check:
-                    submit_daily_checklist(current_user, current_shift)
-                    st.success("✅ Startup checklist recorded! Unlocking systems...")
-                    time.sleep(1.2)
-                    st.rerun()
+            if st.form_submit_button("🔓 Submit Validation & Unlock Terminal", type="primary", use_container_width=True):
+                # Verify ALL manual boxes are checked AND the auto-check is done
+                if qr_check and mat_check:
+                    if st.session_state.get("pre_shift_clean_done"):
+                        submit_daily_checklist(current_user, current_shift)
+                        st.toast("✅ Startup checklist fully recorded! Unlocking systems...")
+
+                        # Clean up the session state flag
+                        del st.session_state["pre_shift_clean_done"]
+                        st.rerun()
+                    else:
+                        st.error(
+                            "⚠️ You must complete and submit the Morning Cleanliness Check (Step 1) above before unlocking.")
                 else:
-                    st.warning("⚠️ You must check ALL items to confirm your workspace is ready.")
+                    st.warning("⚠️ You must check ALL manual verification items in Step 2.")
 
         # This function strictly stops the rest of the page from rendering until the form is passed!
         st.stop()
-
 df_runs = get_assigned_runs_df()
 active_pumps = get_active_pumps()
 dt_reasons = get_downtime_reasons()
@@ -429,8 +496,7 @@ with st.expander("🔄 Mid-Shift Role & Station Transfer", expanded=False):
                     # Instantly update the session state so the UI morphs on reload
                     st.session_state["user_role"] = new_role.lower()
                     st.session_state["user_shift"] = new_shift
-                    st.success(f"✅ Successfully transferred to {new_role} on {new_shift}!")
-                    time.sleep(1)
+                    st.toast(f"✅ Successfully transferred to {new_role} on {new_shift}!")
                     st.rerun()
             else:
                 st.error("Error: Could not locate User ID.")
@@ -497,10 +563,9 @@ with st.expander("👀 Calibrate Tank Level (Visual Level Check)", expanded=Fals
                     )
 
                     if success:
-                        st.success(
+                        st.toast(
                             f"✅ {selected_tank} recalibrated to exactly {estimated_l}L!"
                         )
-                        time.sleep(1.2)
                         st.rerun()
         else:
             st.info("No active reactor tanks currently configured with resin.")
@@ -602,7 +667,6 @@ Progress: <b style="color:#FFFFFF;">{run['current_units']:,} / {run['target_unit
                                 st_lottie(lottie_success, height=200, key=f"lottie_{run['id']}")
                         
                         st.toast(f"Run {run['id']} completed!", icon="✅")
-                        time.sleep(2.0)
                         st.rerun()
                 st.markdown("---")
     else:
@@ -611,6 +675,30 @@ else:
     st.info("No production runs in database.")
 
 # ===================== SECTION 2: DIGITAL LOGGING TRAVELER =====================
+
+# --- NEW: AUTO-SCROLL DOWN TO LOGS ON LOGIN ---
+st.markdown("<div id='log_action_area' style='padding-top: 20px;'></div>", unsafe_allow_html=True)
+
+if not st.session_state.get("auto_scrolled_to_logs", False):
+    import streamlit.components.v1 as components
+    components.html(
+        """
+        <script>
+            // Wait a split-second for the charts and UI to finish rendering above
+            setTimeout(function() {
+                var target = window.parent.document.getElementById('log_action_area');
+                if (target) {
+                    target.scrollIntoView({behavior: 'smooth', block: 'start'});
+                }
+            }, 800); 
+        </script>
+        """,
+        height=0, width=0
+    )
+    # Lock it so it doesn't jump around while they are typing!
+    st.session_state["auto_scrolled_to_logs"] = True
+# -----------------------------------------------------
+
 plant_config = get_plant_settings()
 packing_enabled = plant_config.get("enable_packing", True)
 
@@ -650,49 +738,59 @@ else:
 # --- TAB 1: HOURLY POURING COUNT ---
 if tab1 is not None:
     with tab1:
-        st.subheader("Hourly Production Log (Pouring)")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            station = st.selectbox("Pump Station", active_pumps, key="h_pump")
-        
-        with col2:
-            cartridge = st.selectbox("Container Format", ("V2 (1L Cartridge)", "V1 (1L Cartridge)", "RPS (5L Bulk Jug)", "Pigment"), key="h_cart")
-            cart_code = "RPS" if "RPS" in cartridge else ("V1" if "V1" in cartridge else ("Pigment" if "Pigment" in cartridge else "V2"))
-            
-            specs_df = get_all_resin_specs_df(cart_code)
-            if specs_df.empty:
-                specs_df = get_all_resin_specs_df("ALL")
-            resin_names = sorted(specs_df["resin_name"].unique().tolist())
-            
-            resin = st.selectbox("Resin Formulation", resin_names, key="h_resin")
-            matched = specs_df[specs_df["resin_name"] == resin]
-            if not matched.empty:
-                spec_info = matched.iloc[0]
-                st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g**")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📍 1. Station & Material Setup")
+
+        # Stacked inputs for maximum tap-target size on mobile
+        station = st.selectbox("Pump Station", active_pumps, key="h_pump")
+
+        cartridge = st.selectbox("Container Format",
+                                 ("V2 (1L Cartridge)", "V1 (1L Cartridge)", "RPS (5L Bulk Jug)", "Pigment"),
+                                 key="h_cart")
+        cart_code = "RPS" if "RPS" in cartridge else (
+            "V1" if "V1" in cartridge else ("Pigment" if "Pigment" in cartridge else "V2"))
+
+        specs_df = get_all_resin_specs_df(cart_code)
+        if specs_df.empty:
+            specs_df = get_all_resin_specs_df("ALL")
+        resin_names = sorted(specs_df["resin_name"].unique().tolist())
+
+        resin = st.selectbox("Resin Formulation", resin_names, key="h_resin")
+        matched = specs_df[specs_df["resin_name"] == resin]
+        if not matched.empty:
+            spec_info = matched.iloc[0]
+            st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g**")
 
         station_active_run = df_runs[
-            (df_runs["pump_station"] == station) & 
-            (df_runs["resin_type"] == resin) & 
+            (df_runs["pump_station"] == station) &
+            (df_runs["resin_type"] == resin) &
             (df_runs["cartridge_type"] == cart_code) &
             (df_runs["status"].isin(["Active", "Pouring"]))
-        ]
-        auto_lot = str(station_active_run.iloc[0].get("lot_number", f"LOT-{datetime.now().strftime('%Y%m%d')}-01")) if not station_active_run.empty else f"LOT-{datetime.now().strftime('%Y%m%d')}-01"
+            ]
+        auto_lot = str(station_active_run.iloc[0].get("lot_number",
+                                                      f"LOT-{datetime.now().strftime('%Y%m%d')}-01")) if not station_active_run.empty else f"LOT-{datetime.now().strftime('%Y%m%d')}-01"
 
-        with col3:
-            lot_num = st.text_input("Batch Lot Number", value=auto_lot, help="Auto-fills from active run to ensure exact batch matching.", key="h_lot")
+        lot_num = st.text_input("Batch Lot Number", value=auto_lot, help="Auto-fills from active run.", key="h_lot")
 
-        p_col1, p_col2, p_col3 = st.columns(3)
+        st.markdown("---")
+        st.markdown("#### 📊 2. Production Output")
+
+        # Give the Good Units its own massive full-width input
+        bottles_filled = st.number_input("✅ Good Units / Containers Filled", min_value=0, value=250, step=10,
+                                         key="h_filled")
+
+        # Scrap can share a row since they are smaller numbers
+        p_col1, p_col2 = st.columns(2)
         with p_col1:
-            bottles_filled = st.number_input("Units / Containers Filled", min_value=0, value=250, step=10, key="h_filled")
+            scrap_empty = st.number_input("🗑️ Scrap Empty", min_value=0, value=0, step=1, key="h_s_empty")
         with p_col2:
-            scrap_empty = st.number_input("Scrap / Rejected Empty", min_value=0, value=0, step=1, key="h_s_empty")
-        with p_col3:
-            scrap_filled = st.number_input("Scrap / Rejected Filled", min_value=0, value=0, step=1, key="h_s_filled")
+            scrap_filled = st.number_input("🗑️ Scrap Filled", min_value=0, value=0, step=1, key="h_s_filled")
 
-        notes = st.text_area("Process Observations / Notes", placeholder="e.g. Target fill weight nominal, vacuum degas verified.", key="h_notes")
+        notes = st.text_area("Process Observations / Notes", placeholder="e.g. Target fill weight nominal...",
+                             key="h_notes")
 
-        if st.button("🚀 Submit Pouring Log", type="primary", use_container_width=True):
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🚀 SUBMIT POURING LOG", type="primary", use_container_width=True):
             add_hourly_log(
                 operator_name=current_user,
                 pump_station=station,
@@ -704,74 +802,68 @@ if tab1 is not None:
                 scrap_empty=int(scrap_empty),
                 scrap_filled=int(scrap_filled),
                 notes=notes,
-                log_type="Hourly Bottle Count" 
+                log_type="Hourly Bottle Count"
             )
-            # --- NEW TOAST INJECTED HERE ---
             st.toast(f"Recorded {bottles_filled} units of {resin}!", icon="🧪")
-            time.sleep(1.0)
             st.rerun()
 
 # --- PACKING TAB ---
 if tab_pack is not None:
     with tab_pack:
-        st.subheader("📦 End-of-Line Packing Log")
-    st.caption("Log finished units packed into boxes/skids. This data is exported for engineering/fulfillment.")
-    
-    pk_c1, pk_c2, pk_c3 = st.columns(3)
-    
-    with pk_c1:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📦 1. Packing Details")
         pack_station = "Pack-Out Station"
         st.info("Location: **End-of-Line / Pack-Out**")
-        
-    with pk_c2:
-        pack_cartridge = st.selectbox("Container Format", ("V2 (1L Cartridge)", "V1 (1L Cartridge)", "RPS (5L Bulk Jug)", "Pigment"), key="p_cart")
-        p_cart_code = "RPS" if "RPS" in pack_cartridge else ("V1" if "V1" in pack_cartridge else ("Pigment" if "Pigment" in pack_cartridge else "V2"))
-        
+
+        pack_cartridge = st.selectbox("Container Format",
+                                      ("V2 (1L Cartridge)", "V1 (1L Cartridge)", "RPS (5L Bulk Jug)", "Pigment"),
+                                      key="p_cart")
+        p_cart_code = "RPS" if "RPS" in pack_cartridge else (
+            "V1" if "V1" in pack_cartridge else ("Pigment" if "Pigment" in pack_cartridge else "V2"))
+
         p_specs_df = get_all_resin_specs_df(p_cart_code)
         if p_specs_df.empty:
             p_specs_df = get_all_resin_specs_df("ALL")
         p_resin_names = sorted(p_specs_df["resin_name"].unique().tolist())
-        
+
         pack_resin = st.selectbox("Resin Formulation", p_resin_names, key="p_resin")
-        
+
         matched_pack = p_specs_df[p_specs_df["resin_name"] == pack_resin]
-        units_per_skid = 500 
+        units_per_skid = 500
         if not matched_pack.empty:
             units_per_skid = int(matched_pack.iloc[0].get("units_per_skid", 500))
 
-    with pk_c3:
-        pack_lot = st.text_input("Batch Lot Number Being Packed", value=f"LOT-{datetime.now().strftime('%Y%m%d')}-01", key="p_lot")
+        pack_lot = st.text_input("Batch Lot Number Being Packed", value=f"LOT-{datetime.now().strftime('%Y%m%d')}-01",
+                                 key="p_lot")
 
-    st.markdown("#### Units Packed")
-    pk_in1, pk_in2 = st.columns([1, 2])
-    with pk_in1:
-        units_packed = st.number_input("Total Good Units Packed", min_value=1, value=units_per_skid, step=50, key="p_filled")
-    with pk_in2:
+        st.markdown("---")
+        st.markdown("#### 📊 2. Units Packed")
+
+        units_packed = st.number_input("✅ Total Good Units Packed", min_value=1, value=units_per_skid, step=50,
+                                       key="p_filled")
         skids_calculated = units_packed / units_per_skid if units_per_skid > 0 else 0
+        st.caption(f"Equates to: **{skids_calculated:.2f} Skids** *(Based on {units_per_skid} units/skid)*")
+
+        pack_notes = st.text_area("Packing Notes / Box Issues", placeholder="e.g. 2 partial boxes added to skid.",
+                                  key="p_notes")
+
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"**Equates to:** `{skids_calculated:.2f}` Skids *(Based on {units_per_skid} units/skid)*")
-
-    pack_notes = st.text_area("Packing Notes / Missing Labels / Box Issues", placeholder="e.g. 2 partial boxes added to skid.", key="p_notes")
-
-    if st.button("📦 Submit Packing Log", type="primary", use_container_width=True):
-        add_hourly_log(
-            operator_name=current_user,
-            pump_station=pack_station,
-            shift=current_shift,
-            cartridge_type=p_cart_code,
-            resin_type=pack_resin,
-            lot_number=pack_lot,
-            bottles=int(units_packed),
-            scrap_empty=0, 
-            scrap_filled=0,
-            notes=pack_notes,
-            log_type="Packing Count" 
-        )
-        # --- NEW TOAST INJECTED HERE ---
-        st.toast(f"Packing saved! Recorded {units_packed} units.", icon="📦")
-        time.sleep(1.0)
-        st.rerun()
-
+        if st.button("📦 SUBMIT PACKING LOG", type="primary", use_container_width=True):
+            add_hourly_log(
+                operator_name=current_user,
+                pump_station=pack_station,
+                shift=current_shift,
+                cartridge_type=p_cart_code,
+                resin_type=pack_resin,
+                lot_number=pack_lot,
+                bottles=int(units_packed),
+                scrap_empty=0,
+                scrap_filled=0,
+                notes=pack_notes,
+                log_type="Packing Count"
+            )
+            st.toast(f"Packing saved! Recorded {units_packed} units.", icon="📦")
+            st.rerun()
 # --- TAB 2: DOWNTIME ---
 if tab2 is not None:
     with tab2:
@@ -795,7 +887,6 @@ if tab2 is not None:
             )
             # --- NEW TOAST INJECTED HERE ---
             st.toast(f"Recorded {int(dt_duration)} minutes downtime.", icon="⚠️")
-            time.sleep(1.0)
             st.rerun()
 
 # --- TAB 3: CLEANLINESS & SPILL PHOTO AUDIT ---
@@ -842,7 +933,6 @@ if tab3 is not None:
             
             # --- NEW TOAST INJECTED HERE ---
             st.toast("Photo Audit successfully recorded!", icon="📸")
-            time.sleep(1.0)
             st.rerun()
 
 # --- TAB 4: MANAGER COMMS ---

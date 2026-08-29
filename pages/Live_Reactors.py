@@ -1,10 +1,17 @@
-import sys
 import os
-import time
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
+import base64
+from datetime import datetime, date, timedelta
 
 import streamlit as st
-import pandas as pd
+import extra_streamlit_components as stx
+
+# --- SYSTEM PATH ENFORCEMENT ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+
 from database import (
     get_assigned_runs_df,
     get_all_resin_specs_df,
@@ -16,7 +23,7 @@ from database import (
     get_active_pumps,
     add_suggestion,
 )
-import base64
+
 
 def get_base64_image(image_path):
     try:
@@ -60,11 +67,11 @@ def auto_refresh_reactors():
     pass
 
 auto_refresh_reactors()
-import extra_streamlit_components as stx
+
 cookie_manager = stx.CookieManager(key="reactors_cookies")
 
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-import extra_streamlit_components as stx
+
 
 
 
@@ -89,13 +96,11 @@ if not st.session_state.get("authenticated", False):
             st.session_state["user_name"] = user_data["full_name"]
             st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
             st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
             st.rerun()
     else:
         # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
         if not st.session_state["auth_check_passed"]:
             st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
             st.rerun()
         else:
             # If it checked twice and STILL no cookie, they are truly logged out.
@@ -210,8 +215,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -238,8 +242,7 @@ with st.sidebar:
                     from database import update_user_avatar
 
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                     st.rerun()
 
@@ -283,7 +286,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 

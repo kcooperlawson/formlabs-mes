@@ -1,9 +1,12 @@
-import sys
 import os
-import time
+import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
+
+# --- SYSTEM PATH ENFORCEMENT ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import get_all_users_df, create_user, update_user_pin
 
 st.set_page_config(page_title="Staff Roster | Formlabs MES", page_icon="👥", layout="wide")
@@ -102,8 +105,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -127,8 +129,7 @@ with st.sidebar:
                 if new_avatar:
                     from database import update_user_avatar
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         with set_tab3:
@@ -167,7 +168,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 st.subheader("👥 Floor Personnel Administration (Manager Access)")
@@ -176,7 +176,7 @@ st.info("💡 **Security Notice:** Managers can provision and manage Floor Perso
 df_users = get_all_users_df()
 u_col1, u_col2 = st.columns((1, 2.5))
 
-with u_col1:
+with (u_col1):
     st.markdown("#### ➕ Provision Floor Personnel")
     with st.form("mgr_create_user_form", clear_on_submit=True):
         new_fullname = st.text_input("Full Name")
@@ -189,8 +189,7 @@ with u_col1:
 
         if st.form_submit_button("Create Personnel", type="primary", use_container_width=True):
             if create_user(new_username, new_email, new_pin, new_fullname, new_role.lower(), float(new_target), new_shift):
-                st.success("✅ Account created successfully!")
-                time.sleep(1)
+                st.toast("✅ Account created successfully!")
                 st.rerun()
             else:
                 st.error("❌ Username or email already exists.")
@@ -215,6 +214,5 @@ with st.expander("🔑 Reset Floor Operator PIN", expanded=False):
             if st.button("💾 Reset PIN", type="primary"):
                 user_row = floor_df[floor_df["username"] == target_user].iloc[0]
                 update_user_pin(int(user_row["id"]), new_temp_pin)
-                st.success(f"✅ PIN updated for '{target_user}'.")
-                time.sleep(1)
+                st.toast(f"✅ PIN updated for '{target_user}'.")
                 st.rerun()

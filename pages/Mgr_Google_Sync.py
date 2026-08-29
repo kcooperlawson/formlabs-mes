@@ -32,7 +32,6 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 import extra_streamlit_components as stx
-import time
 
 # Initialize cookie manager for the logout function
 cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
@@ -103,7 +102,7 @@ with st.sidebar:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
                         st.success(f"✅ {msg}")
-                        time.sleep(1)
+
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -127,8 +126,7 @@ with st.sidebar:
                 if new_avatar:
                     from database import update_user_avatar
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         with set_tab3:
@@ -167,7 +165,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 st.subheader("☁️ External Reporting & Google Cloud Sync Control Panel")

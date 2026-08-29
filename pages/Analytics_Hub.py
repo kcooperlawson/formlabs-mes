@@ -1,17 +1,19 @@
-import sys
 import os
-import time
+import sys
+import base64
+from datetime import datetime, date, timedelta
 
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+import extra_streamlit_components as stx
+
+# --- SYSTEM PATH ENFORCEMENT ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, date, timedelta
-import base64
 
 from database import (
     get_production_logs_df,
@@ -19,10 +21,10 @@ from database import (
     get_plant_settings
 )
 
-import extra_streamlit_components as stx
+
 cookie_manager = stx.CookieManager(key="analytics_cookies")
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-import extra_streamlit_components as stx
+
 
 
 
@@ -47,13 +49,12 @@ if not st.session_state.get("authenticated", False):
             st.session_state["user_name"] = user_data["full_name"]
             st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
             st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            time.sleep(0.2)
+
             st.rerun()
     else:
         # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
         if not st.session_state["auth_check_passed"]:
             st.session_state["auth_check_passed"] = True
-            time.sleep(0.2)
             st.rerun()
         else:
             # If it checked twice and STILL no cookie, they are truly logged out.
@@ -153,8 +154,7 @@ with st.sidebar:
                     if success:
                         st.session_state["user_name"] = acc_name.strip()
                         st.session_state["username"] = acc_user.lower().strip()
-                        st.success(f"✅ {msg}")
-                        time.sleep(1)
+                        st.toast(f"✅ {msg}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
@@ -182,8 +182,7 @@ with st.sidebar:
                     from database import update_user_avatar
 
                     update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.success("✅ Avatar updated!")
-                    time.sleep(1)
+                    st.toast("✅ Avatar updated!")
                     st.rerun()
 
         # TAB 3: FEEDBACK & CHANGELOG
@@ -227,7 +226,6 @@ with st.sidebar:
         st.session_state["explicitly_logged_out"] = True
 
         st.switch_page("Home.py")
-        time.sleep(0.5)
         st.rerun()
 
 
