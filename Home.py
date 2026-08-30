@@ -1,3 +1,6 @@
+
+
+
 import base64
 import time
 from datetime import date, datetime, timedelta
@@ -6,8 +9,10 @@ import streamlit as st
 import extra_streamlit_components as stx
 from dotenv import load_dotenv
 
+from crud import delete_session, create_session, get_user_by_session_token
 from db_core import ScopedSession
 from models import Reactor
+from app_logger import logger
 
 load_dotenv()
 from database import (
@@ -21,8 +26,10 @@ from database import (
     get_production_logs_df,
     init_db,
     seed_initial_data,
+    backfill_foreign_keys,
     update_user_theme,
     add_suggestion,
+    do_logout,
 )
 
 # Pull our external theme dictionary
@@ -102,7 +109,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.6.0"
+APP_VERSION = "PT-V3.7.0"
 
 st.set_page_config(
     page_title="Formlabs MES Live Dashboard",
@@ -138,6 +145,18 @@ st.markdown(THEMES[current_css_theme], unsafe_allow_html=True)
 init_db()
 seed_initial_data()
 
+
+@st.cache_resource
+def _run_fk_backfill_once():
+    """Guarded with cache_resource so this only runs once per server process —
+    it's safe to call repeatedly (it only touches rows still missing an FK),
+    but there's no reason to re-query it on every 10s auto-refresh rerun."""
+    backfill_foreign_keys()
+    return True
+
+
+_run_fk_backfill_once()
+
 # --- BLOCK ZOMBIE COOKIES & HANDLE LOGOUT ---
 if st.query_params.get("logged_out") == "true":
     st.session_state["explicitly_logged_out"] = True
@@ -154,18 +173,17 @@ else:
 
 # --- PERSISTENT AUTO-LOGIN ENGINE ---
 if not st.session_state["authenticated"] and cached_token is not None:
-    df_users = get_all_users_df()
-    user_match = df_users[df_users["username"] == cached_token]
+    # noinspection bad-argument-type
+    user_data = get_user_by_session_token(cached_token)
 
-    if not user_match.empty:
-        user_data = user_match.iloc[0]
+    if user_data:
         st.session_state["authenticated"] = True
-        st.session_state["user_id"] = int(user_data["id"])
+        st.session_state["user_id"] = user_data["id"]
         st.session_state["user_role"] = user_data["role"]
         st.session_state["user_name"] = user_data["full_name"]
         st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
         st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-        # --- NEW REDIRECT LOGIC ---
+        st.session_state["avatar_filename"] = user_data.get("avatar_filename")
         if user_data["role"] in ["operator", "packer"]:
             st.switch_page("pages/Operator_Form.py")
         else:
@@ -210,7 +228,7 @@ if not st.session_state["authenticated"]:
                     st.markdown("<br>", unsafe_allow_html=True)
 
                     if st.form_submit_button("INITIALIZE SESSION", type="primary", use_container_width=True):
-                        user = authenticate_user(log_user, log_pin)
+                        user, auth_error = authenticate_user(log_user, log_pin)
                         if user:
                             # Capture theme from user profile and set theme cookie
                             user_theme = user.get("preferred_theme", "Default Dark")
@@ -219,7 +237,8 @@ if not st.session_state["authenticated"]:
 
                             # ONLY SET COOKIE IF CHECKBOX IS TICKED
                             if remember_device:
-                                cookie_manager.set("formlabs_mes_token", user["username"],
+                                session_token = create_session(user["id"])
+                                cookie_manager.set("formlabs_mes_token", session_token,
                                                    expires_at=datetime.now() + timedelta(days=30),
                                                    key="set_token_cookie")
 
@@ -229,6 +248,7 @@ if not st.session_state["authenticated"]:
                             st.session_state["user_name"] = user["full_name"]
                             st.session_state["user_shift"] = user.get("shift", "Shift 1")
                             st.session_state["preferred_theme"] = user_theme
+                            st.session_state["avatar_filename"] = user.get("avatar_filename")
 
                             # --- NEW REDIRECT LOGIC ---
                             if user["role"] in ["operator", "packer"]:
@@ -236,7 +256,7 @@ if not st.session_state["authenticated"]:
                             else:
                                 st.rerun()
                         else:
-                            st.error("❌ Authorization Denied: Invalid Credentials.")
+                            st.error(f"❌ {auth_error or 'Authorization Denied: Invalid Credentials.'}")
 
             # Look how reg_tab is now properly aligned with log_tab!
             with reg_tab:
@@ -247,7 +267,7 @@ if not st.session_state["authenticated"]:
                     reg_pin = st.text_input("CREATE SECURITY PIN", type="password")
                     reg_col1, reg_col2 = st.columns(2)
                     with reg_col1:
-                        reg_role = st.selectbox("ASSIGNED ROLE", ("Operator", "Packer", "Manager", "Admin"))
+                        reg_role = st.selectbox("ASSIGNED ROLE", ("Operator", "Packer"))
                     with reg_col2:
                         reg_shift = st.selectbox(
                             "ASSIGNED SHIFT", ("Shift 1", "Shift 2", "Floater")
@@ -259,14 +279,9 @@ if not st.session_state["authenticated"]:
                             st.error("⚠️ Invalid email address format.")
                         elif reg_name.strip() and reg_user.strip() and reg_pin.strip() and reg_email.strip():
                             success = create_user(
-                                username=reg_user,
-                                email=reg_email,
-                                pin=reg_pin,
-                                full_name=reg_name,
-                                role=reg_role.lower(),
-                                target_lph=400.0,
-                                shift=reg_shift,
-                                theme="Default Dark"
+                                username=reg_user, email=reg_email, pin=reg_pin, full_name=reg_name,
+                                role="operator",  # self-registration can never grant anything above operator
+                                target_lph=400.0, shift=reg_shift, theme="Default Dark"
                             )
                             if success:
                                 st.success("✅ Credentials logged! You may now sign in.")
@@ -347,7 +362,16 @@ st.markdown("---")
 #- SIDEBAR: PROFILE & SETTINGS ---
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
+    from database import get_avatar_path
+    _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
+    if _avatar_path:
+        _av_col, _name_col = st.columns([1, 4])
+        with _av_col:
+            st.image(_avatar_path, width=48)
+        with _name_col:
+            st.markdown(f"### {st.session_state.get('user_name', 'Operator')}")
+    else:
+        st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
@@ -405,11 +429,14 @@ with st.sidebar:
 
             st.markdown("---")
             st.markdown("#### Profile Picture")
+            _current_avatar = get_avatar_path(st.session_state.get("avatar_filename"))
+            if _current_avatar:
+                st.image(_current_avatar, width=64, caption="Current Avatar")
             new_avatar = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg", "webp"], key="set_avatar_upload")
             if st.button("💾 Save Avatar", type="primary", use_container_width=True):
                 if new_avatar:
                     from database import update_user_avatar
-                    update_user_avatar(st.session_state["user_id"], new_avatar)
+                    st.session_state["avatar_filename"] = update_user_avatar(st.session_state["user_id"], new_avatar)
                     st.toast("✅ Avatar updated!")
                     st.rerun()
 
@@ -431,23 +458,7 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Save the current theme before wiping the session
-        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
-
-        try:
-            # 2. Forcing an expired date is much more reliable than just .delete()
-            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
-            cookie_manager.delete("formlabs_mes_token")
-        except Exception:
-            pass
-
-        # 3. Clear memory
-        st.session_state.clear()
-
-        # 4. Restore the theme and set a Hard Lockout flag!
-        st.session_state["preferred_theme"] = saved_theme
-        st.session_state["explicitly_logged_out"] = True
-
+        do_logout(cookie_manager)
         st.switch_page("Home.py")
         st.rerun()
 
@@ -1026,6 +1037,7 @@ def add_reactor(reactor_name: str, max_capacity_l: float) -> bool:
         return True
     except Exception:
         session.rollback()
+        logger.exception(f"add_reactor() failed for reactor_name={reactor_name!r}")
         return False
     finally:
         session.close()
@@ -1041,3 +1053,7 @@ def delete_reactor(reactor_id: int) -> bool:
         return False
     finally:
         session.close()
+
+
+
+

@@ -23,7 +23,7 @@ BASE_UI_CSS = """
     [data-testid="stSidebarNav"] li:has(a[href*="Tv_Dashboard"]) {
         display: none !important;
     }
-    
+
     /* HIDE STREAMLIT DEPLOY BUTTON & 3-DOT MENU ONLY */
     [data-testid="stAppDeployButton"] { display: none !important; }
 
@@ -456,6 +456,260 @@ THEMES = {
         [data-testid="stSidebarNav"] a { color: #A6A4C2 !important; font-weight: 600 !important; border-radius: 6px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: #1B1833 !important; color: #FF416C !important; transform: translateX(5px) !important; border-left: 2px solid #FF416C !important; }
         [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(90deg, #FF4B2B 0%, #FF416C 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Titanium Alloy": """
+    <style>
+        .stApp { background-color: #1A1D21 !important; color: #D6D9DE !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(180deg, #2A2E34 0%, #1A1D21 100%); border: 1px solid #3A3F47; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+        .system-badge { background: rgba(143, 193, 227, 0.12); color: #8FC1E3; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(143, 193, 227, 0.35); text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: linear-gradient(180deg, #24272C 0%, #1D2024 100%); border: 1px solid #34383E; border-radius: 8px; padding: 12px 16px; min-height: 96px; transition: all 0.25s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(143, 193, 227, 0.15); border-color: #8FC1E3; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #8B94A0; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #14161A !important; color: #8FC1E3 !important; border: 1px solid #3A3F47 !important; border-radius: 6px !important; }
+        .stTextInput > div > div > input:focus { border-color: #8FC1E3 !important; box-shadow: 0 0 0 2px rgba(143, 193, 227, 0.2) !important; }
+        .stButton>button { background: linear-gradient(180deg, #5A6672 0%, #3B444C 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: 1px solid #8FC1E3 !important; border-radius: 6px !important; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(180deg, #6E7C89 0%, #4A5560 100%) !important; box-shadow: 0 6px 18px rgba(143, 193, 227, 0.35) !important; }
+        .filter-section-card { background: #24272C; border: 1px solid #34383E; border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #14161A !important; border-right: 1px solid #2E323A !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #8B94A0 !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #24272C !important; color: #8FC1E3 !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(90deg, #5A6672 0%, #8FC1E3 100%) !important; color: #14161A !important; font-weight: 900 !important; box-shadow: 0 4px 12px rgba(143, 193, 227, 0.3) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Carbon Fiber": """
+    <style>
+        .stApp { background-color: #0C0C0E !important; color: #D8D8DC !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: repeating-linear-gradient(45deg, #141414, #141414 3px, #1A1A1A 3px, #1A1A1A 6px); border: 1px solid #262626; border-bottom: 3px solid #E10600; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.15); }
+        .system-badge { background: rgba(225, 6, 0, 0.1); color: #FF3B30; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 4px; border: 1px solid #E10600; text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: repeating-linear-gradient(45deg, #141414, #141414 4px, #1B1B1B 4px, #1B1B1B 8px); border: 1px solid #262626; border-radius: 6px; padding: 12px 16px; min-height: 96px; transition: all 0.2s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-4px); border-color: #E10600; box-shadow: 0 10px 22px rgba(225, 6, 0, 0.25); }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #8A8A8E; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #141414 !important; color: #FF3B30 !important; border: 1px solid #262626 !important; border-radius: 4px !important; }
+        .stTextInput > div > div > input:focus { border-color: #E10600 !important; box-shadow: 0 0 0 2px rgba(225, 6, 0, 0.25) !important; }
+        .stButton>button { background: #1A1A1A !important; color: #FFFFFF !important; font-weight: 800 !important; border: 1px solid #E10600 !important; border-radius: 4px !important; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: #E10600 !important; color: #FFFFFF !important; box-shadow: 0 0 20px rgba(225, 6, 0, 0.6) !important; }
+        .filter-section-card { background: repeating-linear-gradient(45deg, #141414, #141414 4px, #1B1B1B 4px, #1B1B1B 8px); border: 1px solid #262626; border-radius: 6px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #0C0C0E !important; border-right: 1px solid #262626 !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #8A8A8E !important; font-weight: 600 !important; border-radius: 4px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #1A1A1A !important; color: #FF3B30 !important; transform: translateX(5px) !important; border-left: 2px solid #E10600 !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: #E10600 !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 10px rgba(225, 6, 0, 0.35) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Resin Flow": """
+    <style>
+        .stApp { background-color: #04191C !important; color: #C9F5F0 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(135deg, rgba(23, 232, 208, 0.08) 0%, rgba(4, 25, 28, 0.9) 100%); border: 1px solid rgba(23, 232, 208, 0.3); border-radius: 14px; margin-bottom: 16px; backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgba(23, 232, 208, 0.12); }
+        .system-badge { background: rgba(23, 232, 208, 0.12); color: #17E8D0; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(23, 232, 208, 0.4); text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: rgba(9, 45, 49, 0.6); border: 1px solid rgba(23, 232, 208, 0.2); border-radius: 14px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; backdrop-filter: blur(10px); }
+        .telemetry-grid-card:hover { transform: translateY(-6px); box-shadow: 0 14px 28px rgba(23, 232, 208, 0.2); border-color: #17E8D0; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #7FC4BE; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; text-shadow: 0 0 8px rgba(23, 232, 208, 0.4); }
+        .stTextInput > div > div > input { background-color: rgba(4, 25, 28, 0.7) !important; color: #17E8D0 !important; border: 1px solid rgba(23, 232, 208, 0.3) !important; border-radius: 8px !important; }
+        .stTextInput > div > div > input:focus { border-color: #17E8D0 !important; box-shadow: 0 0 0 2px rgba(23, 232, 208, 0.25) !important; }
+        .stButton>button { background: linear-gradient(135deg, #17E8D0 0%, #0E8C9E 100%) !important; color: #04191C !important; font-weight: 900 !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 15px rgba(23, 232, 208, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(135deg, #5FFFEA 0%, #17B8C9 100%) !important; box-shadow: 0 8px 24px rgba(23, 232, 208, 0.6) !important; }
+        .filter-section-card { background: rgba(9, 45, 49, 0.5); border: 1px solid rgba(23, 232, 208, 0.2); border-radius: 14px; padding: 14px 16px; margin: 16px 0; backdrop-filter: blur(8px); }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #031417 !important; border-right: 1px solid rgba(23, 232, 208, 0.15) !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #7FC4BE !important; font-weight: 600 !important; border-radius: 10px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: rgba(23, 232, 208, 0.08) !important; color: #17E8D0 !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(90deg, #17E8D0 0%, #0E8C9E 100%) !important; color: #04191C !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(23, 232, 208, 0.35) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Powder Bed": """
+    <style>
+        .stApp { background-color: #14100C !important; color: #E8DCC8 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #1F1811; border: 1px solid #3A2E20; border-radius: 8px; margin-bottom: 16px; border-bottom: 3px solid #FF6B1A; box-shadow: 0 6px 18px rgba(255, 107, 26, 0.15); }
+        .system-badge { background: rgba(255, 107, 26, 0.12); color: #FF8C42; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 4px; border: 1px solid #FF6B1A; text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: #1C160F; border: 1px solid #3A2E20; border-radius: 8px; padding: 12px 16px; min-height: 96px; transition: all 0.2s ease; border-left: 4px solid #4A3B28; }
+        .telemetry-grid-card:hover { transform: translateX(5px); border-left: 4px solid #FF6B1A; background: #241B12; box-shadow: -4px 4px 14px rgba(255, 107, 26, 0.2); }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #B8A688; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #1C160F !important; color: #FF8C42 !important; border: 1px solid #3A2E20 !important; border-radius: 4px !important; font-weight: 600; }
+        .stTextInput > div > div > input:focus { border-color: #FF6B1A !important; box-shadow: 0 0 0 2px rgba(255, 107, 26, 0.2) !important; }
+        .stButton>button { background: linear-gradient(180deg, #FF6B1A 0%, #CC5514 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 4px !important; box-shadow: 0 4px 10px rgba(255, 107, 26, 0.3) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(180deg, #FF8C42 0%, #E0631A 100%) !important; box-shadow: 0 6px 18px rgba(255, 107, 26, 0.5) !important; }
+        .filter-section-card { background: #1F1811; border: 1px solid #3A2E20; border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #14100C !important; border-right: 1px solid #3A2E20 !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #B8A688 !important; font-weight: 600 !important; border-radius: 6px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #1F1811 !important; color: #FF6B1A !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: #FF6B1A !important; color: #14100C !important; font-weight: 900 !important; box-shadow: 0 4px 10px rgba(255, 107, 26, 0.3) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Midnight Gold": """
+    <style>
+        .stApp { background-color: #0A0A10 !important; color: #E8E4D8 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(180deg, #15151F 0%, #0A0A10 100%); border: 1px solid #2A2A3A; border-radius: 12px; margin-bottom: 16px; border-bottom: 3px solid #D4AF37; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+        .system-badge { background: rgba(212, 175, 55, 0.1); color: #D4AF37; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.4); text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: linear-gradient(180deg, #131320 0%, #0D0D16 100%); border: 1px solid #2A2A3A; border-radius: 10px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-5px); box-shadow: 0 10px 24px rgba(212, 175, 55, 0.2); border-color: #D4AF37; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #8F8B7A; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #0A0A10 !important; color: #D4AF37 !important; border: 1px solid #2A2A3A !important; border-radius: 6px !important; }
+        .stTextInput > div > div > input:focus { border-color: #D4AF37 !important; box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.25) !important; }
+        .stButton>button { background: linear-gradient(180deg, #D4AF37 0%, #A6821E 100%) !important; color: #14140D !important; font-weight: 900 !important; border: none !important; border-radius: 6px !important; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(180deg, #E8CB5C 0%, #C4972A 100%) !important; box-shadow: 0 8px 20px rgba(212, 175, 55, 0.6) !important; }
+        .filter-section-card { background: #131320; border: 1px solid #2A2A3A; border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #0A0A10 !important; border-right: 1px solid #22222E !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #8F8B7A !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #131320 !important; color: #D4AF37 !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(90deg, #D4AF37 0%, #A6821E 100%) !important; color: #14140D !important; font-weight: 900 !important; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.35) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Sapphire Enterprise": """
+    <style>
+        .stApp { background-color: #050B1A !important; color: #DCE6F5 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(135deg, #0B1E42 0%, #050B1A 100%); border: 1px solid #16294D; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 10px 26px rgba(37, 99, 235, 0.2); }
+        .system-badge { background: rgba(37, 99, 235, 0.12); color: #60A5FA; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(96, 165, 250, 0.4); text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: linear-gradient(180deg, #0E1A34 0%, #080F22 100%); border: 1px solid #16294D; border-radius: 12px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-5px); box-shadow: 0 12px 26px rgba(37, 99, 235, 0.25); border-color: #60A5FA; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #7C93BE; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #080F22 !important; color: #60A5FA !important; border: 1px solid #16294D !important; border-radius: 8px !important; }
+        .stTextInput > div > div > input:focus { border-color: #60A5FA !important; box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25) !important; }
+        .stButton>button { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: 1px solid #60A5FA !important; border-radius: 8px !important; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important; box-shadow: 0 8px 24px rgba(96, 165, 250, 0.5) !important; }
+        .filter-section-card { background: #0E1A34; border: 1px solid #16294D; border-radius: 12px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #050B1A !important; border-right: 1px solid #16294D !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #7C93BE !important; font-weight: 600 !important; border-radius: 10px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #0E1A34 !important; color: #60A5FA !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Emerald Ledger": """
+    <style>
+        .stApp { background-color: #06120D !important; color: #DCEEE3 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(180deg, #0C231A 0%, #06120D 100%); border: 1px solid #163B2C; border-radius: 10px; margin-bottom: 16px; border-bottom: 3px solid #10B981; box-shadow: 0 8px 22px rgba(16, 185, 129, 0.15); }
+        .system-badge { background: rgba(16, 185, 129, 0.1); color: #34D399; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(52, 211, 153, 0.4); text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: #0C1F17; border: 1px solid #163B2C; border-radius: 10px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-4px); box-shadow: 0 10px 22px rgba(16, 185, 129, 0.2); border-color: #10B981; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #7CA893; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #F5E6B8; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #06120D !important; color: #34D399 !important; border: 1px solid #163B2C !important; border-radius: 6px !important; }
+        .stTextInput > div > div > input:focus { border-color: #10B981 !important; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important; }
+        .stButton>button { background: linear-gradient(180deg, #10B981 0%, #0D8F65 100%) !important; color: #06120D !important; font-weight: 900 !important; border: none !important; border-radius: 6px !important; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(180deg, #34D399 0%, #10B981 100%) !important; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.5) !important; }
+        .filter-section-card { background: #0C1F17; border: 1px solid #163B2C; border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #06120D !important; border-right: 1px solid #163B2C !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #7CA893 !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #0C1F17 !important; color: #34D399 !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(180deg, #10B981 0%, #0D8F65 100%) !important; color: #06120D !important; font-weight: 900 !important; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Obsidian Chrome": """
+    <style>
+        .stApp { background-color: #0A0A0C !important; color: #EDEDED !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(135deg, #1C1C1F 0%, #0A0A0C 100%); border: 1px solid #2E2E33; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.7); }
+        .system-badge { background: linear-gradient(135deg, #E8E8EC 0%, #B8B8C0 100%); color: #0A0A0C; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; border: none; text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: linear-gradient(180deg, #1A1A1D 0%, #101012 100%); border: 1px solid #2E2E33; border-radius: 10px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-5px); box-shadow: 0 12px 26px rgba(255, 255, 255, 0.08); border-color: #C8C8D0; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #8E8E96; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #101012 !important; color: #E8E8EC !important; border: 1px solid #2E2E33 !important; border-radius: 8px !important; }
+        .stTextInput > div > div > input:focus { border-color: #C8C8D0 !important; box-shadow: 0 0 0 2px rgba(200, 200, 208, 0.2) !important; }
+        .stButton>button { background: linear-gradient(180deg, #E8E8EC 0%, #A8A8B2 100%) !important; color: #0A0A0C !important; font-weight: 900 !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(180deg, #FFFFFF 0%, #C8C8D0 100%) !important; box-shadow: 0 8px 22px rgba(255, 255, 255, 0.25) !important; }
+        .filter-section-card { background: #1A1A1D; border: 1px solid #2E2E33; border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #0A0A0C !important; border-right: 1px solid #2E2E33 !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #8E8E96 !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #1A1A1D !important; color: #FFFFFF !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(180deg, #E8E8EC 0%, #A8A8B2 100%) !important; color: #0A0A0C !important; font-weight: 900 !important; box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+    "Glass Aurora": """
+    <style>
+        .stApp { background: radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 40%), radial-gradient(circle at 80% 70%, rgba(20, 184, 166, 0.15) 0%, transparent 40%), #07070C !important; color: #E7E7F0 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; margin-bottom: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15); }
+        .system-badge { background: rgba(20, 184, 166, 0.15); color: #5EEAD4; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(94, 234, 212, 0.4); text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; padding: 12px 16px; min-height: 96px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(16px); }
+        .telemetry-grid-card:hover { transform: translateY(-6px); box-shadow: 0 16px 32px rgba(139, 92, 246, 0.25); border-color: rgba(139, 92, 246, 0.5); }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #A5A5C0; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: rgba(255, 255, 255, 0.05) !important; color: #C4B5FD !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 10px !important; backdrop-filter: blur(10px); }
+        .stTextInput > div > div > input:focus { border-color: #C4B5FD !important; box-shadow: 0 0 0 2px rgba(196, 181, 253, 0.25) !important; }
+        .stButton>button { background: linear-gradient(135deg, #8B5CF6 0%, #14B8A6 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 10px !important; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button:hover { background: linear-gradient(135deg, #A78BFA 0%, #2DD4BF 100%) !important; box-shadow: 0 8px 28px rgba(139, 92, 246, 0.6) !important; transform: scale(1.02); }
+        .filter-section-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; padding: 14px 16px; margin: 16px 0; backdrop-filter: blur(16px); }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: rgba(7, 7, 12, 0.9) !important; border-right: 1px solid rgba(255, 255, 255, 0.08) !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #A5A5C0 !important; font-weight: 600 !important; border-radius: 12px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: rgba(255, 255, 255, 0.06) !important; color: #C4B5FD !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, #8B5CF6 0%, #14B8A6 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.35) !important; }
+    </style>
+    """ + BASE_UI_CSS,
+
+
+
+
+
+    "Formlabs Onyx": """
+    <style>
+        .stApp { background-color: #0B0B0C !important; color: #F2F2F2 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #131314; border: 1px solid #232324; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+        .system-badge { background: transparent; color: #F2F2F2; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.2em; padding: 4px 10px; border-radius: 4px; border: 1px solid #F2F2F2; text-transform: uppercase; margin-left: 14px; }
+        .telemetry-grid-card { background: #131314; border: 1px solid #232324; border-radius: 10px; padding: 12px 16px; min-height: 96px; transition: all 0.25s ease; }
+        .telemetry-grid-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(255, 255, 255, 0.06); border-color: #F2F2F2; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; color: #8A8A8D; text-transform: uppercase; }
+        .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
+        .stTextInput > div > div > input { background-color: #0B0B0C !important; color: #F2F2F2 !important; border: 1px solid #333335 !important; border-radius: 6px !important; }
+        .stTextInput > div > div > input:focus { border-color: #F2F2F2 !important; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15) !important; }
+        .stButton>button { background: #F2F2F2 !important; color: #0B0B0C !important; font-weight: 900 !important; border: none !important; border-radius: 6px !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.15em; }
+        .stButton>button:hover { background: #FFFFFF !important; box-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important; }
+        .filter-section-card { background: #131314; border: 1px solid #232324; border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { background-color: #0B0B0C !important; border-right: 1px solid #232324 !important; }
+        [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
+        [data-testid="stSidebarNav"] a { color: #8A8A8D !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a:hover { background-color: #131314 !important; color: #FFFFFF !important; transform: translateX(5px) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: #F2F2F2 !important; color: #0B0B0C !important; font-weight: 900 !important; box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important; }
     </style>
     """ + BASE_UI_CSS
 }

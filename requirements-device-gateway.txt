@@ -1,0 +1,15 @@
+# Extra dependencies for the Device Gateway (device_gateway/, run_gateway.py,
+# pages/Device_Registry.py). Install alongside the existing requirements.txt:
+#
+#   pip install -r requirements.txt -r requirements-device-gateway.txt
+#
+# requests is already in requirements.txt (used elsewhere in the app) — not
+# repeated here. Every adapter imports its library lazily inside connect(),
+# so you only strictly need the ones for protocols you actually use — but
+# installing all of them costs little and means "add a device" never blocks
+# on a pip install later.
+
+pymodbus==3.7.4      # modbus_tcp, modbus_rtu
+pyserial==3.5         # modbus_rtu (serial transport), serial_ascii
+opcua==0.98.13        # opcua
+paho-mqtt==1.6.1       # mqtt

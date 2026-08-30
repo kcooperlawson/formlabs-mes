@@ -1,6 +1,10 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text
+
+
+
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, ForeignKey
 from datetime import datetime, date
 from db_core import Base
+import secrets
 
 class User(Base):
     __tablename__ = "users"
@@ -15,6 +19,9 @@ class User(Base):
     # NEW COLUMN FOR THEME ENGINE
     preferred_theme = Column(String(255), default="Default Dark")
     avatar_filename = Column(String(255), nullable=True)
+    # --- LOGIN LOCKOUT ---
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
 
 class ProductionLog(Base):
     __tablename__ = "production_logs"
@@ -24,6 +31,12 @@ class ProductionLog(Base):
     log_type = Column(String(50), nullable=False)
     operator_name = Column(String(100), nullable=False, index=True)
     pump_station = Column(String(50), nullable=False, index=True)
+    # FK columns added alongside the legacy string columns above (kept for
+    # backward compatibility and for "System"-generated rows with no real
+    # matching row, e.g. auto-reconciliation entries). Nullable by design.
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
+    resin_spec_id = Column(Integer, ForeignKey("resin_specs.id", ondelete="SET NULL"), nullable=True, index=True)
     shift = Column(String(20), default="Shift 1")
     cartridge_type = Column(String(20), default="V2")
     resin_type = Column(String(100), nullable=True)
@@ -40,6 +53,8 @@ class DowntimeLog(Base):
     date = Column(Date, default=date.today, index=True)
     operator_name = Column(String(100), nullable=False)
     pump_station = Column(String(50), nullable=False)
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
     shift = Column(String(20), default="Shift 1")
     reason = Column(String(100), nullable=False)
     duration_min = Column(Integer, nullable=False)
@@ -57,6 +72,9 @@ class AssignedRun(Base):
     current_units = Column(Integer, default=0)
     assigned_operator = Column(String(100), nullable=False)
     pump_station = Column(String(50), nullable=False)
+    resin_spec_id = Column(Integer, ForeignKey("resin_specs.id", ondelete="SET NULL"), nullable=True, index=True)
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(String(20), default="Active")
     lot_number = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
@@ -70,6 +88,8 @@ class Reactor(Base):
     status = Column(String(20), default="Active")
     current_resin = Column(String(100), nullable=True)
     assigned_pump = Column(String(50), nullable=True)
+    current_resin_id = Column(Integer, ForeignKey("resin_specs.id", ondelete="SET NULL"), nullable=True, index=True)
+    assigned_pump_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
 
 class ResinSpec(Base):
     __tablename__ = "resin_specs"
@@ -104,6 +124,7 @@ class DailyChecklist(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(Date, default=date.today, index=True)
     operator_name = Column(String(100), nullable=False, index=True)
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     shift = Column(String(20), nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
@@ -115,6 +136,9 @@ class CleanlinessAudit(Base):
     audit_type = Column(String(50), nullable=False)
     operator_name = Column(String(100), nullable=False)
     pump_station = Column(String(50), nullable=False)
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
+    resin_spec_id = Column(Integer, ForeignKey("resin_specs.id", ondelete="SET NULL"), nullable=True, index=True)
     shift = Column(String(20), default="Shift 1")
     resin_type = Column(String(100), nullable=True)
     image_filename = Column(String(255), nullable=True)
@@ -127,6 +151,8 @@ class FloorMessage(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     operator_name = Column(String(100), nullable=False, index=True)
     sender_name = Column(String(100), nullable=False)
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     message = Column(Text, nullable=False)
     is_manager_reply = Column(Integer, default=0)
 
@@ -160,8 +186,20 @@ class Suggestion(Base):
     status = Column(String(20), default="Open")  # Open, In Review, Implemented, Dismissed
     admin_notes = Column(Text, nullable=True)
 
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
 # Generic public placeholders (Safe for source code)
 MASTER_FORMLABS_CATALOG = (
     ("V2", "RS-C2-GPCL-05", "FLGPCL05", "24", "Standard Clear V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
     ("V2", "RS-C2-GPBK-05", "FLGPBK05", "24", "Standard Black V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
 )
+
+
+
+

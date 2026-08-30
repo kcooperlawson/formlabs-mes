@@ -1,3 +1,5 @@
+
+
 import os
 import sys
 from datetime import date, timedelta
@@ -10,7 +12,7 @@ import streamlit as st
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from database import get_production_logs_df
+from database import get_production_logs_df, do_logout, get_all_users_df
 
 st.set_page_config(page_title="Historical Analytics | Formlabs MES", page_icon="📈", layout="wide")
 
@@ -71,7 +73,16 @@ st.markdown("---")
 # --- SIDEBAR: PROFILE & SETTINGS ---
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
+    from database import get_avatar_path
+    _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
+    if _avatar_path:
+        _av_col, _name_col = st.columns([1, 4])
+        with _av_col:
+            st.image(_avatar_path, width=48)
+        with _name_col:
+            st.markdown(f"### {st.session_state.get('user_name', 'Operator')}")
+    else:
+        st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
@@ -126,11 +137,14 @@ with st.sidebar:
 
             st.markdown("---")
             st.markdown("#### Profile Picture")
+            _current_avatar = get_avatar_path(st.session_state.get("avatar_filename"))
+            if _current_avatar:
+                st.image(_current_avatar, width=64, caption="Current Avatar")
             new_avatar = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg", "webp"], key="set_avatar_upload")
             if st.button("💾 Save Avatar", type="primary", use_container_width=True):
                 if new_avatar:
                     from database import update_user_avatar
-                    update_user_avatar(st.session_state["user_id"], new_avatar)
+                    st.session_state["avatar_filename"] = update_user_avatar(st.session_state["user_id"], new_avatar)
                     st.toast("✅ Avatar updated!")
                     st.rerun()
 
@@ -152,23 +166,7 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Save the current theme before wiping the session
-        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
-
-        try:
-            # 2. Forcing an expired date is much more reliable than just .delete()
-            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
-            cookie_manager.delete("formlabs_mes_token")
-        except Exception:
-            pass
-
-        # 3. Clear memory
-        st.session_state.clear()
-
-        # 4. Restore the theme and set a Hard Lockout flag!
-        st.session_state["preferred_theme"] = saved_theme
-        st.session_state["explicitly_logged_out"] = True
-
+        do_logout(cookie_manager)
         st.switch_page("Home.py")
         st.rerun()
 
@@ -176,13 +174,32 @@ st.markdown("### 📈 Historical Plant Analytics & Production Trends")
 
 df_logs = get_production_logs_df()
 
+# Build operator dropdown from resolved identities: prefer each operator_id's
+# CURRENT full_name so a mid-history rename shows one entry, not two. Any
+# operator_name with no resolved operator_id (a deleted account, or a legacy
+# name that never matched a real user) still gets its own entry so that data
+# isn't silently hidden from the filter.
+_users_df = get_all_users_df()
+_id_to_name = dict(zip(_users_df["id"], _users_df["full_name"])) if not _users_df.empty else {}
+_name_to_id = {v: k for k, v in _id_to_name.items()}
+
+if not df_logs.empty:
+    resolved_ids = df_logs["operator_id"].dropna().unique().tolist()
+    resolved_names = sorted({_id_to_name[i] for i in resolved_ids if i in _id_to_name})
+    unresolved_names = sorted(
+        df_logs[df_logs["operator_id"].isna()]["operator_name"].dropna().unique().tolist()
+    )
+    operator_options = ["All Operators"] + resolved_names + unresolved_names
+else:
+    operator_options = ["All Operators"]
+
 col_f1, col_f2, col_f3 = st.columns(3)
 with col_f1:
     date_range = st.selectbox("📅 Time Horizon", ["Past 7 Days", "Past 30 Days", "Year to Date", "All Time"])
 with col_f2:
     selected_resin = st.selectbox("🧪 Resin Filter", ["All Resins"] + sorted(df_logs["resin_type"].dropna().unique().tolist()) if not df_logs.empty else ["All Resins"])
 with col_f3:
-    selected_op = st.selectbox("👤 Operator Filter", ["All Operators"] + sorted(df_logs["operator_name"].dropna().unique().tolist()) if not df_logs.empty else ["All Operators"])
+    selected_op = st.selectbox("👤 Operator Filter", operator_options)
 
 today_d = date.today()
 start_date_filter = None
@@ -190,7 +207,17 @@ if date_range == "Past 7 Days": start_date_filter = today_d - timedelta(days=7)
 elif date_range == "Past 30 Days": start_date_filter = today_d - timedelta(days=30)
 elif date_range == "Year to Date": start_date_filter = date(today_d.year, 1, 1)
 
-hist_df = get_production_logs_df(start_date=start_date_filter, end_date=today_d, resin=selected_resin, operator=selected_op)
+# A selected name that resolves to a current user filters by operator_id (FK) —
+# this pulls in every row tied to that person, even ones logged under an older
+# name. A name with no resolution (deleted/legacy) falls back to an exact
+# operator_name match, same as before.
+selected_operator_id = _name_to_id.get(selected_op) if selected_op != "All Operators" else None
+selected_operator_name = selected_op if (selected_op != "All Operators" and selected_operator_id is None) else None
+
+hist_df = get_production_logs_df(
+    start_date=start_date_filter, end_date=today_d, resin=selected_resin,
+    operator=selected_operator_name, operator_id=selected_operator_id
+)
 
 if not hist_df.empty:
     hist_df['date_str'] = pd.to_datetime(hist_df['date']).dt.strftime('%Y-%m-%d')
@@ -217,7 +244,13 @@ if not pour_df.empty:
         fig_trend.update_layout(height=320, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#94A3B8'))
         st.plotly_chart(fig_trend, use_container_width=True)
     with c2:
-        op_df = pour_df.groupby("operator_name")["bottles_filled"].sum().reset_index().sort_values("bottles_filled", ascending=False)
-        fig_op = px.bar(op_df, x="operator_name", y="bottles_filled", color="operator_name", title="Total Output by Operator")
+        _op_display = pour_df.copy()
+        _op_display["display_operator"] = _op_display.apply(
+            lambda r: _id_to_name.get(r.get("operator_id"), r["operator_name"]), axis=1
+        )
+        op_df = _op_display.groupby("display_operator")["bottles_filled"].sum().reset_index().sort_values("bottles_filled", ascending=False)
+        fig_op = px.bar(op_df, x="display_operator", y="bottles_filled", color="display_operator", title="Total Output by Operator")
         fig_op.update_layout(height=320, showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#94A3B8'))
         st.plotly_chart(fig_op, use_container_width=True)
+
+

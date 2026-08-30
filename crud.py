@@ -1,16 +1,21 @@
+
+
+
+
 import os
 import uuid
 import subprocess
 from datetime import datetime, date, timedelta
-
+import secrets
 import pandas as pd
 import bcrypt
-from sqlalchemy import desc, text
+from sqlalchemy import desc, text, func, or_
 
 from db_core import engine, ScopedSession, Base
 from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
-                    CleanlinessAudit, FloorMessage, PlantSettings, Suggestion)
+                    CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession)
+from app_logger import logger
 
 # --- DIRECTORY SETUP ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,36 +33,161 @@ MASTER_FORMLABS_CATALOG = (
     ("V2", "RS-C2-GPBK-05", "FLGPBK05", "24", "Standard Black V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
 )
 
+# Set True by init_db() after its first successful run in this process — see
+# the guard inside init_db() for why repeat calls need to be a no-op.
+_schema_ready = False
+
 def init_db():
-    Base.metadata.create_all(bind=engine)
-    migrations = [
-        "ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255);",
-        "ALTER TABLE users ADD COLUMN email VARCHAR(120);",
-        "ALTER TABLE users ADD COLUMN target_lph FLOAT DEFAULT 400.0;",
-        "ALTER TABLE users ADD COLUMN shift VARCHAR(20) DEFAULT 'Shift 1';",
-        "ALTER TABLE resin_specs ADD COLUMN units_per_skid INTEGER DEFAULT 500;",
-        "ALTER TABLE assigned_runs ADD COLUMN run_type VARCHAR(20) DEFAULT 'Pouring';",
-        "ALTER TABLE plant_settings ADD COLUMN packing_target_uph FLOAT DEFAULT 500.0;",
-        "ALTER TABLE plant_settings ADD COLUMN shift_3_start VARCHAR(10) DEFAULT '23:00';",
-        "ALTER TABLE plant_settings ADD COLUMN shift_3_hours FLOAT DEFAULT 7.0;",
-        "ALTER TABLE plant_settings ADD COLUMN packing_yield_target_pct FLOAT DEFAULT 99.5;",
-        "ALTER TABLE reactors ADD COLUMN current_resin VARCHAR(100);",
-        "ALTER TABLE reactors ADD COLUMN assigned_pump VARCHAR(50);",
-        "ALTER TABLE plant_settings ADD COLUMN shift_1_break_mins FLOAT DEFAULT 60.0;",
-        "ALTER TABLE plant_settings ADD COLUMN shift_2_break_mins FLOAT DEFAULT 60.0;",
-        "ALTER TABLE plant_settings ADD COLUMN shift_3_break_mins FLOAT DEFAULT 60.0;",
-        "ALTER TABLE plant_settings ADD COLUMN handover_emails TEXT DEFAULT '';",
-        "ALTER TABLE users ADD COLUMN preferred_theme VARCHAR(50) DEFAULT 'Default Dark';",
-        "ALTER TABLE plant_settings ADD COLUMN enable_packing INTEGER DEFAULT 1;",
-        "ALTER TABLE users ADD COLUMN avatar_filename VARCHAR(255);"
-    ]
-    with engine.connect() as conn:
-        for m in migrations:
-            try:
-                conn.execute(text(m))
-                conn.commit()
-            except Exception:
-                conn.rollback()
+    """Brings the database schema up to date via Alembic.
+
+    Replaces the old pattern of Base.metadata.create_all() plus a
+    hand-maintained, ever-growing list of raw ALTER TABLE strings wrapped in
+    a silent try/except (which couldn't tell "column already exists" from a
+    real failure). Schema changes now live as versioned files in
+    migrations/versions/ — see migrations/versions/0001_baseline_schema.py
+    for the full history up to the point Alembic was introduced.
+
+    Handles the one-time transition automatically, so this still self-heals
+    on every boot the way the old init_db() did:
+      - Brand-new, empty database: runs every migration from scratch.
+      - Existing database that already has the app's tables (built by the
+        pre-Alembic init_db()) but was never stamped with a migration
+        version: gets stamped at the baseline instead of re-running
+        CREATE TABLE against tables that already exist. This assumes the
+        existing schema is fully caught up with the old ALTER TABLE list —
+        true for any database this app has been booted against, since that
+        list ran on every prior boot.
+      - Already stamped (normal case after the first boot on this version):
+        just applies any migrations added since.
+
+    Idempotent within a process: unlike the old raw-SQL version, Alembic's
+    command.upgrade()/command.stamp() aren't designed to be re-entered
+    multiple times in one running process (its internal EnvironmentContext
+    teardown breaks the second time around — surfaces as a stray
+    `KeyError: 'script'`). Streamlit re-executes Home.py's script on every
+    rerun, and this function is called both from crud.py's own module-level
+    bootstrap and explicitly from Home.py, so without this guard the real
+    Alembic call could fire many times over a single session. The guard
+    below makes every call after the first a no-op.
+    """
+    global _schema_ready
+    if _schema_ready:
+        return
+
+    from alembic.config import Config
+    from alembic import command
+    from sqlalchemy import inspect
+
+    alembic_cfg = Config(os.path.join(BASE_DIR, "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", os.path.join(BASE_DIR, "migrations"))
+
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+
+    if "alembic_version" not in existing_tables and "users" in existing_tables:
+        command.stamp(alembic_cfg, "0001_baseline")
+    else:
+        command.upgrade(alembic_cfg, "head")
+
+    _schema_ready = True
+
+
+# --- FOREIGN KEY RESOLUTION HELPERS ---
+# The tables above still carry the original free-text name columns
+# (operator_name, pump_station, resin_type, ...) so nothing that reads
+# them breaks. These helpers resolve a name to its matching row's id at
+# write time, so new records get a real FK alongside the legacy string.
+# A name with no match (e.g. the "System Auto-Reconciliation" pseudo-operator
+# used for adjustment entries) simply resolves to None — that's expected,
+# not an error, since not every name string corresponds to a real row.
+def _resolve_user_id(session, full_name: str):
+    if not full_name:
+        return None
+    name = str(full_name).strip().lower()
+    user = session.query(User).filter(func.lower(User.full_name) == name).first()
+    return user.id if user else None
+
+
+def _resolve_pump_id(session, station_name: str):
+    if not station_name:
+        return None
+    name = str(station_name).strip().lower()
+    pump = session.query(PumpStation).filter(func.lower(PumpStation.station_name) == name).first()
+    return pump.id if pump else None
+
+
+def _resolve_resin_id(session, resin_name: str):
+    if not resin_name:
+        return None
+    name = str(resin_name).strip().lower()
+    resin = session.query(ResinSpec).filter(func.lower(ResinSpec.resin_name) == name).first()
+    return resin.id if resin else None
+
+
+def backfill_foreign_keys():
+    """One-time (but safe-to-rerun) pass that fills in the new *_id FK columns
+    on rows that predate them, by matching the legacy name strings. Only
+    touches rows where the FK is still NULL, so after the first run it's a
+    cheap no-op scan. Call this after seed_initial_data() so the pump/resin/
+    user reference rows it matches against already exist."""
+    session = ScopedSession()
+    try:
+        user_map = {u.full_name.strip().lower(): u.id for u in session.query(User).all()}
+        pump_map = {p.station_name.strip().lower(): p.id for p in session.query(PumpStation).all()}
+        resin_map = {r.resin_name.strip().lower(): r.id for r in session.query(ResinSpec).all()}
+
+        def uid(name): return user_map.get(str(name or "").strip().lower())
+        def pid(name): return pump_map.get(str(name or "").strip().lower())
+        def rid(name): return resin_map.get(str(name or "").strip().lower())
+
+        for log in session.query(ProductionLog).filter(or_(
+                ProductionLog.operator_id.is_(None), ProductionLog.pump_station_id.is_(None),
+                ProductionLog.resin_spec_id.is_(None))).all():
+            if log.operator_id is None: log.operator_id = uid(log.operator_name)
+            if log.pump_station_id is None: log.pump_station_id = pid(log.pump_station)
+            if log.resin_spec_id is None: log.resin_spec_id = rid(log.resin_type)
+
+        for log in session.query(DowntimeLog).filter(or_(
+                DowntimeLog.operator_id.is_(None), DowntimeLog.pump_station_id.is_(None))).all():
+            if log.operator_id is None: log.operator_id = uid(log.operator_name)
+            if log.pump_station_id is None: log.pump_station_id = pid(log.pump_station)
+
+        for run in session.query(AssignedRun).filter(or_(
+                AssignedRun.resin_spec_id.is_(None), AssignedRun.operator_id.is_(None),
+                AssignedRun.pump_station_id.is_(None))).all():
+            if run.resin_spec_id is None: run.resin_spec_id = rid(run.resin_type)
+            if run.operator_id is None: run.operator_id = uid(run.assigned_operator)
+            if run.pump_station_id is None: run.pump_station_id = pid(run.pump_station)
+
+        for chk in session.query(DailyChecklist).filter(DailyChecklist.operator_id.is_(None)).all():
+            chk.operator_id = uid(chk.operator_name)
+
+        for aud in session.query(CleanlinessAudit).filter(or_(
+                CleanlinessAudit.operator_id.is_(None), CleanlinessAudit.pump_station_id.is_(None),
+                CleanlinessAudit.resin_spec_id.is_(None))).all():
+            if aud.operator_id is None: aud.operator_id = uid(aud.operator_name)
+            if aud.pump_station_id is None: aud.pump_station_id = pid(aud.pump_station)
+            if aud.resin_spec_id is None: aud.resin_spec_id = rid(aud.resin_type)
+
+        for msg in session.query(FloorMessage).filter(or_(
+                FloorMessage.operator_id.is_(None), FloorMessage.sender_id.is_(None))).all():
+            if msg.operator_id is None: msg.operator_id = uid(msg.operator_name)
+            if msg.sender_id is None: msg.sender_id = uid(msg.sender_name)
+
+        for reactor in session.query(Reactor).filter(or_(
+                Reactor.current_resin_id.is_(None), Reactor.assigned_pump_id.is_(None))).all():
+            if reactor.current_resin_id is None and reactor.current_resin:
+                reactor.current_resin_id = rid(reactor.current_resin)
+            if reactor.assigned_pump_id is None and reactor.assigned_pump:
+                reactor.assigned_pump_id = pid(reactor.assigned_pump)
+
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("backfill_foreign_keys() failed; FK columns may be incomplete until the next boot")
+    finally:
+        session.close()
+
 
 def seed_initial_data():
     session = ScopedSession()
@@ -245,7 +375,10 @@ def create_assigned_run(
         new_run = AssignedRun(
             reactor_id=reactor_id, reactor_size_l=reactor_size_l, resin_type=resin_type, cartridge_type=cartridge_type,
             target_units=target_units, current_units=auto_detected, assigned_operator=assigned_operator,
-            pump_station=pump_station, status=new_status, lot_number=lot_number, notes=notes, run_type=run_type
+            pump_station=pump_station, status=new_status, lot_number=lot_number, notes=notes, run_type=run_type,
+            resin_spec_id=_resolve_resin_id(session, resin_type),
+            operator_id=_resolve_user_id(session, assigned_operator),
+            pump_station_id=_resolve_pump_id(session, pump_station),
         )
         session.add(new_run)
 
@@ -254,6 +387,8 @@ def create_assigned_run(
             if reactor:
                 reactor.current_resin = resin_type
                 reactor.assigned_pump = pump_station
+                reactor.current_resin_id = _resolve_resin_id(session, resin_type)
+                reactor.assigned_pump_id = _resolve_pump_id(session, pump_station)
 
         session.commit()
         return auto_detected
@@ -273,6 +408,8 @@ def complete_run_with_custom_total(run_id: int, final_units: int):
                 if reactor and reactor.current_resin == run.resin_type:
                     reactor.current_resin = None
                     reactor.assigned_pump = None
+                    reactor.current_resin_id = None
+                    reactor.assigned_pump_id = None
             session.commit()
             return True
         return False
@@ -437,23 +574,82 @@ def update_reactor_config(reactor_id: int, resin: str, pump: str):
         session.close()
 
 
-def authenticate_user(username: str, pin: str):
+# --- LOGIN LOCKOUT SETTINGS ---
+MAX_FAILED_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION_MINUTES = 15
+
+
+def authenticate_user(username: str, pin: str) -> tuple[dict | None, str | None]:
+    """Verifies credentials with a per-user lockout after repeated failures.
+
+    Returns (user_dict, None) on success, or (None, error_message) on failure.
+    The error message distinguishes "locked out" from "wrong credentials" so
+    the UI can tell the operator how long to wait, without ever revealing
+    whether the failure was a bad username or a bad PIN.
+    """
     session = ScopedSession()
     try:
-        # Fetch the user purely by username first
         user = session.query(User).filter(User.username == username.lower().strip()).first()
 
-        # Verify the PIN using bcrypt
-        if user and bcrypt.checkpw(pin.strip().encode('utf-8'), user.pin.encode('utf-8')):
+        # Unknown username: don't leak whether the account exists.
+        if not user:
+            return None, "Invalid credentials."
+
+        now = datetime.utcnow()
+
+        # Already locked out? Tell them how much longer to wait.
+        if user.locked_until and user.locked_until > now:
+            remaining = int((user.locked_until - now).total_seconds() // 60) + 1
+            return None, f"Account locked. Try again in {remaining} minute(s)."
+
+        # Lock has expired naturally — clear it before checking the PIN.
+        if user.locked_until and user.locked_until <= now:
+            user.locked_until = None
+            user.failed_login_attempts = 0
+
+        try:
+            pin_valid = bcrypt.checkpw(pin.strip().encode('utf-8'), user.pin.encode('utf-8'))
+        except (ValueError, TypeError):
+            # user.pin isn't a valid bcrypt hash — almost certainly a legacy
+            # account whose PIN was never touched since before the bcrypt
+            # migration (it's structurally impossible to convert an old
+            # SHA-256 digest into a bcrypt hash without the original
+            # plaintext PIN, so this can only be fixed with a manual reset).
+            # No PIN will ever verify here, so don't count it against the
+            # lockout threshold — that would just lock the account for a
+            # problem retrying can't solve.
+            session.commit()
+            logger.error(
+                f"authenticate_user(): user '{user.username}' has a malformed/legacy PIN hash "
+                f"(pre-bcrypt) — needs an IT admin PIN reset, not a retry"
+            )
+            return None, "This account's PIN needs to be reset by an IT administrator."
+
+        if pin_valid:
+            # Success: reset the counter.
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            session.commit()
             return {
                 "id": user.id,
                 "username": user.username,
                 "full_name": user.full_name,
                 "role": user.role,
                 "shift": user.shift,
-                "preferred_theme": getattr(user, 'preferred_theme', "Default Dark")
-            }
-        return None
+                "preferred_theme": getattr(user, 'preferred_theme', "Default Dark"),
+                "avatar_filename": user.avatar_filename,
+            }, None
+
+        # Wrong PIN: increment and lock if this tips over the threshold.
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+        if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+            user.locked_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+            session.commit()
+            return None, f"Too many failed attempts. Account locked for {LOCKOUT_DURATION_MINUTES} minutes."
+
+        session.commit()
+        remaining_tries = MAX_FAILED_LOGIN_ATTEMPTS - user.failed_login_attempts
+        return None, f"Invalid credentials. {remaining_tries} attempt(s) remaining before lockout."
     finally:
         session.close()
 
@@ -503,6 +699,9 @@ def update_user_pin(user_id: int, new_pin: str) -> bool:
         if user:
             # Hash the new PIN using bcrypt before saving
             user.pin = bcrypt.hashpw(new_pin.strip().encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            # A PIN reset (e.g. by an IT admin) also clears any active lockout.
+            user.failed_login_attempts = 0
+            user.locked_until = None
             session.commit()
             return True
         return False
@@ -517,6 +716,22 @@ def update_user_theme(user_id: int, new_theme: str):
         if user:
             user.preferred_theme = new_theme
             session.commit()
+    finally:
+        session.close()
+
+
+def unlock_user_account(user_id: int) -> bool:
+    """Manually clears a lockout without touching the user's PIN — for IT admins
+    who just need to let someone back in before the timer expires."""
+    session = ScopedSession()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if user:
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            session.commit()
+            return True
+        return False
     finally:
         session.close()
 
@@ -572,7 +787,10 @@ def reconcile_reactor_level(reactor_name: str, visual_fill_pct: float, operator_
             shift="Shift 1", cartridge_type="V2" if vol_mult == 1.0 else "RPS", resin_type=reactor.current_resin,
             lot_number=(active_run.lot_number if active_run else "RECON-ADJ"),
             bottles_filled=target_units_poured - current_logged,
-            notes=f"👀 VISUAL LEVEL CALIBRATION: Set to {visual_fill_pct}%. {notes}".strip()
+            notes=f"👀 VISUAL LEVEL CALIBRATION: Set to {visual_fill_pct}%. {notes}".strip(),
+            operator_id=_resolve_user_id(session, operator_name),
+            pump_station_id=_resolve_pump_id(session, reactor.assigned_pump or ""),
+            resin_spec_id=_resolve_resin_id(session, reactor.current_resin),
         ))
         if active_run: active_run.current_units = target_units_poured
         session.commit()
@@ -594,7 +812,10 @@ def add_hourly_log(
         session.add(ProductionLog(
             log_type=log_type, operator_name=operator_name, pump_station=pump_station, shift=shift,
             cartridge_type=cartridge_type, resin_type=resin_type, lot_number=lot_number, bottles_filled=bottles,
-            scrap_empty=scrap_empty, scrap_filled=scrap_filled, notes=notes
+            scrap_empty=scrap_empty, scrap_filled=scrap_filled, notes=notes,
+            operator_id=_resolve_user_id(session, operator_name),
+            pump_station_id=_resolve_pump_id(session, pump_station),
+            resin_spec_id=_resolve_resin_id(session, resin_type),
         ))
         if log_type == "Hourly Bottle Count":
             active_run = session.query(AssignedRun).filter(
@@ -616,7 +837,9 @@ def add_downtime_log(operator_name: str, pump_station: str, shift: str, reason: 
     session = ScopedSession()
     try:
         session.add(DowntimeLog(operator_name=operator_name, pump_station=pump_station, shift=shift, reason=reason,
-                                duration_min=duration_min, notes=notes))
+                                duration_min=duration_min, notes=notes,
+                                operator_id=_resolve_user_id(session, operator_name),
+                                pump_station_id=_resolve_pump_id(session, pump_station)))
         session.commit()
     finally:
         session.close()
@@ -633,7 +856,10 @@ def add_cleanliness_audit(audit_type: str, operator_name: str, pump_station: str
         session.add(
             CleanlinessAudit(audit_type=audit_type, operator_name=operator_name, pump_station=pump_station, shift=shift,
                              resin_type=resin_type if resin_type else None, image_filename=saved_filename,
-                             is_spill="Yes" if is_spill else "No", notes=notes))
+                             is_spill="Yes" if is_spill else "No", notes=notes,
+                             operator_id=_resolve_user_id(session, operator_name),
+                             pump_station_id=_resolve_pump_id(session, pump_station),
+                             resin_spec_id=_resolve_resin_id(session, resin_type)))
         session.commit()
         return True
     except Exception as e:
@@ -653,7 +879,7 @@ def get_cleanliness_audits_df() -> pd.DataFrame:
 
 
 def get_production_logs_df(start_date=None, end_date=None, shift=None, pump=None, resin=None,
-                           operator=None) -> pd.DataFrame:
+                           operator=None, operator_id=None) -> pd.DataFrame:
     session = ScopedSession()
     try:
         query = session.query(ProductionLog)
@@ -669,7 +895,14 @@ def get_production_logs_df(start_date=None, end_date=None, shift=None, pump=None
             query = query.filter(ProductionLog.pump_station == pump)
         if resin and resin != "All Resins":
             query = query.filter(ProductionLog.resin_type == resin)
-        if operator and operator != "All Operators":
+        # operator_id (FK) takes priority when given: it catches every row tied
+        # to that person regardless of what name string was logged at the time,
+        # so a mid-history rename doesn't silently drop old rows from the filter.
+        # Falls back to the exact-string match for names with no resolved user
+        # (e.g. a deleted account, or a legacy typo that never matched anyone).
+        if operator_id:
+            query = query.filter(ProductionLog.operator_id == operator_id)
+        elif operator and operator != "All Operators":
             query = query.filter(ProductionLog.operator_name == operator)
 
         return pd.read_sql(query.order_by(desc(ProductionLog.timestamp)).statement, session.bind)
@@ -724,42 +957,13 @@ def delete_cleanliness_audit(audit_id: int) -> bool:
     finally:
         session.close()
 
-def create_database_backup() -> str:
-    filename = f"mes_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
-    env = os.environ.copy()
-
-    # Strictly pulling from .env, no fallback!
-    env["PGPASSWORD"] = os.getenv("PG_PASS")
-
-    try:
-        subprocess.run(
-            [r"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe", "-U", "postgres", "-h", "localhost", "-p", "5432", "-d",
-             "formlabs_mes", "-f", os.path.join(BACKUP_DIR, filename)], env=env, check=True)
-        return filename
-    except Exception:
-        return None
-
-
-def restore_database_backup(filename: str) -> bool:
-    env = os.environ.copy()
-
-    # Strictly pulling from .env, no fallback!
-    env["PGPASSWORD"] = os.getenv("PG_PASS")
-
-    try:
-        subprocess.run(
-            [r"C:\Program Files\PostgreSQL\18\bin\psql.exe", "-U", "postgres", "-h", "localhost", "-p", "5432", "-d",
-             "formlabs_mes", "-f", os.path.join(BACKUP_DIR, filename)], env=env, check=True)
-        return True
-    except Exception:
-        return False
-
-
 def send_floor_message(operator_name: str, sender_name: str, message: str, is_manager: bool):
     session = ScopedSession()
     try:
         session.add(FloorMessage(operator_name=operator_name, sender_name=sender_name, message=message,
-                                 is_manager_reply=1 if is_manager else 0))
+                                 is_manager_reply=1 if is_manager else 0,
+                                 operator_id=_resolve_user_id(session, operator_name),
+                                 sender_id=_resolve_user_id(session, sender_name)))
         session.commit()
     finally:
         session.close()
@@ -768,8 +972,17 @@ def send_floor_message(operator_name: str, sender_name: str, message: str, is_ma
 def get_chat_history_df(operator_name: str) -> pd.DataFrame:
     session = ScopedSession()
     try:
-        return pd.read_sql(session.query(FloorMessage).filter(FloorMessage.operator_name == operator_name).order_by(
-            FloorMessage.timestamp).statement, session.bind)
+        # Outer-joined against the sender's current avatar (by sender_id, the
+        # FK resolved at write time in send_floor_message) so the chat UI can
+        # show the real sender's profile picture instead of a generic icon.
+        # LEFT join so messages whose sender account was deleted, or logged
+        # before the FK backfill, still render (just with no avatar).
+        return pd.read_sql(
+            session.query(FloorMessage, User.avatar_filename.label("sender_avatar"))
+            .outerjoin(User, User.id == FloorMessage.sender_id)
+            .filter(FloorMessage.operator_name == operator_name)
+            .order_by(FloorMessage.timestamp).statement,
+            session.bind)
     finally:
         session.close()
 
@@ -812,7 +1025,8 @@ def reconcile_pouring_to_packing(lot_number: str, final_packed_qty: int) -> bool
             resin_type=pour_logs[0].resin_type,
             lot_number=lot_number,
             bottles_filled=delta,  # Assign the entire delta to the System
-            notes=f"🔄 AUTO-RECONCILIATION: Plant-wide adjustment of {delta} units to align with finalized packing skid count of {final_packed_qty}."
+            notes=f"🔄 AUTO-RECONCILIATION: Plant-wide adjustment of {delta} units to align with finalized packing skid count of {final_packed_qty}.",
+            resin_spec_id=_resolve_resin_id(session, pour_logs[0].resin_type),
         )
         session.add(adj_log)
 
@@ -855,7 +1069,10 @@ def reconcile_reactor_liters(reactor_name: str, actual_liters: float, operator_n
             resin_type=reactor.current_resin,
             lot_number=(active_run.lot_number if active_run else "RECON-ADJ"),
             bottles_filled=target_units_poured - current_logged,
-            notes=f"👀 EXACT LITERS CALIBRATION: Set to {actual_liters}L remaining. {notes}".strip()
+            notes=f"👀 EXACT LITERS CALIBRATION: Set to {actual_liters}L remaining. {notes}".strip(),
+            operator_id=_resolve_user_id(session, operator_name),
+            pump_station_id=_resolve_pump_id(session, reactor.assigned_pump or ""),
+            resin_spec_id=_resolve_resin_id(session, reactor.current_resin),
         ))
 
         if active_run:
@@ -896,7 +1113,8 @@ def submit_daily_checklist(operator_name: str, shift: str) -> bool:
 
         new_check = DailyChecklist(
             operator_name=operator_name,
-            shift=shift
+            shift=shift,
+            operator_id=_resolve_user_id(session, operator_name),
         )
         session.add(new_check)
         session.commit()
@@ -972,6 +1190,7 @@ def add_resin_spec(cartridge_type: str, sku: str, resin_code: str, resin_name: s
         return True
     except Exception:
         session.rollback()
+        logger.exception(f"add_resin_spec() failed for resin_name={resin_name!r}")
         return False
     finally:
         session.close()
@@ -1004,6 +1223,7 @@ def add_suggestion(user_name: str, user_role: str, category: str, suggestion: st
         return True
     except Exception:
         session.rollback()
+        logger.exception(f"add_suggestion() failed for user_name={user_name!r}")
         return False
     finally:
         session.close()
@@ -1012,7 +1232,17 @@ def add_suggestion(user_name: str, user_role: str, category: str, suggestion: st
 def get_all_suggestions_df() -> pd.DataFrame:
     session = ScopedSession()
     try:
-        return pd.read_sql(session.query(Suggestion).order_by(desc(Suggestion.timestamp)).statement, session.bind)
+        # Suggestion only ever stored a free-text submitter name (no FK, this
+        # inbox predates the FK-backfill work), so the avatar match here is
+        # necessarily best-effort by current display name -- same fallback
+        # approach already used for legacy string-only lookups elsewhere in
+        # the app. A renamed account or a name that no longer matches any
+        # user just renders with no avatar rather than the wrong one.
+        return pd.read_sql(
+            session.query(Suggestion, User.avatar_filename.label("avatar_filename"))
+            .outerjoin(User, User.full_name == Suggestion.user_name)
+            .order_by(desc(Suggestion.timestamp)).statement,
+            session.bind)
     finally:
         session.close()
 
@@ -1151,5 +1381,68 @@ def update_plant_settings(
     finally:
         session.close()
 
+SESSION_LIFETIME_DAYS = 30
+
+def create_session(user_id: int) -> str:
+    """Issues a random, unguessable session token and stores it server-side."""
+    session = ScopedSession()
+    try:
+        token = secrets.token_urlsafe(32)
+        session.add(UserSession(
+            token=token,
+            user_id=user_id,
+            expires_at=datetime.utcnow() + timedelta(days=SESSION_LIFETIME_DAYS)
+        ))
+        session.commit()
+        return token
+    finally:
+        session.close()
+
+def get_user_by_session_token(token: str) -> dict | None:
+    """Validates a session token server-side and returns the user, or None."""
+    if not token:
+        return None
+    session = ScopedSession()
+    try:
+        sess = session.query(UserSession).filter(UserSession.token == token).first()
+        if not sess or sess.expires_at < datetime.utcnow():
+            if sess:  # expired — clean it up
+                session.delete(sess)
+                session.commit()
+            return None
+
+        user = session.query(User).filter(User.id == sess.user_id).first()
+        if not user:
+            return None
+
+        return {
+            "id": user.id, "username": user.username, "full_name": user.full_name,
+            "role": user.role, "shift": user.shift,
+            "preferred_theme": getattr(user, "preferred_theme", "Default Dark"),
+            "avatar_filename": user.avatar_filename,
+        }
+    finally:
+        session.close()
+
+def delete_session(token: str):
+    """Revokes a single session token (used on logout)."""
+    if not token:
+        return
+    session = ScopedSession()
+    try:
+        sess = session.query(UserSession).filter(UserSession.token == token).first()
+        if sess:
+            session.delete(sess)
+            session.commit()
+    finally:
+        session.close()
+
 init_db()
 seed_initial_data()
+backfill_foreign_keys()
+
+
+
+
+
+

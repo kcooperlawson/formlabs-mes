@@ -1,0 +1,36 @@
+2026-08-29 19:15:51 [ERROR] formlabs_mes: authenticate_user(): user 'operator' has a malformed/legacy PIN hash (pre-bcrypt) — needs an IT admin PIN reset, not a retry
+2026-08-29 19:15:54 [ERROR] formlabs_mes: authenticate_user(): user 'operator' has a malformed/legacy PIN hash (pre-bcrypt) — needs an IT admin PIN reset, not a retry
+2026-08-29 20:33:21 [ERROR] formlabs_mes: do_logout() cookie cleanup failed (user was logged out locally regardless)
+Traceback (most recent call last):
+  File "C:\Users\keaga\Desktop\fromlabs-mes3.5.2\utils.py", line 154, in do_logout
+    cookie_manager.delete("formlabs_mes_token")
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\extra_streamlit_components\CookieManager\__init__.py", line 109, in delete
+    self.cookie_manager(method="delete", cookie=cookie, key=key, default=False)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\streamlit\components\v1\custom_component.py", line 57, in __call__
+    return self.create_instance(
+           ~~~~~~~~~~~~~~~~~~~~^
+        *args,
+        ^^^^^^
+    ...<4 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\streamlit\runtime\metrics_util.py", line 628, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\streamlit\components\v1\custom_component.py", line 214, in create_instance
+    return_value = marshall_component(dg, element)
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\streamlit\components\v1\custom_component.py", line 174, in marshall_component
+    computed_id = compute_and_register_element_id(
+        "component_instance",
+    ...<9 lines>...
+        special_args=special_args,
+    )
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\streamlit\elements\lib\utils.py", line 261, in compute_and_register_element_id
+    _register_element_id(ctx, element_type, element_id)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keaga\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\streamlit\elements\lib\utils.py", line 143, in _register_element_id
+    raise StreamlitDuplicateElementKey(user_key)
+streamlit.errors.StreamlitDuplicateElementKey: There are multiple elements with the same `key='delete'`. To fix this, please make sure that the `key` argument is unique for each element you create.

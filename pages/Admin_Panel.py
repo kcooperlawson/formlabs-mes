@@ -1,8 +1,9 @@
+
+
 import os
 import sys
 import base64
 from datetime import datetime, date, timedelta
-
 import pandas as pd
 import streamlit as st
 import extra_streamlit_components as stx
@@ -13,8 +14,10 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import (
     get_all_users_df, create_user, update_user_role_and_shift, update_user_pin, delete_user_by_username,
+    unlock_user_account,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
-    get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion,
+    get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
+    check_authentication
 )
 
 st.set_page_config(page_title="IT Admin Console | Formlabs MES", page_icon="🛡️", layout="wide")
@@ -43,19 +46,7 @@ active_theme = st.session_state.get("preferred_theme", "Default Dark")
 st.markdown(THEMES.get(active_theme, THEMES["Default Dark"]), unsafe_allow_html=True)
 
 cookie_manager = stx.CookieManager(key="admin_cookies")
-
-if not st.session_state.get("authenticated", False):
-    cached_token = cookie_manager.get(cookie="formlabs_mes_token")
-    if cached_token:
-        df_users = get_all_users_df()
-        user_match = df_users[df_users["username"] == cached_token]
-        if not user_match.empty:
-            ud = user_match.iloc[0]
-            st.session_state.update(
-                {"authenticated": True, "user_id": int(ud["id"]), "user_role": ud["role"], "user_name": ud["full_name"],
-                 "user_shift": ud.get("shift", "Shift 1"),
-                 "preferred_theme": ud.get("preferred_theme", "Default Dark")})
-            st.rerun()
+check_authentication(cookie_manager)
 
 if not st.session_state.get("authenticated", False):
     st.switch_page("Home.py")
@@ -74,46 +65,19 @@ def get_base64_image(image_path):
 
 
 logo_b64 = get_base64_image("assets/formlabs_logo.png")
-# --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
 
-
-cookie_manager = stx.CookieManager(key="adm_cookies")
-
-# Initialize our double-take flag
-if "auth_check_passed" not in st.session_state:
-    st.session_state["auth_check_passed"] = False
-
-if not st.session_state.get("authenticated", False):
-    cached_token = cookie_manager.get(cookie="formlabs_mes_token")
-
-    if cached_token is not None:
-        from database import get_all_users_df
-
-        df_users = get_all_users_df()
-        user_match = df_users[df_users["username"] == cached_token]
-
-        if not user_match.empty:
-            user_data = user_match.iloc[0]
-            st.session_state["authenticated"] = True
-            st.session_state["user_id"] = int(user_data["id"])
-            st.session_state["user_role"] = user_data["role"]
-            st.session_state["user_name"] = user_data["full_name"]
-            st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
-            st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            st.rerun()
-    else:
-        # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
-        if not st.session_state["auth_check_passed"]:
-            st.session_state["auth_check_passed"] = True
-            st.rerun()
-        else:
-            # If it checked twice and STILL no cookie, they are truly logged out.
-            st.warning("🔒 Session Expired. Please log in.")
-            st.switch_page("Home.py")
-            st.stop()
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
+    from database import get_avatar_path
+    _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
+    if _avatar_path:
+        _av_col, _name_col = st.columns([1, 4])
+        with _av_col:
+            st.image(_avatar_path, width=48)
+        with _name_col:
+            st.markdown(f"### {st.session_state.get('user_name', 'Operator')}")
+    else:
+        st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
@@ -128,6 +92,7 @@ with st.sidebar:
     # Only show IT Admin to actual admins
     if st.session_state.get("user_role") == "admin":
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+    st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
 
     st.markdown("---")
     # ---------------------------
@@ -173,6 +138,19 @@ with st.sidebar:
                 cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
+            st.markdown("---")
+            st.markdown("#### Profile Picture")
+            _current_avatar = get_avatar_path(st.session_state.get("avatar_filename"))
+            if _current_avatar:
+                st.image(_current_avatar, width=64, caption="Current Avatar")
+            new_avatar = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg", "webp"], key="set_avatar_upload")
+            if st.button("💾 Save Avatar", type="primary", use_container_width=True):
+                if new_avatar:
+                    from database import update_user_avatar
+                    st.session_state["avatar_filename"] = update_user_avatar(st.session_state["user_id"], new_avatar)
+                    st.toast("✅ Avatar updated!")
+                    st.rerun()
+
         # TAB 3: FEEDBACK
         with set_tab3:
             st.markdown("#### Universal Feedback Box")
@@ -198,23 +176,7 @@ with st.sidebar:
             st.caption("⚠️ CHANGELOG.md file not found in root directory.")
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Save the current theme before wiping the session
-        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
-
-        try:
-            # 2. Forcing an expired date is much more reliable than just .delete()
-            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
-            cookie_manager.delete("formlabs_mes_token")
-        except Exception:
-            pass
-
-        # 3. Clear memory
-        st.session_state.clear()
-
-        # 4. Restore the theme and set a Hard Lockout flag!
-        st.session_state["preferred_theme"] = saved_theme
-        st.session_state["explicitly_logged_out"] = True
-
+        do_logout(cookie_manager)
         st.switch_page("Home.py")
         st.rerun()
 
@@ -276,9 +238,19 @@ with tab_roster:
         st.markdown("#### 📋 Current Staff Database")
         df_users = get_all_users_df()
         if not df_users.empty:
+            display_df = df_users[["id", "full_name", "username", "email", "role", "shift"]].copy()
+            now = datetime.utcnow()
+            locked_mask = df_users["locked_until"].apply(
+                lambda v: pd.notna(v) and pd.Timestamp(v).to_pydatetime() > now
+            )
+            display_df["status"] = locked_mask.map({True: "🔒 Locked", False: "✅ Active"})
             st.markdown(
-                f'<div style="overflow-x: auto;">{df_users[["id", "full_name", "username", "email", "role", "shift"]].to_html(index=False)}</div>',
+                f'<div style="overflow-x: auto;">{display_df.to_html(index=False)}</div>',
                 unsafe_allow_html=True)
+
+            locked_users_df = df_users[locked_mask]
+            if not locked_users_df.empty:
+                st.warning(f"🔒 {len(locked_users_df)} account(s) currently locked out.")
 
     with st.expander("🛠️ Modify User Role & Shift Assignment", expanded=False):
         if not df_users.empty:
@@ -300,6 +272,28 @@ with tab_roster:
                 update_user_pin(int(user_row["id"]), new_temp_pin)
                 st.toast(f"✅ PIN updated for '{target_user}'.")
                 st.rerun()
+
+    with st.expander("🔓 Unlock Account", expanded=False):
+        if not df_users.empty:
+            now = datetime.utcnow()
+            locked_mask = df_users["locked_until"].apply(
+                lambda v: pd.notna(v) and pd.Timestamp(v).to_pydatetime() > now
+            )
+            locked_users_df = df_users[locked_mask]
+            if locked_users_df.empty:
+                st.caption("No accounts are currently locked out.")
+            else:
+                unlock_target = st.selectbox(
+                    "Select Locked Personnel", locked_users_df["username"].tolist(), key="unlock_usr"
+                )
+                unlock_row = locked_users_df[locked_users_df["username"] == unlock_target].iloc[0]
+                locked_until_local = pd.Timestamp(unlock_row["locked_until"]).to_pydatetime()
+                minutes_left = max(0, int((locked_until_local - now).total_seconds() // 60) + 1)
+                st.caption(f"Locked for {minutes_left} more minute(s), after {int(unlock_row['failed_login_attempts'])} failed attempts.")
+                if st.button("🔓 Unlock Now", type="primary"):
+                    if unlock_user_account(int(unlock_row["id"])):
+                        st.toast(f"✅ '{unlock_target}' unlocked.")
+                        st.rerun()
 
     with st.expander("⚠️ Terminate Account", expanded=False):
         if not df_users.empty:
@@ -517,7 +511,7 @@ with tab_settings:
 
 with tab_sug:
     st.subheader("💡 Floor Feedback & Issue Inbox")
-    from database import get_all_suggestions_df, update_suggestion_status, delete_suggestion
+    from database import get_all_suggestions_df, update_suggestion_status, delete_suggestion, get_avatar_data_uri
 
     df_sug = get_all_suggestions_df()
 
@@ -536,6 +530,15 @@ with tab_sug:
 
         for _, row in df_sug.iterrows():
             badge_color = "#EF4444" if row["status"] == "Open" else ("#F59E0B" if row["status"] == "In Review" else "#10B981")
+            # Suggestion has no FK to users (it only ever stored a free-text
+            # submitter name), so this avatar is matched by current display
+            # name via get_all_suggestions_df's join -- best-effort, same as
+            # other legacy name-matched lookups in this app.
+            _sug_avatar_uri = get_avatar_data_uri(row.get("avatar_filename"))
+            _sug_avatar_html = (
+                f'<img src="{_sug_avatar_uri}" style="width:20px; height:20px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:2px;">'
+                if _sug_avatar_uri else "👤"
+            )
             with st.container():
                 st.markdown(
                     f"""
@@ -545,7 +548,7 @@ with tab_sug:
                                 <span style="background:{badge_color}; color:#FFFFFF; font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:4px;">● {row['status'].upper()}</span>
                                 <b style="color:#FFFFFF; font-size:1.05rem; margin-left:8px;">[{row['category']}]</b>
                             </div>
-                            <span style="color:#94A3B8; font-size:0.8rem;">👤 <b>{row['user_name']}</b> ({str(row['user_role']).upper()}) | {pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M')}</span>
+                            <span style="color:#94A3B8; font-size:0.8rem;">{_sug_avatar_html} <b>{row['user_name']}</b> ({str(row['user_role']).upper()}) | {pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M')}</span>
                         </div>
                         <p style="color:#E2E8F0; margin-top:10px; font-size:0.95rem;">{row['suggestion']}</p>
                         {f'<div style="color:#38BDF8; font-size:0.85rem;"><b>Admin Note:</b> {row["admin_notes"]}</div>' if row["admin_notes"] else ''}
@@ -574,3 +577,5 @@ with tab_sug:
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("No suggestions or issue reports submitted yet.")
+
+

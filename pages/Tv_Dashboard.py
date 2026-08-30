@@ -1,3 +1,5 @@
+
+
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
@@ -12,6 +14,9 @@ from database import (
     get_all_resin_specs_df,
     get_plant_settings,
     add_suggestion,
+    do_logout,
+    check_authentication,
+    get_all_users_df,
 )
 import base64
 
@@ -41,40 +46,10 @@ st.markdown("""
 import extra_streamlit_components as stx
 cookie_manager = stx.CookieManager(key="tv_cookies")
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-
-
-# Initialize our double-take flag
-if "auth_check_passed" not in st.session_state:
-    st.session_state["auth_check_passed"] = False
+check_authentication(cookie_manager)
 
 if not st.session_state.get("authenticated", False):
-    cached_token = cookie_manager.get(cookie="formlabs_mes_token")
-
-    if cached_token is not None:
-        from database import get_all_users_df
-
-        df_users = get_all_users_df()
-        user_match = df_users[df_users["username"] == cached_token]
-
-        if not user_match.empty:
-            user_data = user_match.iloc[0]
-            st.session_state["authenticated"] = True
-            st.session_state["user_id"] = int(user_data["id"])
-            st.session_state["user_role"] = user_data["role"]
-            st.session_state["user_name"] = user_data["full_name"]
-            st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
-            st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            st.rerun()
-    else:
-        # THE DOUBLE-TAKE: Give the browser 0.2 seconds to send the cookie!
-        if not st.session_state["auth_check_passed"]:
-            st.session_state["auth_check_passed"] = True
-            st.rerun()
-        else:
-            # If it checked twice and STILL no cookie, they are truly logged out.
-            st.warning("🔒 Session Expired. Please log in.")
-            st.switch_page("Home.py")
-            st.stop()
+    st.switch_page("Home.py")
 
 # 1. Initialize User & Role FIRST
 current_user = st.session_state.get("user_name") or "Keagan C."
@@ -144,7 +119,16 @@ st.markdown("---")
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
+    from database import get_avatar_path
+    _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
+    if _avatar_path:
+        _av_col, _name_col = st.columns([1, 4])
+        with _av_col:
+            st.image(_avatar_path, width=48)
+        with _name_col:
+            st.markdown(f"### {st.session_state.get('user_name', 'Operator')}")
+    else:
+        st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
@@ -195,12 +179,15 @@ with st.sidebar:
 
             st.markdown("---")
             st.markdown("#### Profile Picture")
+            _current_avatar = get_avatar_path(st.session_state.get("avatar_filename"))
+            if _current_avatar:
+                st.image(_current_avatar, width=64, caption="Current Avatar")
             new_avatar = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg", "webp"], key="set_avatar_upload")
             if st.button("💾 Save Avatar", type="primary", use_container_width=True):
                 if new_avatar:
                     from database import update_user_avatar
 
-                    update_user_avatar(st.session_state["user_id"], new_avatar)
+                    st.session_state["avatar_filename"] = update_user_avatar(st.session_state["user_id"], new_avatar)
                     st.toast("✅ Avatar updated!")
                     st.rerun()
 
@@ -226,23 +213,7 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Save the current theme before wiping the session
-        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
-
-        try:
-            # 2. Forcing an expired date is much more reliable than just .delete()
-            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
-            cookie_manager.delete("formlabs_mes_token")
-        except Exception:
-            pass
-
-        # 3. Clear memory
-        st.session_state.clear()
-
-        # 4. Restore the theme and set a Hard Lockout flag!
-        st.session_state["preferred_theme"] = saved_theme
-        st.session_state["explicitly_logged_out"] = True
-
+        do_logout(cookie_manager)
         st.switch_page("Home.py")
         st.rerun()
 
@@ -273,6 +244,17 @@ else:
 
 df_today_pour = df_today[df_today["log_type"] == "Hourly Bottle Count"] if not df_today.empty else pd.DataFrame()
 df_today_pack = df_today[df_today["log_type"] == "Packing Count"] if not df_today.empty else pd.DataFrame()
+
+# Consolidate an operator's rows under their current display name via the
+# operator_id FK, so a rename mid-shift (or a stray typo in an old row)
+# doesn't split one person's numbers into two leaderboard entries.
+if not df_today_pour.empty:
+    _users_df = get_all_users_df()
+    _id_to_name = dict(zip(_users_df["id"], _users_df["full_name"])) if not _users_df.empty else {}
+    df_today_pour = df_today_pour.copy()
+    df_today_pour["display_operator"] = df_today_pour.apply(
+        lambda r: _id_to_name.get(r.get("operator_id"), r["operator_name"]), axis=1
+    )
 
 def calculate_liters(df_subset):
     total_l = 0.0
@@ -441,8 +423,8 @@ with b1:
     st.markdown("<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>💧 TOP POURERS (L/h)</div>", unsafe_allow_html=True)
     if not df_today_pour.empty:
         op_stats = []
-        for op in df_today_pour["operator_name"].unique():
-            op_data = df_today_pour[df_today_pour["operator_name"] == op]
+        for op in df_today_pour["display_operator"].unique():
+            op_data = df_today_pour[df_today_pour["display_operator"] == op]
 
             # 1. Calculate liters
             op_liters = 0.0
@@ -521,3 +503,4 @@ with b3:
 
 # Wait 10 seconds, then force the entire script to run again from top to bottom
 st.rerun()
+

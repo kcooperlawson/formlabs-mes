@@ -1,3 +1,4 @@
+
 import os
 import sys
 import base64
@@ -44,36 +45,13 @@ st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 st.logo("assets/formlabs_logo.png")
 
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-cookie_manager = stx.CookieManager(key="mgr_cookies")
+from database import do_logout, check_authentication
 
-if "auth_check_passed" not in st.session_state:
-    st.session_state["auth_check_passed"] = False
+cookie_manager = stx.CookieManager(key="mgr_cookies")
+check_authentication(cookie_manager)
 
 if not st.session_state.get("authenticated", False):
-    cached_token = cookie_manager.get(cookie="formlabs_mes_token")
-
-    if cached_token is not None:
-        from database import get_all_users_df
-        df_users = get_all_users_df()
-        user_match = df_users[df_users["username"] == cached_token]
-
-        if not user_match.empty:
-            user_data = user_match.iloc[0]
-            st.session_state["authenticated"] = True
-            st.session_state["user_id"] = int(user_data["id"])
-            st.session_state["user_role"] = user_data["role"]
-            st.session_state["user_name"] = user_data["full_name"]
-            st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
-            st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
-            st.rerun()
-    else:
-        if not st.session_state["auth_check_passed"]:
-            st.session_state["auth_check_passed"] = True
-            st.rerun()
-        else:
-            st.warning("🔒 Session Expired. Please log in.")
-            st.switch_page("Home.py")
-            st.stop()
+    st.switch_page("Home.py")
 
 if st.session_state.get("user_role") not in ["manager", "admin"]:
     st.error("🔒 Access Denied: Restricted to Plant Management.")
@@ -91,7 +69,16 @@ logo_b64 = get_base64_image("assets/formlabs_logo.png")
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
+    from database import get_avatar_path
+    _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
+    if _avatar_path:
+        _av_col, _name_col = st.columns([1, 4])
+        with _av_col:
+            st.image(_avatar_path, width=48)
+        with _name_col:
+            st.markdown(f"### {st.session_state.get('user_name', 'Operator')}")
+    else:
+        st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
@@ -151,11 +138,14 @@ with st.sidebar:
 
             st.markdown("---")
             st.markdown("#### Profile Picture")
+            _current_avatar = get_avatar_path(st.session_state.get("avatar_filename"))
+            if _current_avatar:
+                st.image(_current_avatar, width=64, caption="Current Avatar")
             new_avatar = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg", "webp"], key="set_avatar_upload")
             if st.button("💾 Save Avatar", type="primary", use_container_width=True):
                 if new_avatar:
                     from database import update_user_avatar
-                    update_user_avatar(st.session_state["user_id"], new_avatar)
+                    st.session_state["avatar_filename"] = update_user_avatar(st.session_state["user_id"], new_avatar)
                     st.toast("✅ Avatar updated!")
                     st.rerun()
 
@@ -176,23 +166,7 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        # 1. Save the current theme before wiping the session
-        saved_theme = st.session_state.get("preferred_theme", "Default Dark")
-
-        try:
-            # 2. Forcing an expired date is much more reliable than just .delete()
-            cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
-            cookie_manager.delete("formlabs_mes_token")
-        except Exception:
-            pass
-
-        # 3. Clear memory
-        st.session_state.clear()
-
-        # 4. Restore the theme and set a Hard Lockout flag!
-        st.session_state["preferred_theme"] = saved_theme
-        st.session_state["explicitly_logged_out"] = True
-
+        do_logout(cookie_manager)
         st.switch_page("Home.py")
         st.rerun()
 
