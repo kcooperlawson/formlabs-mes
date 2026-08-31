@@ -15,3 +15,28 @@ backups/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Secrets — never commit. Use .env.example as the shared template.
+.env
+*.env
+!.env.example
+
+# Local database files and dumps
+*.db
+*.sql
+
+# Editor / tooling noise
+.idea/
+.vscode/
+
+# Generated: combine.py rebuilds this on demand
+combined_code.txt
+
+# Runtime output
+logs/
+resin_backups/
+
+# Rollback copies taken before edits
+*.bak
+*.bak_*
+*.bak[0-9]*
