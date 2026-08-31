@@ -3,7 +3,8 @@
 
 import base64
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as dtime, timedelta
+from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 import extra_streamlit_components as stx
@@ -31,6 +32,7 @@ from database import (
     add_suggestion,
     do_logout,
 )
+from database import esc
 
 # Pull our external theme dictionary
 try:
@@ -38,6 +40,98 @@ try:
 except ImportError:
     THEMES = {
         "Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+
+
+# ===================== SHIFT STATUS ENGINE =====================
+# Single source of truth for "what shift is running right now." Used both
+# by the "Live Today" data filter above and the Live Shift Trajectory card
+# further down the page — previously each had its own, slightly different
+# copy of this logic, and they could (and did) disagree.
+#
+# Two bugs fixed here at once:
+#   1. Timezone: this used datetime.now(), the server's raw system clock,
+#      which is not necessarily the plant's own local time. Logged
+#      timestamps elsewhere on this page are explicitly tz_convert()'d to
+#      America/New_York for the same reason — this calculation just never
+#      got the same treatment, so "is a shift active" could be wrong by
+#      however many hours the server is offset from the floor.
+#   2. Midnight rollover: it only ever checked "did this shift start
+#      earlier TODAY," so a shift that's still running from a start time
+#      the previous calendar day (or one that already ended hours ago but
+#      whose start time still looks like "later today") could report the
+#      wrong answer well into the night. This checks both today's and
+#      yesterday's start time for each shift.
+PLANT_TZ = ZoneInfo("America/New_York")
+
+
+def _shift_window(base_date, start_h, start_m, gross_hours):
+    start = datetime.combine(base_date, dtime(start_h, start_m), tzinfo=PLANT_TZ)
+    end = start + timedelta(hours=gross_hours)
+    return start, end
+
+
+def compute_shift_status(settings):
+    now = datetime.now(PLANT_TZ)
+    today = now.date()
+    yesterday = today - timedelta(days=1)
+    tomorrow = today + timedelta(days=1)
+
+    s1_h, s1_m = map(int, settings["shift_1_start"].split(":"))
+    s2_h, s2_m = map(int, settings["shift_2_start"].split(":"))
+    s1_gross = float(settings["shift_1_hours"])
+    s2_gross = float(settings["shift_2_hours"])
+    s1_break = float(settings.get("shift_1_break_mins", 60.0)) / 60.0
+    s2_break = float(settings.get("shift_2_break_mins", 60.0)) / 60.0
+    s1_net = max(0.1, s1_gross - s1_break)
+    s2_net = max(0.1, s2_gross - s2_break)
+
+    shifts = [
+        ("Shift 1", s1_h, s1_m, s1_gross, s1_net),
+        ("Shift 2", s2_h, s2_m, s2_gross, s2_net),
+    ]
+
+    # Check "started yesterday" first so a still-running overnight shift
+    # takes priority over anything that merely "starts today" but hasn't
+    # happened yet.
+    for base_date in (yesterday, today):
+        for name, h, m, gross, net in shifts:
+            start, end = _shift_window(base_date, h, m, gross)
+            if start <= now < end:
+                elapsed_gross = (now - start).total_seconds() / 3600.0
+                elapsed_net = elapsed_gross * (net / gross) if gross > 0 else 0.0
+                return {
+                    "is_active": True,
+                    "shift_name": name,
+                    "elapsed_net": elapsed_net,
+                    "shift_net_hours": net,
+                    "remaining_hours": max(0.0, net - elapsed_net),
+                    "shift_pct": min(100.0, max(0.0, (elapsed_net / net) * 100.0)) if net > 0 else 0.0,
+                    "next_shift_label": "",
+                }
+
+    # No shift running — find the next one so the idle state can say
+    # something useful instead of just "nothing's active."
+    upcoming = []
+    for base_date in (today, tomorrow):
+        for name, h, m, gross, net in shifts:
+            start, _ = _shift_window(base_date, h, m, gross)
+            if start > now:
+                upcoming.append((start, name))
+    upcoming.sort(key=lambda x: x[0])
+    next_shift_label = ""
+    if upcoming:
+        next_start, next_name = upcoming[0]
+        next_shift_label = f"{next_name} at {next_start.strftime('%I:%M %p').lstrip('0')}"
+
+    return {
+        "is_active": False,
+        "shift_name": "Off-Shift",
+        "elapsed_net": 0.0,
+        "shift_net_hours": s1_net,
+        "remaining_hours": 0.0,
+        "shift_pct": 0.0,
+        "next_shift_label": next_shift_label,
+    }
 
 
 @st.fragment(run_every="10s")
@@ -109,7 +203,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.7.0"
+APP_VERSION = "PT-V3.8.0"
 
 st.set_page_config(
     page_title="Formlabs MES Live Dashboard",
@@ -144,6 +238,21 @@ st.markdown(THEMES[current_css_theme], unsafe_allow_html=True)
 
 init_db()
 seed_initial_data()
+
+
+@st.cache_resource
+def _announce_database_once():
+    """Advertises this machine's database on the local network via mDNS so
+    a Device Gateway on another floor PC can find it automatically instead
+    of a manually-typed DB_URL - see service_announcer.py. Wrapped in
+    st.cache_resource the same way as the FK backfill just below, so it
+    only actually runs once per server process despite Streamlit
+    re-executing this script on every rerun."""
+    from service_announcer import start_announcing
+    start_announcing()
+
+
+_announce_database_once()
 
 
 @st.cache_resource
@@ -496,11 +605,6 @@ st.markdown(
         <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain;">
         <div class="system-badge" style="margin-left: 0px;">{APP_VERSION}</div>
     </div>
-    <div style="margin-top: 2px;">
-        <span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; white-space: nowrap; display: inline-block;">
-            ● PLANT FLOOR LIVE SYNC
-        </span>
-    </div>
 </div>
 """,
     unsafe_allow_html=True,
@@ -535,9 +639,14 @@ with f1_col2:
             "Choose Exact Production Date:", all_dates, index=0 if all_dates else 0
         )
     elif time_horizon == "⚡ Live Today (Active Shift)":
-        st.info(
-            "Showing live production logged for today"
-            f" ({date.today().strftime('%Y-%m-%d')})."
+        st.markdown(
+            f"""<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:6px;">
+                <span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; white-space: nowrap;">
+                    ● PLANT FLOOR LIVE SYNC
+                </span>
+                <span style="color:#94A3B8; font-size:0.85rem;">Showing live production for today ({date.today().strftime('%Y-%m-%d')}).</span>
+            </div>""",
+            unsafe_allow_html=True,
         )
     elif time_horizon == "📆 Past 7 Days (Week)":
         st.caption("Aggregating all runs over the rolling 7-day window.")
@@ -583,22 +692,17 @@ today_d = date.today()
 if not filtered_df.empty:
     if time_horizon == "⚡ Live Today (Active Shift)":
         settings = get_plant_settings()
-        time_now = datetime.now()
-        s1_h, s1_m = map(int, settings["shift_1_start"].split(":"))
-        s2_h, s2_m = map(int, settings["shift_2_start"].split(":"))
-
-        s1_start = time_now.replace(hour=s1_h, minute=s1_m, second=0)
-        s2_start = time_now.replace(hour=s2_h, minute=s2_m, second=0)
-
-        if s1_start <= time_now < s2_start:
-            active_shift = "Shift 1"
+        _live_shift_status = compute_shift_status(settings)
+        if _live_shift_status["is_active"]:
+            filtered_df = filtered_df[
+                (filtered_df["date_obj"] == today_d) &
+                (filtered_df["shift"] == _live_shift_status["shift_name"])
+                ]
         else:
-            active_shift = "Shift 2"
-
-        filtered_df = filtered_df[
-            (filtered_df["date_obj"] == today_d) &
-            (filtered_df["shift"] == active_shift)
-            ]
+            # No shift is actually running right now — "Live Today" should
+            # show nothing rather than leaking into whichever shift the
+            # old logic defaulted to.
+            filtered_df = filtered_df.iloc[0:0]
     elif time_horizon == "📅 Specific Single Day":
         filtered_df = filtered_df[filtered_df["date_str"] == selected_specific_date]
     elif time_horizon == "📆 Past 7 Days (Week)":
@@ -687,45 +791,12 @@ if not pack_df.empty:
 settings = get_plant_settings()
 target_rate_lh = float(settings.get("target_lph", 400.0))
 
-time_now = datetime.now()
-s1_h, s1_m = map(int, settings["shift_1_start"].split(":"))
-s2_h, s2_m = map(int, settings["shift_2_start"].split(":"))
-
-s1_gross = float(settings["shift_1_hours"])
-s2_gross = float(settings["shift_2_hours"])
-
-s1_break = float(settings.get("shift_1_break_mins", 60.0)) / 60.0
-s2_break = float(settings.get("shift_2_break_mins", 60.0)) / 60.0
-
-s1_net = max(0.1, s1_gross - s1_break)
-s2_net = max(0.1, s2_gross - s2_break)
-
-s1_start_time = time_now.replace(hour=s1_h, minute=s1_m, second=0)
-s2_start_time = time_now.replace(hour=s2_h, minute=s2_m, second=0)
-s1_end_time = s1_start_time + timedelta(hours=s1_gross)
-s2_end_time = s2_start_time + timedelta(hours=s2_gross)
-
-# 1. Determine if a shift is currently active
-is_shift_active = False
-active_shift_name = "Off-Shift"
-elapsed_gross = 0.0
-active_shift_net = s1_net
-
-if s1_start_time <= time_now < s1_end_time:
-    is_shift_active = True
-    active_shift_name = "Shift 1"
-    active_shift_net = s1_net
-    elapsed_gross = (time_now - s1_start_time).total_seconds() / 3600.0
-    elapsed_net = elapsed_gross * (s1_net / s1_gross)
-elif s2_start_time <= time_now < s2_end_time:
-    is_shift_active = True
-    active_shift_name = "Shift 2"
-    active_shift_net = s2_net
-    elapsed_gross = (time_now - s2_start_time).total_seconds() / 3600.0
-    elapsed_net = elapsed_gross * (s2_net / s2_gross)
-else:
-    is_shift_active = False
-    elapsed_net = 0.0
+shift_status = compute_shift_status(settings)
+is_shift_active = shift_status["is_active"]
+active_shift_name = shift_status["shift_name"]
+elapsed_net = shift_status["elapsed_net"]
+active_shift_net = shift_status["shift_net_hours"]
+shift_pct = shift_status["shift_pct"]
 
 operating_hours = elapsed_net if (time_horizon == "⚡ Live Today (Active Shift)" and is_shift_active) else active_shift_net
 
@@ -734,7 +805,9 @@ pack_velocity_uh = (total_packed / operating_hours) if operating_hours > 0 else 
 oee_pct = (run_velocity_lh / target_rate_lh) * 100.0 if target_rate_lh > 0 else 0.0
 yield_pct = (total_poured / (total_poured + total_scrap) * 100.0) if (total_poured + total_scrap) > 0 else 100.0
 
-# 2. Dynamic Pace Variance Display Logic
+# 2. Dynamic Pace Variance Display Logic — only meaningful in Live Today
+# mode. The trajectory card itself is now hidden outside that mode (see
+# row2_col1 below) instead of showing stale placeholder text.
 if is_shift_active and time_horizon == "⚡ Live Today (Active Shift)":
     expected_now = target_rate_lh * max(0.1, operating_hours)
     pace_variance_l = liters_output - expected_now
@@ -743,11 +816,11 @@ if is_shift_active and time_horizon == "⚡ Live Today (Active Shift)":
     status_badge = f"🟢 {active_shift_name} Active"
 else:
     pace_variance_l = 0.0
-    expected_display = "⏸️ Shift Standby"
-    variance_display = "⏸️ Idle / Off-Hours"
-    status_badge = "🔴 No Active Shift"
+    expected_display = "—"
+    variance_display = "—"
+    status_badge = "⏸️ Floor Idle"
 
-remaining_hours = max(0.0, active_shift_net - operating_hours)
+remaining_hours = shift_status["remaining_hours"]
 blended_rate = run_velocity_lh if operating_hours > 0.5 else target_rate_lh
 projected_total = liters_output + (blended_rate * remaining_hours)
 
@@ -842,23 +915,66 @@ if show_pouring:
 
     row2_col1, row2_col2 = st.columns((2, 1.3))
     with row2_col1:
-        st.markdown(
-            f"""
-            <div style="background:#0D1627; border:1px solid #1E2B45; border-radius:8px; padding:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <b style="color:#10B981; font-size:1.1rem;">⏱️ LIVE SHIFT TRAJECTORY</b>
-                    <span style="font-size:0.8rem; font-weight:800; color:#94A3B8;">{status_badge}</span>
+        if time_horizon == "⚡ Live Today (Active Shift)" and is_shift_active:
+            variance_color = "#10B981" if pace_variance_l >= 0 else "#EF4444"
+            st.markdown(
+                f"""
+                <div class="telemetry-grid-card" style="border-color:#10B981;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="telemetry-label" style="color:#10B981;">⏱️ LIVE SHIFT TRAJECTORY</span>
+                        <span style="font-size:0.75rem; font-weight:800; color:#10B981;">{status_badge}</span>
+                    </div>
+                    <div style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-top:4px;">{active_shift_name}</div>
+                    <div style="margin:14px 0 6px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#94A3B8; margin-bottom:4px;">
+                            <span>{elapsed_net:.1f}h elapsed</span><span>{remaining_hours:.1f}h remaining</span>
+                        </div>
+                        <div style="background:#1E2B45; border-radius:6px; height:8px; overflow:hidden;">
+                            <div style="background:linear-gradient(90deg,#10B981,#00D2FF); width:{shift_pct:.1f}%; height:100%; transition: width 0.4s ease;"></div>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
+                        <div><span class="telemetry-label" style="color:#00D2FF;">Expected Right Now</span><br><b style="font-size:1.3rem; color:#00D2FF;">{expected_display}</b></div>
+                        <div><span class="telemetry-label" style="color:#A855F7;">Projected Shift End</span><br><b style="font-size:1.3rem; color:#A855F7;">{projected_total:,.0f} L</b></div>
+                        <div><span class="telemetry-label">Pace Variance</span><br><b style="font-size:1.1rem; color:{variance_color};">{variance_display}</b></div>
+                        <div><span class="telemetry-label">OEE Performance</span><br><b style="font-size:1.1rem; color:#FFFFFF;">{oee_pct:.1f}%</b></div>
+                    </div>
                 </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:12px;">
-                    <div><span class="telemetry-label" style="color:#00D2FF;">Expected Right Now</span><br><b style="font-size:1.4rem; color:#00D2FF;">{expected_display}</b></div>
-                    <div><span class="telemetry-label" style="color:#A855F7;">Projected Shift End</span><br><b style="font-size:1.4rem; color:#A855F7;">{projected_total:,.0f} L</b></div>
-                    <div style="margin-top:8px;"><span class="telemetry-label">Pace Variance</span><br><b style="font-size:1.2rem; color:{'#10B981' if is_shift_active and pace_variance_l >= 0 else ('#EF4444' if is_shift_active else '#94A3B8')};">{variance_display}</b></div>
-                    <div style="margin-top:8px;"><span class="telemetry-label">OEE Performance</span><br><b style="font-size:1.2rem; color:#FFFFFF;">{oee_pct:.1f}%</b></div>
+                """,
+                unsafe_allow_html=True,
+            )
+        elif time_horizon == "⚡ Live Today (Active Shift)":
+            next_line = (
+                f"Next up: <b style='color:#94A3B8;'>{shift_status['next_shift_label']}</b>"
+                if shift_status.get("next_shift_label")
+                else "Check Plant Settings for the shift schedule."
+            )
+            st.markdown(
+                f"""
+                <div class="telemetry-grid-card" style="border-color:#334155;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="telemetry-label">⏱️ LIVE SHIFT TRAJECTORY</span>
+                        <span style="font-size:0.75rem; font-weight:800; color:#64748B;">⏸️ FLOOR IDLE</span>
+                    </div>
+                    <div style="text-align:center; padding:26px 0 10px;">
+                        <div style="font-size:1rem; color:#94A3B8;">No shift is currently running.</div>
+                        <div style="font-size:0.8rem; color:#64748B; margin-top:6px;">{next_line}</div>
+                    </div>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"""
+                <div class="telemetry-grid-card" style="border-color:#1E2B45;">
+                    <div class="telemetry-label">📊 VIEWING HISTORICAL DATA</div>
+                    <div style="font-size:0.95rem; color:#94A3B8; margin-top:10px;">Live shift trajectory only applies in <b style="color:#FFFFFF;">⚡ Live Today (Active Shift)</b> mode.</div>
+                    <div style="font-size:0.8rem; color:#64748B; margin-top:8px;">Switch the Time Horizon filter above to see real-time shift pace.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     with row2_col2:
         st.markdown(
             "<div class='operator-card'><div class='telemetry-label'"
@@ -956,8 +1072,8 @@ if show_packing:
                 f"<div style='display:flex; justify-content:space-between;"
                 " border-bottom:1px solid #1E2B45; padding-bottom:6px;"
                 " margin-bottom:6px;'><span><b"
-                f" style='color:#FFFFFF;'>{row['resin_type']}</b> <span"
-                f" style='color:#94A3B8; font-size:0.8rem;'>({row['lot_number']})</span></span>"
+                f" style='color:#FFFFFF;'>{esc(row['resin_type'])}</b> <span"
+                f" style='color:#94A3B8; font-size:0.8rem;'>({esc(row['lot_number'])})</span></span>"
                 f" <span><b style='color:#A855F7;'>{row['bottles_filled']:,}"
                 f" Units</b> <span style='color:#64748B;'>({skids:.1f}"
                 " Skids)</span></span></div>",

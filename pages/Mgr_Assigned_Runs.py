@@ -1,7 +1,7 @@
 
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
@@ -13,6 +13,7 @@ from database import (
     get_plant_settings, get_all_reactors_df, complete_run_with_custom_total,
     reconcile_pouring_to_packing, get_all_users_df, get_all_pumps_df, do_logout
 )
+from database import esc
 
 st.set_page_config(page_title="Assigned Runs | Formlabs MES", page_icon="🎯", layout="wide")
 
@@ -39,136 +40,9 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
     st.stop()
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
-import extra_streamlit_components as stx
-
-# Initialize cookie manager for the logout function
-cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
+from ui_shell import render_shell
+cookie_manager = render_shell()
 current_role = st.session_state.get("user_role", "operator")
-
-# --- TOP NAVIGATION BAR ---
-st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-else:
-    nav_1, nav_2, nav_3 = st.columns(3, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-
-st.markdown("---")
-
-# --- SIDEBAR: PROFILE & SETTINGS ---
-with st.sidebar:
-    st.markdown("---")
-    from database import get_avatar_path
-    _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
-    if _avatar_path:
-        _av_col, _name_col = st.columns([1, 4])
-        with _av_col:
-            st.image(_avatar_path, width=48)
-        with _name_col:
-            st.markdown(f"### {st.session_state.get('user_name', 'Operator')}")
-    else:
-        st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
-    st.caption(
-        f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
-
-    # --- CUSTOM ROUTER (NEW) ---
-    st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-
-    # Only show IT Admin to actual admins
-    if st.session_state.get("user_role") == "admin":
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-
-    st.markdown("---")
-    # ---------------------------
-
-    # UNIFIED SETTINGS POPOVER
-    with st.popover("⚙️ Account & Preferences", use_container_width=True):
-        set_tab1, set_tab2, set_tab3 = st.tabs(["🔑 Security", "🎨 Theme & Avatar", "💡 Feedback"])
-
-        with set_tab1:
-            st.markdown("#### Update Account Credentials")
-            with st.form("user_cred_form"):
-                acc_name = st.text_input("Full Display Name", value=st.session_state.get("user_name", ""))
-                acc_user = st.text_input("Username / ID", value=st.session_state.get("username", ""))
-                acc_pin = st.text_input("New PIN / Password", type="password", placeholder="Leave blank to keep current PIN")
-
-                if st.form_submit_button("💾 Save Credentials", type="primary", use_container_width=True):
-                    from database import update_user_credentials
-                    success, msg = update_user_credentials(st.session_state["user_id"], acc_user, acc_pin, acc_name)
-                    if success:
-                        st.session_state["user_name"] = acc_name.strip()
-                        st.session_state["username"] = acc_user.lower().strip()
-                        st.toast(f"✅ {msg}")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ {msg}")
-
-        with set_tab2:
-            st.markdown("#### Interface Preferences")
-            current_t = st.session_state.get("preferred_theme", "Default Dark")
-            chosen_t = st.selectbox("System Theme", list(THEMES.keys()), index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
-
-            if chosen_t != current_t:
-                from database import update_user_theme
-                update_user_theme(st.session_state["user_id"], chosen_t)
-                st.session_state["preferred_theme"] = chosen_t
-                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
-                st.rerun()
-
-            st.markdown("---")
-            st.markdown("#### Profile Picture")
-            _current_avatar = get_avatar_path(st.session_state.get("avatar_filename"))
-            if _current_avatar:
-                st.image(_current_avatar, width=64, caption="Current Avatar")
-            new_avatar = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg", "webp"], key="set_avatar_upload")
-            if st.button("💾 Save Avatar", type="primary", use_container_width=True):
-                if new_avatar:
-                    from database import update_user_avatar
-                    st.session_state["avatar_filename"] = update_user_avatar(st.session_state["user_id"], new_avatar)
-                    st.toast("✅ Avatar updated!")
-                    st.rerun()
-
-        with set_tab3:
-            st.markdown("#### Universal Feedback Box")
-            with st.form("settings_sug_form", clear_on_submit=True):
-                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue"))
-                s_txt = st.text_area("Observation / Description")
-                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                    if s_txt.strip():
-                        from database import add_suggestion
-                        add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat, s_txt)
-                        st.success("✅ Submitted to IT Admin!")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    if current_role in ["admin", "manager"]:
-        st.page_link("pages/Tv_Dashboard.py", label="Launch TV Mode", icon="📺", use_container_width=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
-    if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
-        do_logout(cookie_manager)
-        st.switch_page("Home.py")
-        st.rerun()
 
 st.subheader("🎯 Fleet Production Progress & Work Order Dispatch")
 
@@ -293,11 +167,11 @@ with active_tab:
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <span style="background:{status_color}; color:#FFFFFF; font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:4px;">● {run['status'].upper()}</span>
-                            <span style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-left:8px;">{run['resin_type']}</span>
-                            <span style="color:#00D2FF; font-weight:700; font-size:0.85rem; margin-left:6px;">[{run['cartridge_type']}]</span>
+                            <span style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-left:8px;">{esc(run['resin_type'])}</span>
+                            <span style="color:#00D2FF; font-weight:700; font-size:0.85rem; margin-left:6px;">[{esc(run['cartridge_type'])}]</span>
                         </div>
                         <div style="color:#94A3B8; font-size:0.85rem;">
-                            🛢️ <b>{run.get('reactor_id', 'Reactor 1')}</b> ({run.get('reactor_size_l', 5000):,} L) &nbsp;|&nbsp; 🏷️ <b>{run['pump_station']}</b> &nbsp;|&nbsp; 👤 <b>{run['assigned_operator']}</b>
+                            🛢️ <b>{esc(run.get('reactor_id', 'Reactor 1'))}</b> ({run.get('reactor_size_l', 5000):,} L) &nbsp;|&nbsp; 🏷️ <b>{esc(run['pump_station'])}</b> &nbsp;|&nbsp; 👤 <b>{esc(run['assigned_operator'])}</b>
                         </div>
                     </div>
                 </div>
@@ -308,11 +182,11 @@ with active_tab:
                 b_c1, b_c2, b_c3, b_c4 = st.columns(4)
                 with b_c1:
                     if st.button("+50 Units", key=f"p50_{run['id']}", use_container_width=True):
-                        update_assigned_run_progress(run['id'], 50)
+                        update_assigned_run_progress(run['id'], 50, operator_name=st.session_state.get("user_name", "Manager"))
                         st.rerun()
                 with b_c2:
                     if st.button("+100 Units", key=f"p100_{run['id']}", use_container_width=True):
-                        update_assigned_run_progress(run['id'], 100)
+                        update_assigned_run_progress(run['id'], 100, operator_name=st.session_state.get("user_name", "Manager"))
                         st.rerun()
                 with b_c3:
                     if run["status"] == "Queued":
@@ -357,6 +231,23 @@ with completed_tab:
         if not comp_df.empty:
             display_cols = ["id", "created_at", "run_type", "resin_type", "cartridge_type", "lot_number", "target_units", "current_units", "assigned_operator", "pump_station"]
             st.markdown(f'<div style="overflow-x: auto;">{comp_df[display_cols].to_html(index=False)}</div>', unsafe_allow_html=True)
+
+            st.markdown("---")
+            with st.expander("🗑️ Delete a Completed Work Order"):
+                st.caption(
+                    "Permanently removes this archived Work Order. This does NOT delete the "
+                    "underlying production logs that were poured/packed against it — use "
+                    "**Log Management & Cleanup** from the Manager Cockpit for that."
+                )
+                _del_options = {
+                    f"#{r['id']} — {r['resin_type']} [{r['cartridge_type']}] · {r['pump_station']} · {r['current_units']:,} units · {r['created_at']}": r['id']
+                    for _, r in comp_df.iterrows()
+                }
+                _del_label = st.selectbox("Select Work Order to delete", list(_del_options.keys()), key="del_completed_run_select")
+                if st.button("🗑️ Permanently Delete Selected Work Order", key="del_completed_run_btn"):
+                    delete_assigned_run(_del_options[_del_label])
+                    st.success(f"Deleted {_del_label}")
+                    st.rerun()
         else:
             st.info("No completed orders match the current filters.")
     else:

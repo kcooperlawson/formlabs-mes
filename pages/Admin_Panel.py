@@ -19,6 +19,7 @@ from database import (
     get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
     check_authentication
 )
+from database import esc
 
 st.set_page_config(page_title="IT Admin Console | Formlabs MES", page_icon="🛡️", layout="wide")
 
@@ -430,7 +431,7 @@ with tab_settings:
                 with st.container():
                     st.markdown(
                         f"<div style='background:#0F172A; padding:10px; border-radius:6px; border:1px solid #1E293B; margin-bottom:5px;'>"
-                        f"<b style='color:#38BDF8;'>{r['reactor_name']}</b> <br>"
+                        f"<b style='color:#38BDF8;'>{esc(r['reactor_name'])}</b> <br>"
                         f"<span style='color:#94A3B8; font-size:0.85rem;'>Capacity: {r['max_capacity_l']:,} L</span>"
                         f"</div>", unsafe_allow_html=True
                     )
@@ -468,7 +469,7 @@ with tab_settings:
                     st.markdown(
                         f"<div style='background:#0F172A; padding:10px; border-radius:6px; border:1px solid #1E293B; margin-bottom:5px;'>"
                         f"<b style='color:#FFFFFF;'>{pump_display_name}</b> <br>"
-                        f"<span style='color:{status_color}; font-size:0.85rem; font-weight:bold;'>● {p.get('status', 'Active')}</span>"
+                        f"<span style='color:{status_color}; font-size:0.85rem; font-weight:bold;'>● {esc(p.get('status', 'Active'))}</span>"
                         f"</div>", unsafe_allow_html=True
                     )
                     if st.button("🗑️ Delete", key=f"del_p_{p['id']}", use_container_width=True):
@@ -550,8 +551,8 @@ with tab_sug:
                             </div>
                             <span style="color:#94A3B8; font-size:0.8rem;">{_sug_avatar_html} <b>{row['user_name']}</b> ({str(row['user_role']).upper()}) | {pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M')}</span>
                         </div>
-                        <p style="color:#E2E8F0; margin-top:10px; font-size:0.95rem;">{row['suggestion']}</p>
-                        {f'<div style="color:#38BDF8; font-size:0.85rem;"><b>Admin Note:</b> {row["admin_notes"]}</div>' if row["admin_notes"] else ''}
+                        <p style="color:#E2E8F0; margin-top:10px; font-size:0.95rem;">{esc(row['suggestion'])}</p>
+                        {f'<div style="color:#38BDF8; font-size:0.85rem;"><b>Admin Note:</b> {esc(row["admin_notes"])}</div>' if row["admin_notes"] else ''}
                     </div>
                     """,
                     unsafe_allow_html=True

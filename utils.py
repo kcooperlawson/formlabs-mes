@@ -1,10 +1,11 @@
 
 
 import os
+import glob
 import subprocess
 import shutil
 import base64
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from sqlalchemy.engine import make_url
 import streamlit as st
 from datetime import datetime, timedelta
@@ -15,10 +16,38 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "cleanliness")
 AVATAR_DIR = os.path.join(BASE_DIR, "uploads", "avatars")
+LOT_PHOTO_DIR = os.path.join(BASE_DIR, "uploads", "lot_labels")
+
+
+def esc(value) -> str:
+    """Escape a value before it goes into a raw-HTML block.
+
+    Anywhere the app renders with `unsafe_allow_html=True`, an f-string drops
+    database values straight into markup. Most of those values are typed by
+    people on the floor - operator names, note fields, chat messages, lot
+    codes - so they have to be escaped on the way in. Two reasons, and the
+    second one bites more often than the first:
+
+      1. Security. Unescaped input rendered as HTML is a cross-site scripting
+         hole, even on an internal plant tool.
+      2. Layout. A note containing "<" or "&" currently breaks the card it is
+         rendered in, on whoever's screen happens to load it.
+
+    None turns into an empty string rather than the text "None".
+
+    Only for raw-HTML blocks. Streamlit already escapes HTML in normal
+    st.markdown / st.caption calls, so escaping there would show the entity
+    codes to the user instead.
+    """
+    import html as _html
+    if value is None:
+        return ""
+    return _html.escape(str(value), quote=True)
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(AVATAR_DIR, exist_ok=True)
+os.makedirs(LOT_PHOTO_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 
@@ -58,15 +87,46 @@ def _get_pg_bin(binary_name: str) -> str:
 
     Uses PG_BIN_DIR from .env if set — needed on Windows, where these tools
     usually aren't on PATH (e.g. PG_BIN_DIR=C:\\Program Files\\PostgreSQL\\18\\bin).
-    Otherwise assumes the bare command is on PATH, which is the normal case
-    on Linux/Mac and in most server/container deployments.
+    Falls back to PATH, which is the normal case on Linux/Mac and in most
+    server/container deployments.
+
+    If neither finds it and this is Windows, scans the Postgres installer's
+    own standard install location (C:\\Program Files\\PostgreSQL\\<version>\\bin)
+    instead of just failing — that's where it lives on the overwhelming
+    majority of Windows installs, PATH or no PATH, and there was previously
+    no fallback for this at all: any Windows machine without PG_BIN_DIR set
+    by hand had backup/restore silently broken (FileNotFoundError) with no
+    guidance on what to fix. When the scan finds it, persists it to .env's
+    PG_BIN_DIR so this only has to happen once per machine.
     """
     exe_name = f"{binary_name}.exe" if os.name == "nt" else binary_name
     bin_dir = os.getenv("PG_BIN_DIR", "").strip()
     if bin_dir:
         return os.path.join(bin_dir, exe_name)
+
     resolved = shutil.which(exe_name)
-    return resolved or exe_name
+    if resolved:
+        return resolved
+
+    if os.name == "nt":
+        candidates = sorted(
+            glob.glob(os.path.join("C:\\Program Files\\PostgreSQL", "*", "bin", exe_name)),
+            reverse=True,  # prefer the newest version if more than one is installed
+        )
+        if candidates:
+            found_path = candidates[0]
+            found_dir = os.path.dirname(found_path)
+            try:
+                env_path = os.path.join(BASE_DIR, ".env")
+                if os.path.exists(env_path):
+                    set_key(env_path, "PG_BIN_DIR", found_dir)
+                    os.environ["PG_BIN_DIR"] = found_dir
+                    logger.info(f"_get_pg_bin() auto-detected PostgreSQL at {found_dir!r} and saved it to .env")
+            except Exception:
+                logger.exception("_get_pg_bin() found PostgreSQL but couldn't persist PG_BIN_DIR to .env")
+            return found_path
+
+    return exe_name
 
 
 def _get_db_connection_params():
@@ -107,7 +167,15 @@ def create_database_backup() -> str:
     try:
         subprocess.run(
             [_get_pg_bin("pg_dump"), "-U", params["user"], "-h", params["host"], "-p", params["port"],
-             "-d", params["dbname"], "-f", os.path.join(BACKUP_DIR, filename)],
+             "-d", params["dbname"],
+             # --clean + --if-exists: the dump includes "DROP TABLE IF EXISTS ..."
+             # before every CREATE TABLE, so restoring onto a target database
+             # that already has some (or all) of these tables/rows - a partially
+             # seeded DB, a previous failed restore, whatever - drops and
+             # replaces them cleanly instead of erroring out on "already exists"
+             # and silently skipping that table's data.
+             "--clean", "--if-exists", "--no-owner", "--no-privileges",
+             "-f", os.path.join(BACKUP_DIR, filename)],
             env=env, check=True, capture_output=True, text=True)
         return filename
     except subprocess.CalledProcessError as e:
@@ -132,7 +200,16 @@ def restore_database_backup(filename: str) -> bool:
     try:
         subprocess.run(
             [_get_pg_bin("psql"), "-U", params["user"], "-h", params["host"], "-p", params["port"],
-             "-d", params["dbname"], "-f", os.path.join(BACKUP_DIR, filename)],
+             "-d", params["dbname"],
+             # ON_ERROR_STOP=1: without this, psql -f prints an error for a
+             # failing statement (a duplicate key, a bad COPY block, whatever)
+             # and just keeps going through the rest of the file - so one
+             # table's data can silently fail to load while everything else
+             # looks like it restored fine. With this set, restore_database_backup()
+             # actually fails (and logs the real Postgres error below) instead
+             # of returning True over a partially-restored database.
+             "-v", "ON_ERROR_STOP=1",
+             "-f", os.path.join(BACKUP_DIR, filename)],
             env=env, check=True, capture_output=True, text=True)
         return True
     except subprocess.CalledProcessError as e:

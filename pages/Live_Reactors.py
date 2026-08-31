@@ -26,6 +26,7 @@ from database import (
     do_logout,
     check_authentication,
 )
+from database import esc
 
 
 def get_base64_image(image_path):
@@ -297,7 +298,7 @@ if st.session_state.get("user_role") in ["manager", "admin"]:
                     r_id = r['id']
                     col_r1, col_r2 = st.columns([4, 1])
                     
-                    col_r1.markdown(f"<div style='margin-top:8px;'><b>🛢️ {r['reactor_name']}</b> <span style='color:#94A3B8; font-size:0.9rem;'>({r['max_capacity_l']:,} L Capacity)</span></div>", unsafe_allow_html=True)
+                    col_r1.markdown(f"<div style='margin-top:8px;'><b>🛢️ {esc(r['reactor_name'])}</b> <span style='color:#94A3B8; font-size:0.9rem;'>({r['max_capacity_l']:,} L Capacity)</span></div>", unsafe_allow_html=True)
                     
                     if col_r2.button("🗑️ Remove", key=f"del_{r_id}"):
                         delete_reactor(r_id)

@@ -2,6 +2,7 @@
 
 import sys
 import os
+import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 
 import streamlit as st
@@ -18,6 +19,7 @@ from database import (
     check_authentication,
     get_all_users_df,
 )
+from database import esc
 import base64
 
 def get_base64_image(image_path):
@@ -491,7 +493,7 @@ with b3:
             for _, run in active_runs.iterrows():
                 prog_pct = min(1.0, run["current_units"] / run["target_units"]) if run["target_units"] > 0 else 0.0
                 st.markdown(
-                    f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'><b style='color:white; font-size:1.1rem;'>{run['resin_type']}</b> &nbsp;|&nbsp; <span style='color:#94A3B8;'>{run['pump_station']}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
+                    f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'><b style='color:white; font-size:1.1rem;'>{esc(run['resin_type'])}</b> &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
                     unsafe_allow_html=True)
                 st.progress(prog_pct)
         else:
@@ -501,6 +503,11 @@ with b3:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# Wait 10 seconds, then force the entire script to run again from top to bottom
+# Wait 10 seconds, then force the entire script to run again from top to bottom.
+# The sleep is what makes this a refresh instead of a hot loop: st.rerun() on
+# its own re-executes this script as fast as the machine allows, and every
+# pass runs several full-table queries. On a TV left up all shift that is
+# continuous load on the floor PC and on Postgres for no extra freshness.
+time.sleep(10)
 st.rerun()
 

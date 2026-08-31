@@ -27,6 +27,7 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 from database import (
     get_active_pumps, get_all_pumps_df, get_all_reactors_df, check_authentication, do_logout,
 )
+from database import esc
 from device_crud import (
     get_devices_df, get_device_dict, create_device, update_device, delete_device, set_device_enabled,
     get_tag_map_df, upsert_tag_map_row, delete_tag_map_row, get_recent_readings_df, test_device_connection,
@@ -139,8 +140,8 @@ with tab_devices:
                     st.markdown(
                         f"<div style='background:#0F172A; padding:12px 16px; border-radius:6px; "
                         f"border:1px solid #1E293B; margin-bottom:6px;'>"
-                        f"<b style='color:#FFFFFF; font-size:1.05rem;'>{row['device_name']}</b> "
-                        f"<span style='color:{color}; font-weight:bold; font-size:0.85rem;'>● {row['status']}</span>"
+                        f"<b style='color:#FFFFFF; font-size:1.05rem;'>{esc(row['device_name'])}</b> "
+                        f"<span style='color:{color}; font-weight:bold; font-size:0.85rem;'>● {esc(row['status'])}</span>"
                         f"<br><span style='color:#94A3B8; font-size:0.85rem;'>"
                         f"{PROTOCOL_LABELS.get(row['protocol'], row['protocol'])} · role: {row['device_role']} · "
                         f"pump: {row['assigned_pump']} · reactor: {row['assigned_reactor']} · "
