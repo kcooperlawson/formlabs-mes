@@ -1641,34 +1641,39 @@ def get_plant_settings() -> dict:
     finally:
         session.close()
 
-def update_plant_settings(
-    target_lph: float | int, packing_target_uph: float | int, s1_start: str, s1_hrs: float | int,
-    s2_start: str, s2_hrs: float | int, s3_start: str, s3_hrs: float | int, yield_tgt: float | int,
-    packing_yield_tgt: float | int, s1_break: float | int = 60.0, s2_break: float | int = 60.0,
-    s3_break: float | int = 60.0, emails: str = "", enable_packing: int = 1
-):
+def update_plant_settings(values: dict) -> bool:
+    """Apply a partial update to the single plant settings row.
+
+    Takes a dict of column name -> value and writes only the keys present.
+    It used to take fifteen positional arguments while its only caller - the
+    Admin Panel's "Save Operational Parameters" button - passed a single
+    dict, so every save raised TypeError and no plant parameter could be
+    changed from the interface at all. A dict is also what the caller wanted
+    anyway: the form edits a subset of the fields, and a partial update lets
+    it leave the rest alone instead of having to resend values it never
+    showed the user.
+
+    Unknown keys are ignored rather than raising, so a form that grows a
+    field before the column exists degrades quietly instead of taking the
+    admin page down.
+    """
     session = ScopedSession()
     try:
         settings = session.query(PlantSettings).first()
-        if settings:
-            settings.target_lph = target_lph
-            settings.packing_target_uph = packing_target_uph
-            settings.shift_1_start = s1_start
-            settings.shift_1_hours = s1_hrs
-            settings.shift_2_start = s2_start
-            settings.shift_2_hours = s2_hrs
-            settings.shift_3_start = s3_start
-            settings.shift_3_hours = s3_hrs
-            settings.yield_target_pct = yield_tgt
-            settings.packing_yield_target_pct = packing_yield_tgt
-            settings.shift_1_break_mins = s1_break
-            settings.shift_2_break_mins = s2_break
-            settings.shift_3_break_mins = s3_break
-            settings.handover_emails = emails
-            settings.enable_packing = enable_packing
-            session.commit()
+        if not settings:
+            settings = PlantSettings()
+            session.add(settings)
+        for key, value in (values or {}).items():
+            if hasattr(settings, key) and key not in ("id",):
+                setattr(settings, key, value)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
+
 
 SESSION_LIFETIME_DAYS = 30
 

@@ -166,6 +166,23 @@ add_hourly_log(operator_name="Cy Patel", pump_station="Pack-Out Station", shift=
 print("  9 production logs, 1 downtime, 5 lot checks written")
 
 # ================================================================= NUMBERS
+section("4b. PLANT SETTINGS SAVE")
+# The Admin Panel passes a dict of just the fields its form shows. This used
+# to raise TypeError, so no plant parameter could be saved from the UI at all.
+_before = get_plant_settings()
+update_plant_settings({"target_lph": 512.0, "handover_emails": "lead@plant.local",
+                       "shift_1_start": "05:45"})
+_after = get_plant_settings()
+check("target rate saved", _after.get("target_lph"), 512.0)
+check("handover recipients saved", _after.get("handover_emails"), "lead@plant.local")
+check("shift start saved", _after.get("shift_1_start"), "05:45")
+check("fields not in the payload are left alone",
+      _after.get("shift_3_start"), _before.get("shift_3_start"))
+update_plant_settings({"target_lph": _before.get("target_lph")})
+check("partial update touches nothing else",
+      get_plant_settings().get("handover_emails"), "lead@plant.local")
+print("  plant settings save verified end to end")
+
 section("5. STATISTICAL OUTPUTS  (recomputed from raw logs)")
 df = get_production_logs_df()
 pours = df[df["log_type"] == "Hourly Bottle Count"]
