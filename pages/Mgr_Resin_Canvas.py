@@ -15,17 +15,6 @@ from database import get_all_resin_specs_df, add_resin_spec, bulk_update_resin_s
 
 st.set_page_config(page_title="Resin Specifications | Formlabs MES", page_icon="⚖️", layout="wide")
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 try:
     from themes import THEMES

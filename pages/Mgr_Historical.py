@@ -16,17 +16,6 @@ from database import get_production_logs_df, do_logout, get_all_users_df
 
 st.set_page_config(page_title="Historical Analytics | Formlabs MES", page_icon="📈", layout="wide")
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 try:
     from themes import THEMES

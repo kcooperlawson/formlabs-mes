@@ -33,17 +33,6 @@ logo_b64 = get_base64_image("assets/formlabs_logo.png")
 
 st.set_page_config(page_title="Factory Live TV | Formlabs SCADA", page_icon="📺", layout="wide")
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 import extra_streamlit_components as stx
 cookie_manager = stx.CookieManager(key="tv_cookies")

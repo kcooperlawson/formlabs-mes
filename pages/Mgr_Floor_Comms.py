@@ -11,17 +11,6 @@ from database import get_operators_with_messages, get_active_operators, get_chat
 st.set_page_config(page_title="Floor Comms | Formlabs MES", page_icon="💬", layout="wide")
 from database import esc, get_avatar_path
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 try:
     from themes import THEMES

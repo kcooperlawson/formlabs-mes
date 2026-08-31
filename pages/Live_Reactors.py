@@ -41,17 +41,6 @@ logo_b64 = get_base64_image("assets/formlabs_logo.png")
 st.set_page_config(page_title="Live Reactor Fleet SCADA | Formlabs MES", page_icon="🛢️", layout="wide")
 st.logo("assets/formlabs_logo.png")
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # ===================== DYNAMIC THEME INJECTION =====================
 try:

@@ -10,17 +10,6 @@ from database import get_cleanliness_audits_df, delete_cleanliness_audit, UPLOAD
 st.set_page_config(page_title="Cleanliness Gallery | Formlabs MES", page_icon="📸", layout="wide")
 from database import esc
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 try:
     from themes import THEMES

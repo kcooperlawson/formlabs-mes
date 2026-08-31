@@ -13,17 +13,6 @@ from database import get_all_users_df, create_user, update_user_pin, do_logout
 
 st.set_page_config(page_title="Staff Roster | Formlabs MES", page_icon="👥", layout="wide")
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 try:
     from themes import THEMES

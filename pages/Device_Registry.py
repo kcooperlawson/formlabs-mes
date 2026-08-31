@@ -38,13 +38,6 @@ from device_gateway.normalize import CANONICAL_METRICS
 st.set_page_config(page_title="Device Gateway | Formlabs MES", page_icon="🔌", layout="wide")
 st.logo("assets/formlabs_logo.png")
 
-st.markdown("""
-<style>
-    [data-testid="stSidebarNav"], [data-testid="stSidebarNav"] > ul {
-        display: none !important; visibility: hidden !important; height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 try:
     from themes import THEMES

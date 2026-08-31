@@ -205,6 +205,8 @@ active_theme = st.session_state.get("preferred_theme", "Default Dark")
 # Change this variable to easily update the version across the app!
 APP_VERSION = "PT-V3.8.0"
 
+_signed_in = bool(st.session_state.get("authenticated", False))
+
 st.set_page_config(
     page_title="Formlabs MES Live Dashboard",
     page_icon="🧪",
@@ -212,17 +214,20 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""
-<style>
-    /* Aggressively hide native multi-page navigation to minimize load flash */
-    [data-testid="stSidebarNav"], 
-    [data-testid="stSidebarNav"] > ul {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Nothing is written to the sidebar until after sign-in, so on the login screen
+# it renders as an empty panel taking a third of the width. Streamlit has no
+# server-side "no sidebar on this render" switch - initial_sidebar_state only
+# applies on the first page load, so collapsing it here would leave it collapsed
+# after login too. Hiding it while signed out is scoped to exactly that state
+# and reverts the moment the operator is authenticated.
+if not _signed_in:
+    st.markdown("""
+    <style>
+      [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+      [data-testid="stAppViewContainer"] > section:first-of-type { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
 
 st.logo("assets/formlabs_logo.png")
 

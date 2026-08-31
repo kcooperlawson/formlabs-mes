@@ -1,0 +1,23 @@
+# Project-level Streamlit configuration.
+# Committed on purpose: these settings are how the app is meant to run, and
+# every launcher (run_mes.bat, PyCharm, a service) picks them up automatically.
+
+[client]
+# Removes Streamlit's built-in multi-page navigation list from the sidebar at
+# the source. Every page used to inject CSS to hide it after the fact, which
+# still let it render for a moment on load - the flash operators noticed on
+# the login screen and the workstation. Switching it off server-side means it
+# is never sent to the browser at all.
+showSidebarNavigation = false
+
+# Keep tracebacks off the floor terminals; the app logs them via app_logger.
+showErrorDetails = "none"
+
+[server]
+# The launcher passes --server.address; leaving it here too is harmless and
+# means the app behaves the same when started any other way.
+address = "0.0.0.0"
+headless = true
+
+[browser]
+gatherUsageStats = false
