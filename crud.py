@@ -3,7 +3,9 @@
 
 
 import os
+import re
 import uuid
+import calendar
 import subprocess
 from datetime import datetime, date, timedelta
 import secrets
@@ -14,17 +16,20 @@ from sqlalchemy import desc, text, func, or_
 from db_core import engine, ScopedSession, Base
 from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
-                    CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession)
+                    CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
+                    LotVerification)
 from app_logger import logger
 
 # --- DIRECTORY SETUP ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "cleanliness")
 AVATAR_DIR = os.path.join(BASE_DIR, "uploads", "avatars")
+LOT_PHOTO_DIR = os.path.join(BASE_DIR, "uploads", "lot_labels")
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(AVATAR_DIR, exist_ok=True)
+os.makedirs(LOT_PHOTO_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # --- BASELINE DATA ---
@@ -349,7 +354,16 @@ def delete_assigned_run(run_id: int) -> bool:
         session.close()
 
 
-def update_assigned_run_progress(run_id: int, delta_units: int):
+def update_assigned_run_progress(run_id: int, delta_units: int, operator_name: str = "Manual Adjustment"):
+    """Adds delta_units to a run's progress AND writes a matching
+    ProductionLog row (log_type="System Calibration", same resin/
+    cartridge/pump/lot as the run) so this survives the very next page
+    load. get_assigned_runs_df(auto_sync=True) recomputes current_units
+    from scratch from logged production every time it's called (see
+    calculate_logged_units_for_resin) — a bare `current_units +=` with no
+    corresponding log row looked, to that recompute, like it never
+    happened, and got silently reverted on the next rerun.
+    """
     session = ScopedSession()
     try:
         run = session.query(AssignedRun).filter(AssignedRun.id == run_id).first()
@@ -357,6 +371,22 @@ def update_assigned_run_progress(run_id: int, delta_units: int):
             run.current_units = max(0, run.current_units + delta_units)
             if run.current_units >= run.target_units and run.target_units > 0:
                 run.status = "Done"
+            if delta_units:
+                session.add(ProductionLog(
+                    log_type="System Calibration",
+                    operator_name=operator_name,
+                    pump_station=run.pump_station,
+                    shift="System",
+                    cartridge_type=run.cartridge_type,
+                    resin_type=run.resin_type,
+                    lot_number=run.lot_number,
+                    bottles_filled=delta_units,
+                    scrap_empty=0, scrap_filled=0,
+                    notes=f"Manual +{delta_units} adjustment via Assigned Runs progress button.",
+                    operator_id=_resolve_user_id(session, operator_name),
+                    pump_station_id=run.pump_station_id,
+                    resin_spec_id=run.resin_spec_id,
+                ))
             session.commit()
     finally:
         session.close()
@@ -802,32 +832,268 @@ def reconcile_reactor_level(reactor_name: str, visual_fill_pct: float, operator_
         session.close()
 
 
+# ============================================================================
+# CARTRIDGE LOT VERIFICATION
+# ----------------------------------------------------------------------------
+# The lot printed on the bottom of a V1/V2/Pigment cartridge is stamped as
+#   L-2411A0742
+#   E-11/2026
+# while the manager creating the run types the bare number into the run's
+# lot field. Every comparison in this module therefore happens on a
+# normalized form so an operator can type the stamp verbatim (prefix and
+# all) and still match a run whose lot was entered bare.
+#
+# RPS is poured without lot labels, so nothing here applies to it - the
+# caller is responsible for skipping the gate on that container format.
+# ============================================================================
+
+# Lots the app invented for itself because no active run matched the
+# station/resin/cartridge combination. There is nothing physical behind these,
+# so a mismatch against one means nothing and must never be reported as one.
+_PLACEHOLDER_LOT_RE = re.compile(r"^LOT-?\d{6,8}-?\d*$", re.IGNORECASE)
+
+# Expiry within this many days still lets the pour happen but raises a flag.
+EXPIRY_SOON_DAYS = 60
+
+
+def normalize_lot(value) -> str:
+    """Reduce a lot string to the form used for comparison.
+
+    Uppercases, strips an `L-` / `E-` / `LOT-` stamp prefix (the colon form is
+    accepted too, since the stamp has been seen printed both ways), and drops every
+    character that isn't a letter or digit. That makes all of these equal:
+        "L-2411A0742"  "l- 2411a0742"  "L:2411A0742"  "2411A0742"
+    """
+    s = str(value or "").strip().upper()
+    s = re.sub(r"^(?:LOT|L|E)\s*[:#\-]?\s*", "", s)
+    return re.sub(r"[^A-Z0-9]", "", s)
+
+
+def is_placeholder_lot(value) -> bool:
+    """True when this lot is the app's own generated stand-in, not a real one."""
+    s = str(value or "").strip()
+    if not s or s.lower() in ("n/a", "none", "recon-adj"):
+        return True
+    return bool(_PLACEHOLDER_LOT_RE.match(s))
+
+
+def lots_match(expected, entered) -> bool:
+    """Compare a run's lot to what the operator read off the cartridge."""
+    e, t = normalize_lot(expected), normalize_lot(entered)
+    return bool(e) and bool(t) and e == t
+
+
+def parse_expiry(value):
+    """Parse the `E-` stamp into a date, tolerating how it gets typed.
+
+    Accepts MM/YYYY, MM-YY, YYYY-MM, MMYYYY, MMYY, MM/DD/YYYY and YYYYMMDD.
+    A month-only stamp resolves to the LAST day of that month, because a
+    cartridge stamped E-11/2026 is good through the end of November.
+
+    Returns (status, parsed_date) where status is one of:
+        ok | soon | expired | unreadable
+    """
+    raw = str(value or "").strip().upper()
+    raw = re.sub(r"^(?:EXP|E)\s*[:#\-]?\s*", "", raw)
+    digits = re.sub(r"[^0-9]", "", raw)
+    parts = [p for p in re.split(r"[^0-9]+", raw) if p]
+
+    y = m = d = None
+    try:
+        if len(parts) == 3:
+            a, b, c = parts
+            if len(a) == 4:            # YYYY-MM-DD
+                y, m, d = int(a), int(b), int(c)
+            else:                      # MM/DD/YYYY
+                m, d, y = int(a), int(b), int(c)
+        elif len(parts) == 2:
+            a, b = parts
+            if len(a) == 4:            # YYYY-MM
+                y, m = int(a), int(b)
+            else:                      # MM/YYYY or MM/YY
+                m, y = int(a), int(b)
+        elif len(parts) == 1:
+            if len(digits) == 8:       # YYYYMMDD
+                y, m, d = int(digits[:4]), int(digits[4:6]), int(digits[6:])
+            elif len(digits) == 6:     # MMYYYY
+                m, y = int(digits[:2]), int(digits[2:])
+            elif len(digits) == 4:     # MMYY
+                m, y = int(digits[:2]), int(digits[2:])
+            else:
+                return "unreadable", None
+        else:
+            return "unreadable", None
+
+        if y is None or m is None:
+            return "unreadable", None
+        if y < 100:
+            y += 2000
+        if not (1 <= m <= 12) or not (2000 <= y <= 2099):
+            return "unreadable", None
+        if d is None:
+            d = calendar.monthrange(y, m)[1]
+        if not (1 <= d <= calendar.monthrange(y, m)[1]):
+            return "unreadable", None
+        parsed = date(y, m, d)
+    except (ValueError, TypeError):
+        return "unreadable", None
+
+    today = date.today()
+    if parsed < today:
+        return "expired", parsed
+    if (parsed - today).days <= EXPIRY_SOON_DAYS:
+        return "soon", parsed
+    return "ok", parsed
+
+
+def save_lot_photo(uploaded_file) -> str:
+    """Persist a cartridge-stamp photo and return its filename (or None)."""
+    if uploaded_file is None:
+        return None
+    name = getattr(uploaded_file, "name", "") or ""
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else "jpg"
+    if ext not in ("jpg", "jpeg", "png", "webp", "heic", "heif"):
+        ext = "jpg"
+    fname = f"lot_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{ext}"
+    with open(os.path.join(LOT_PHOTO_DIR, fname), "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return fname
+
+
+def _build_lot_verification(session, v: dict, production_log_id=None) -> LotVerification:
+    """Turn the dict the operator form assembles into a LotVerification row."""
+    return LotVerification(
+        operator_name=v.get("operator_name", "Unknown"),
+        operator_id=_resolve_user_id(session, v.get("operator_name")),
+        pump_station=v.get("pump_station", "Unknown"),
+        pump_station_id=_resolve_pump_id(session, v.get("pump_station")),
+        shift=v.get("shift", "Shift 1"),
+        cartridge_type=v.get("cartridge_type", "V2"),
+        resin_type=v.get("resin_type"),
+        resin_spec_id=_resolve_resin_id(session, v.get("resin_type")),
+        expected_lot=(v.get("expected_lot") or "")[:50] or None,
+        entered_lot=(v.get("entered_lot") or "")[:50] or None,
+        entered_expiry=(v.get("entered_expiry") or "")[:20] or None,
+        expiry_status=v.get("expiry_status"),
+        result=v.get("result", "recorded"),
+        check_level=v.get("check_level", "full"),
+        reason=v.get("reason") or None,
+        photo_filename=v.get("photo_filename"),
+        production_log_id=production_log_id,
+    )
+
+
+def add_lot_verification(verification: dict) -> int:
+    """Record a standalone check with no production behind it.
+
+    This is what a successful catch looks like: the operator read the stamp,
+    it was the wrong lot, and they pulled the cartridge instead of pouring
+    it. There is no ProductionLog to attach it to, and that absence is the
+    point - these rows are the saves, not the misses.
+    """
+    session = ScopedSession()
+    try:
+        row = _build_lot_verification(session, verification)
+        session.add(row)
+        session.commit()
+        return row.id
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def get_lot_verifications_df(days: int = 30, result: str = None) -> pd.DataFrame:
+    """All lot checks in the trailing window, newest first."""
+    session = ScopedSession()
+    try:
+        q = session.query(LotVerification)
+        if days:
+            q = q.filter(LotVerification.timestamp >= datetime.utcnow() - timedelta(days=int(days)))
+        if result:
+            q = q.filter(LotVerification.result == result)
+        return pd.read_sql(q.order_by(desc(LotVerification.timestamp)).statement, session.bind)
+    finally:
+        session.close()
+
+
 def add_hourly_log(
         operator_name: str, pump_station: str, shift: str, cartridge_type: str,
         resin_type: str, lot_number: str, bottles: int, scrap_empty: int,
-        scrap_filled: int, notes: str = "", log_type: str = "Hourly Bottle Count"
-):
+        scrap_filled: int, notes: str = "", log_type: str = "Hourly Bottle Count",
+        verification: dict = None
+) -> bool:
+    """Returns True if this log was matched to (and credited toward) an
+    active AssignedRun's live progress tracker, False otherwise — the
+    ProductionLog row is written either way, this only reports whether a
+    specific run's counter moved, so the caller can tell the operator when
+    it didn't (previously this failed completely silently, which is why a
+    trailing space or case difference in a lot number could make a run's
+    "current_units" quietly stop climbing with no indication why).
+
+    Matching is case-/whitespace-insensitive and treats a blank lot number
+    on either side as a wildcard, mirroring
+    calculate_logged_units_for_resin()'s tolerance — an exact, case-
+    sensitive match was too strict given pump/resin/cartridge values both
+    ultimately come from the same dropdowns but lot numbers are free-typed
+    by both the manager (creating the run) and the operator (logging
+    against it).
+
+    `verification` is the cartridge lot check the operator completed for
+    this log, as assembled by the pouring form (see add_lot_verification
+    for the shape and the meaning of each result). It is optional so that
+    every existing caller - the Admin Panel, reconciliation, and the
+    Device Gateway writer - keeps working untouched.
+    """
     session = ScopedSession()
+    matched_run = False
     try:
-        session.add(ProductionLog(
+        log_row = ProductionLog(
             log_type=log_type, operator_name=operator_name, pump_station=pump_station, shift=shift,
             cartridge_type=cartridge_type, resin_type=resin_type, lot_number=lot_number, bottles_filled=bottles,
             scrap_empty=scrap_empty, scrap_filled=scrap_filled, notes=notes,
             operator_id=_resolve_user_id(session, operator_name),
             pump_station_id=_resolve_pump_id(session, pump_station),
             resin_spec_id=_resolve_resin_id(session, resin_type),
-        ))
+            verify_status=(verification or {}).get("result"),
+        )
+        session.add(log_row)
+
+        # The cartridge check and the log it belongs to are written in one
+        # transaction on purpose: a log that exists without its verification
+        # row (or the reverse) would quietly undermine the whole audit trail.
+        # The flush is only here to get log_row.id for the foreign key.
+        if verification:
+            session.flush()
+            session.add(_build_lot_verification(session, verification, log_row.id))
         if log_type == "Hourly Bottle Count":
-            active_run = session.query(AssignedRun).filter(
-                AssignedRun.pump_station == pump_station, AssignedRun.resin_type == resin_type,
-                AssignedRun.cartridge_type == cartridge_type, AssignedRun.lot_number == lot_number,
-                AssignedRun.status.in_(["Active", "Pouring"])
-            ).first()
+            t_pump = str(pump_station or "").strip().lower()
+            t_resin = str(resin_type or "").strip().lower()
+            t_cart = str(cartridge_type or "").strip().lower()
+            t_lot = str(lot_number or "").strip().lower()
+
+            active_run = None
+            for run in session.query(AssignedRun).filter(AssignedRun.status.in_(["Active", "Pouring"])).all():
+                if str(run.pump_station or "").strip().lower() != t_pump:
+                    continue
+                if str(run.resin_type or "").strip().lower() != t_resin:
+                    continue
+                if str(run.cartridge_type or "").strip().lower() != t_cart:
+                    continue
+                r_lot = str(run.lot_number or "").strip().lower()
+                if t_lot and r_lot and t_lot != r_lot:
+                    continue
+                active_run = run
+                break
+
             if active_run:
                 active_run.current_units += bottles
                 if active_run.current_units >= active_run.target_units and active_run.target_units > 0:
                     active_run.status = "Done"
+                matched_run = True
         session.commit()
+        return matched_run
     finally:
         session.close()
 
@@ -1087,33 +1353,56 @@ def reconcile_reactor_liters(reactor_name: str, actual_liters: float, operator_n
         session.close()
 
 
-def has_completed_daily_checklist(operator_name: str, shift: str) -> bool:
-    """Checks if the operator has completed the checklist for the current date and shift."""
+def has_completed_daily_checklist(operator_name: str, shift: str, pump_station: str = None) -> bool:
+    """Has this operator validated the station they're standing at, today, on this shift?
+
+    The station is part of the question. A checklist certifies the condition
+    of one pump - bins staged, station clean - so an operator moved to a
+    different pump has certified nothing about it and gets asked again.
+
+    Rows recorded before daily_checklists carried a station have a NULL one
+    and count for any station on their date. That's deliberate: it keeps the
+    day this shipped from re-locking every operator who had already done
+    their checklist an hour earlier. From the next day on, every row carries
+    a station and the per-pump rule applies in full.
+    """
     session = ScopedSession()
     try:
-        today_d = date.today()
-        record = session.query(DailyChecklist).filter(
+        q = session.query(DailyChecklist).filter(
             DailyChecklist.operator_name == operator_name,
-            DailyChecklist.date == today_d,
-            DailyChecklist.shift == shift
-        ).first()
-        return record is not None
+            DailyChecklist.date == date.today(),
+            DailyChecklist.shift == shift,
+        )
+        if pump_station:
+            q = q.filter(or_(DailyChecklist.pump_station == pump_station,
+                             DailyChecklist.pump_station.is_(None)))
+        return q.first() is not None
     finally:
         session.close()
 
 
-def submit_daily_checklist(operator_name: str, shift: str) -> bool:
-    """Logs the checklist completion for the operator."""
+def submit_daily_checklist(operator_name: str, shift: str, pump_station: str = None) -> bool:
+    """Records a completed startup checklist for one operator at one station."""
     session = ScopedSession()
     try:
         today_d = date.today()
-        # Prevent double-logging
-        if session.query(DailyChecklist).filter_by(operator_name=operator_name, date=today_d, shift=shift).first():
+        # Prevent double-logging - scoped to the station, so validating a
+        # second pump on the same shift correctly writes a second row.
+        dupe = session.query(DailyChecklist).filter(
+            DailyChecklist.operator_name == operator_name,
+            DailyChecklist.date == today_d,
+            DailyChecklist.shift == shift,
+        )
+        if pump_station:
+            dupe = dupe.filter(DailyChecklist.pump_station == pump_station)
+        if dupe.first():
             return True
 
         new_check = DailyChecklist(
             operator_name=operator_name,
             shift=shift,
+            pump_station=pump_station,
+            pump_station_id=_resolve_pump_id(session, pump_station),
             operator_id=_resolve_user_id(session, operator_name),
         )
         session.add(new_check)

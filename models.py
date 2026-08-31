@@ -45,6 +45,11 @@ class ProductionLog(Base):
     scrap_empty = Column(Integer, default=0)
     scrap_filled = Column(Integer, default=0)
     notes = Column(Text, nullable=True)
+    # Cartridge lot verification outcome for this log. Denormalized onto the
+    # log itself purely so dashboards can filter/count without joining
+    # lot_verifications; that table remains the system of record.
+    #   verified | mismatch | expired | recorded | fast_path | skipped
+    verify_status = Column(String(20), nullable=True, index=True)
 
 class DowntimeLog(Base):
     __tablename__ = "downtime_logs"
@@ -120,11 +125,21 @@ class DowntimeReason(Base):
     reason_name = Column(String(100), unique=True, nullable=False)
 
 class DailyChecklist(Base):
+    """Pre-shift startup validation, scoped to one operator at one station.
+
+    The station is part of the key, not decoration: a checklist certifies
+    the condition of the pump you are standing at, so moving to a different
+    pump means a new checklist. Rows written before the station column
+    existed carry NULL and still satisfy any station for the day they were
+    made, so adding this never locked anyone out mid-shift.
+    """
     __tablename__ = "daily_checklists"
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(Date, default=date.today, index=True)
     operator_name = Column(String(100), nullable=False, index=True)
     operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    pump_station = Column(String(50), nullable=True, index=True)
+    pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
     shift = Column(String(20), nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
@@ -193,6 +208,53 @@ class UserSession(Base):
     user_id = Column(Integer, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
+
+class LotVerification(Base):
+    """One row per cartridge-lot check at the pouring station.
+
+    Written for every check the operator completes, not just the failures —
+    a pass is what proves the check actually happened, and the mismatches
+    are the first real measurement of how often the wrong lot reaches the
+    pour. `production_log_id` is NULL when the operator rejected the
+    cartridge and set it aside instead of pouring it, which is a successful
+    catch, not a missing log.
+
+    result:
+        verified  - typed lot matched the run's lot
+        mismatch  - did not match; operator logged anyway with a reason
+        expired   - lot matched but the E- date is past; logged with a reason
+        rejected  - operator pulled the cartridge, no production logged
+        recorded  - no real run lot to compare against, stamp captured only
+    check_level:
+        full   - typed the stamp and photographed it
+        fast   - one-tap confirm, nothing had changed since the last full check
+        record - stamp captured with no run lot to compare it to
+    """
+    __tablename__ = "lot_verifications"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    date = Column(Date, default=date.today, index=True)
+    operator_name = Column(String(100), nullable=False, index=True)
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    pump_station = Column(String(50), nullable=False, index=True)
+    pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
+    shift = Column(String(20), default="Shift 1")
+    cartridge_type = Column(String(20), default="V2")
+    resin_type = Column(String(100), nullable=True)
+    resin_spec_id = Column(Integer, ForeignKey("resin_specs.id", ondelete="SET NULL"), nullable=True, index=True)
+    expected_lot = Column(String(50), nullable=True)
+    entered_lot = Column(String(50), nullable=True)      # raw, exactly as typed
+    entered_expiry = Column(String(20), nullable=True)   # raw, exactly as typed
+    expiry_status = Column(String(20), nullable=True)    # ok | soon | expired | unreadable
+    result = Column(String(20), nullable=False, index=True)
+    check_level = Column(String(20), default="full")
+    reason = Column(Text, nullable=True)                 # required on mismatch/expired/rejected
+    photo_filename = Column(String(255), nullable=True)
+    ocr_lot = Column(String(50), nullable=True)          # phase 3, offline OCR cross-check
+    ocr_conflict = Column(Integer, default=0)            # 1 = photo disagrees with what was typed
+    production_log_id = Column(Integer, ForeignKey("production_logs.id", ondelete="SET NULL"),
+                               nullable=True, index=True)
+
 
 # Generic public placeholders (Safe for source code)
 MASTER_FORMLABS_CATALOG = (

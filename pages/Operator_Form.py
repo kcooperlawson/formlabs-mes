@@ -10,11 +10,19 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 
 # --- NEW IMPORTS FOR ANIMATION ---
-import streamlit_lottie
+# st_lottie is the actual render function this page calls (see the
+# "Mark Done" button below) — `import streamlit_lottie` alone only binds
+# the module name, not st_lottie itself, which is what was crashing every
+# "Mark Done" click with NameError: name 'st_lottie' is not defined.
+from streamlit_lottie import st_lottie
 import requests
 
 from database import (
     add_hourly_log,
+    add_lot_verification,
+    save_lot_photo,
+    is_placeholder_lot,
+    lots_match,
     add_downtime_log,
     add_cleanliness_audit,
     get_assigned_runs_df,
@@ -38,6 +46,7 @@ from database import (
     do_logout,
     check_authentication,
 )
+from database import esc
 import base64
 
 import extra_streamlit_components as stx
@@ -45,12 +54,28 @@ cookie_manager = stx.CookieManager(key="op_cookies")
 
 # Load the Lottie Animation once
 def load_lottieurl(url):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
+    """Fetch the run-complete animation without ever taking the page down.
 
-lottie_success = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_lk80fpsm.json")
+    This runs while the page script is still loading, so an unguarded
+    requests.get here is a single point of failure for the whole operator
+    terminal: a slow CDN, a proxy, or a plant PC that has lost its internet
+    would hang the page and then raise before one widget rendered. The
+    animation is decoration; the terminal is not. Every caller already
+    checks `if lottie_success:` before rendering, so None is safe.
+    """
+    try:
+        r = requests.get(url, timeout=3)
+        return r.json() if r.status_code == 200 else None
+    except Exception:
+        return None
+
+# Fetched once per session rather than on every rerun - Streamlit re-executes
+# this script top to bottom on every widget interaction, and an operator
+# should not be waiting on a CDN round trip each time they touch a number.
+if "lottie_success" not in st.session_state:
+    st.session_state["lottie_success"] = load_lottieurl(
+        "https://assets10.lottiefiles.com/packages/lf20_lk80fpsm.json")
+lottie_success = st.session_state["lottie_success"]
 
 def get_base64_image(image_path):
     try:
@@ -293,6 +318,21 @@ if current_role in ["manager", "admin"]:
 else:
     st.caption(f"Logged in as: **{current_user}** ({current_role.upper()}) | Live Machine Sync Active")
 
+# ===================== LOT MASKING =====================
+# Blind entry only works if the answer isn't already on the screen. The
+# active-run card sits directly above the verification gate, so for the
+# roles the gate applies to it shows a mask instead of the run's lot.
+# Managers and admins still see the real value - they're the ones who have
+# to compare it against what an operator typed.
+def _display_lot(lot_value, cartridge_type=None):
+    lot = str(lot_value or "N/A")
+    if str(st.session_state.get("user_role", "operator")) in ("manager", "admin"):
+        return lot
+    if str(cartridge_type or "").strip().upper() == "RPS":
+        return lot          # RPS carries no label, so there is nothing to blind
+    return "•" * 9 if lot not in ("", "N/A", "None") else lot
+
+
 # ===================== PERSONALIZED TODAY'S STATS =====================
 df_logs = get_production_logs_df()
 today_str = date.today().strftime("%Y-%m-%d")
@@ -336,29 +376,58 @@ st.markdown("---")
 # ===================== THE HARD GATE: DAILY STARTUP CHECKLIST =====================
 # Only enforce this for Operators and Packers, not Managers in Debug mode
 if current_role in ["operator", "packer"]:
-    if not has_completed_daily_checklist(current_user, current_shift):
+    # Which station the operator is standing at is part of the question. A
+    # checklist certifies the condition of one pump - bins staged, station
+    # clean - so someone moved to a different pump has certified nothing
+    # about it and gets asked again. The selector below writes to the same
+    # session_state key ("h_pump") the Hourly Pouring tab uses, so the pump
+    # chosen here is the pump they end up logging against; there is only
+    # ever one answer to "which station am I at".
+    if current_role == "packer":
+        _checklist_pumps = []
+        checklist_station = "Pack-Out Station"
+    else:
+        _checklist_pumps = get_active_pumps() or ["New Pump #1"]
+        if st.session_state.get("h_pump") not in _checklist_pumps:
+            _saved_station = cookie_manager.get(f"op_station_{current_user.replace(' ', '')}")
+            st.session_state["h_pump"] = (_saved_station if _saved_station in _checklist_pumps
+                                          else _checklist_pumps[0])
+        checklist_station = st.session_state["h_pump"]
+
+    if not has_completed_daily_checklist(current_user, current_shift, checklist_station):
         st.error("🛑 **TERMINAL LOCKED: PRE-SHIFT VALIDATION REQUIRED**")
         st.info(
-            f"Welcome, {current_user}. Please complete your mandatory startup checklist for **{current_shift}** before accessing the production modules.")
+            f"Welcome, {current_user}. Complete the startup checklist for **{checklist_station}** "
+            f"on **{current_shift}** before the production modules unlock.")
 
-        # --- NEW: Cookie Check to survive page refreshes ---
-        clean_cookie_name = f"clean_chk_{current_user.replace(' ', '')}"
+        if current_role != "packer":
+            st.selectbox(
+                "📍 Which pump station are you starting at?", _checklist_pumps, key="h_pump",
+                help="Changing this switches which station's checklist you're completing — and "
+                     "carries through to your logging tab, so you only answer it once.")
+
+        # --- Cookie check to survive page refreshes ---
+        # Keyed by station as well as operator: moving to a new pump means a
+        # new cleanliness photo of THAT pump, not a pass carried over from the
+        # one they left.
+        clean_cookie_name = f"clean_chk_{current_user.replace(' ', '')}_{checklist_station.replace(' ', '')}"
+        clean_flag_key = f"pre_shift_clean_done_{checklist_station.replace(' ', '')}"
 
         # If the cookie has today's date, they already submitted the photo!
         if cookie_manager.get(clean_cookie_name) == str(date.today()):
-            st.session_state["pre_shift_clean_done"] = True
-        elif "pre_shift_clean_done" not in st.session_state:
-            st.session_state["pre_shift_clean_done"] = False
+            st.session_state[clean_flag_key] = True
+        elif clean_flag_key not in st.session_state:
+            st.session_state[clean_flag_key] = False
 
         st.markdown("### 📋 Daily Startup Checklist")
 
         # --- STEP 1: THE AUTO-CHECK (CLEANLINESS AUDIT) ---
-        if not st.session_state["pre_shift_clean_done"]:
+        if not st.session_state[clean_flag_key]:
             with st.expander("📸 Step 1: Perform & Submit Morning Cleanliness Check", expanded=True):
                 st.caption("Submit your start-of-shift photo audit here to satisfy this requirement.")
 
-                active_pumps_list = get_active_pumps()
-                audit_station = st.selectbox("Assigned Pump / Workstation", active_pumps_list, key="pre_pump")
+                audit_station = checklist_station
+                st.caption(f"Station: **{audit_station}** — set by the picker above.")
                 audit_notes = st.text_area("Observations", placeholder="Station clean, ready for shift.",
                                            key="pre_notes")
 
@@ -387,7 +456,7 @@ if current_role in ["operator", "packer"]:
                         # Flip the flag and save the cookie for today!
                         from datetime import timedelta
 
-                        st.session_state["pre_shift_clean_done"] = True
+                        st.session_state[clean_flag_key] = True
                         cookie_manager.set(clean_cookie_name, str(date.today()),
                                            expires_at=datetime.now() + timedelta(hours=12))
 
@@ -418,12 +487,12 @@ if current_role in ["operator", "packer"]:
             if st.form_submit_button("🔓 Submit Validation & Unlock Terminal", type="primary", use_container_width=True):
                 # Verify ALL manual boxes are checked AND the auto-check is done
                 if qr_check and mat_check:
-                    if st.session_state.get("pre_shift_clean_done"):
-                        submit_daily_checklist(current_user, current_shift)
+                    if st.session_state.get(clean_flag_key):
+                        submit_daily_checklist(current_user, current_shift, checklist_station)
                         st.toast("✅ Startup checklist fully recorded! Unlocking systems...")
 
                         # Clean up the session state flag
-                        del st.session_state["pre_shift_clean_done"]
+                        del st.session_state[clean_flag_key]
                         st.rerun()
                     else:
                         st.error(
@@ -437,37 +506,86 @@ df_runs = get_assigned_runs_df()
 active_pumps = get_active_pumps()
 dt_reasons = get_downtime_reasons()
 
-# ===================== ROLE & SHIFT TRANSFER =====================
-with st.expander("🔄 Mid-Shift Role & Station Transfer", expanded=False):
-    st.caption("Update your assignment if you are pulled to a different station or shift.")
+# ===================== MY STATION (multi-pourer support) =====================
+# Which station's runs show in Section 1 below. Deliberately independent
+# of AssignedRun.assigned_operator: any number of operators can point at
+# the same station and all see — and log against — the exact same run,
+# with no extra assignment needed from the manager.
+#
+# No separate "pick your station" widget here anymore — that was a
+# redundant second click on top of the Hourly Pouring tab's own "Pump
+# Station" selector (key="h_pump") further down. That selector now IS the
+# station picker: Streamlit reruns this whole script top-to-bottom on
+# every widget interaction and keeps a keyed widget's value in
+# st.session_state across reruns, so the moment an operator changes "Pump
+# Station" in that tab, the very next rerun sees the new value in
+# st.session_state["h_pump"] — and Section 1 above that tab picks it up
+# immediately, since Section 1 filters on `my_station` (set here from that
+# same session_state key). We only need a sensible default before that
+# widget has ever been rendered.
+if current_role != "packer":
+    station_cookie_name = f"op_station_{current_user.replace(' ', '')}"
+    station_options = active_pumps if active_pumps else ["New Pump #1"]
 
-    t_col1, t_col2, t_col3 = st.columns(3)
-    with t_col1:
-        role_opts = ["Operator", "Packer"]
-        current_role_cap = current_role.capitalize()
-        # Fallback in case a manager uses this
-        start_role_idx = role_opts.index(current_role_cap) if current_role_cap in role_opts else 0
-        new_role = st.selectbox("New Assigned Role", role_opts, index=start_role_idx)
+    if "h_pump" not in st.session_state:
+        saved_station = cookie_manager.get(station_cookie_name)
+        st.session_state["h_pump"] = saved_station if saved_station in station_options else station_options[0]
 
-    with t_col2:
-        shift_opts = ["Shift 1", "Shift 2", "Shift 3", "Floater"]
-        start_shift_idx = shift_opts.index(current_shift) if current_shift in shift_opts else 0
-        new_shift = st.selectbox("New Assigned Shift", shift_opts, index=start_shift_idx)
+    my_station = (st.session_state["h_pump"]
+                  if st.session_state.get("h_pump") in station_options else station_options[0])
 
-    with t_col3:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("💾 Apply Transfer", use_container_width=True):
-            user_id = st.session_state.get("user_id")
-            if user_id:
-                if update_user_role_and_shift(user_id, new_role, new_shift):
-                    # Instantly update the session state so the UI morphs on reload
-                    st.session_state["user_role"] = new_role.lower()
-                    st.session_state["user_shift"] = new_shift
-                    st.toast(f"✅ Successfully transferred to {new_role} on {new_shift}!")
-                    st.rerun()
-            else:
-                st.error("Error: Could not locate User ID.")
+    # Keep the "remember for next time" cookie in sync whenever the
+    # Hourly Pouring station selector changes.
+    if cookie_manager.get(station_cookie_name) != my_station:
+        cookie_manager.set(station_cookie_name, my_station, expires_at=datetime.now() + timedelta(days=90))
+else:
+    # Packing only ever has the one shared station — see the Packing tab
+    # further down — so there's nothing to pick.
+    my_station = "Pack-Out Station"
+
 st.markdown("---")
+
+# ===================== ROLE & SHIFT TRANSFER =====================
+# Gated to real operators/packers only. This writes to
+# st.session_state["user_id"] — the REAL logged-in account, never the
+# name picked in the manager/admin "Impersonate Operator" debug selector
+# above — so an admin/manager using this page (including while browsing
+# it in impersonation mode to see what an operator sees) could otherwise
+# silently downgrade their OWN account's role to Operator/Packer with one
+# click, since the dropdown only ever offers those two options. That is
+# exactly what happened once already; this block no longer renders at all
+# for admin/manager sessions. Managers change anyone's role deliberately,
+# from Admin_Panel.py, where the target user is chosen explicitly.
+if current_role in ("operator", "packer"):
+    with st.expander("🔄 Mid-Shift Role & Station Transfer", expanded=False):
+        st.caption("Update your assignment if you are pulled to a different station or shift.")
+
+        t_col1, t_col2, t_col3 = st.columns(3)
+        with t_col1:
+            role_opts = ["Operator", "Packer"]
+            current_role_cap = current_role.capitalize()
+            start_role_idx = role_opts.index(current_role_cap) if current_role_cap in role_opts else 0
+            new_role = st.selectbox("New Assigned Role", role_opts, index=start_role_idx)
+
+        with t_col2:
+            shift_opts = ["Shift 1", "Shift 2", "Shift 3", "Floater"]
+            start_shift_idx = shift_opts.index(current_shift) if current_shift in shift_opts else 0
+            new_shift = st.selectbox("New Assigned Shift", shift_opts, index=start_shift_idx)
+
+        with t_col3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("💾 Apply Transfer", use_container_width=True):
+                user_id = st.session_state.get("user_id")
+                if user_id:
+                    if update_user_role_and_shift(user_id, new_role, new_shift):
+                        # Instantly update the session state so the UI morphs on reload
+                        st.session_state["user_role"] = new_role.lower()
+                        st.session_state["user_shift"] = new_shift
+                        st.toast(f"✅ Successfully transferred to {new_role} on {new_shift}!")
+                        st.rerun()
+                else:
+                    st.error("Error: Could not locate User ID.")
+    st.markdown("---")
 
 # ===================== VISUAL TANK RECONCILIATION =====================
 with st.expander("👀 Calibrate Tank Level (Visual Level Check)", expanded=False):
@@ -577,9 +695,12 @@ st.subheader("🎯 Active Assigned Production Runs (Assigned by Manager)")
 if not df_runs.empty:
     target_run_type = "Packing" if current_role == "packer" else "Pouring"
     
+    # Gated by station, not by who the manager originally dispatched it
+    # to — see the "My Station" picker above. Whoever is logged in and
+    # pointed at this station sees (and can log against) the same run.
     active_runs = df_runs[
-        (df_runs["status"].isin(["Active", "Pouring", "Queued"])) & 
-        (df_runs["assigned_operator"] == current_user) &
+        (df_runs["status"].isin(["Active", "Pouring", "Queued"])) &
+        (df_runs["pump_station"] == my_station) &
         (df_runs.get("run_type", "Pouring") == target_run_type)
     ]
     
@@ -599,18 +720,18 @@ if not df_runs.empty:
 <div style="display:flex; justify-content:space-between; align-items:center;">
 <div>
 <span style="background:rgba(16, 185, 129, 0.1); color:{status_color}; font-size:0.75rem; font-weight:800; padding:4px 8px; border-radius:4px; border: 1px solid {status_color};">{status_badge}</span>
-<span style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-left:8px;">{run['resin_type']}</span>
-<span style="color:#00D2FF; font-weight:700; font-size:0.85rem; margin-left:6px;">[{run['cartridge_type']}]</span>
+<span style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-left:8px;">{esc(run['resin_type'])}</span>
+<span style="color:#00D2FF; font-weight:700; font-size:0.85rem; margin-left:6px;">[{esc(run['cartridge_type'])}]</span>
 </div>
 <div style="color:#94A3B8; font-size:0.85rem;">
-🛢️ <b>{run.get('reactor_id', 'Reactor 1')}</b> ({run.get('reactor_size_l', 5000):,} L) &nbsp;|&nbsp; 🏷️ <b>{run['pump_station']}</b>
+🛢️ <b>{esc(run.get('reactor_id', 'Reactor 1'))}</b> ({run.get('reactor_size_l', 5000):,} L) &nbsp;|&nbsp; 🏷️ <b>{esc(run['pump_station'])}</b> &nbsp;|&nbsp; 👤 Dispatched: <b>{esc(run.get('assigned_operator', '—'))}</b>
 </div>
 </div>
 <div style="background-color: #1E2B45; border-radius: 8px; width: 100%; height: 16px; margin-top: 14px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-<div class="animated-progress-bar" style="width: {prog_pct * 100}%; background-color: {status_color};"></div>
+<div class="animated-progress-bar" style="width: {prog_pct * 100}%; height: 100%; background-color: {status_color}; transition: width 0.4s ease;"></div>
 </div>
 <div style="font-size: 0.8rem; color: #94A3B8; margin-top: 4px; text-align: right;">
-Progress: <b style="color:#FFFFFF;">{run['current_units']:,} / {run['target_units']:,}</b> Units ({prog_pct*100:.1f}%) | Lot: {run.get('lot_number', 'N/A')}
+Progress: <b style="color:#FFFFFF;">{run['current_units']:,} / {run['target_units']:,}</b> Units ({prog_pct*100:.1f}%) | Lot: {_display_lot(run.get('lot_number'), run.get('cartridge_type'))}
 </div>
 </div>
 """, unsafe_allow_html=True)
@@ -618,11 +739,11 @@ Progress: <b style="color:#FFFFFF;">{run['current_units']:,} / {run['target_unit
                 col_btn1, col_btn2, col_btn3 = st.columns(3)
                 with col_btn1:
                     if st.button("+50 Units", key=f"p50_{run['id']}"):
-                        update_assigned_run_progress(run['id'], 50)
+                        update_assigned_run_progress(run['id'], 50, operator_name=current_user)
                         st.rerun()
                 with col_btn2:
                     if st.button("+100 Units", key=f"p100_{run['id']}"):
-                        update_assigned_run_progress(run['id'], 100)
+                        update_assigned_run_progress(run['id'], 100, operator_name=current_user)
                         st.rerun()
                 with col_btn3:
                     if st.button("✓ Mark Done", key=f"done_{run['id']}"):
@@ -637,7 +758,8 @@ Progress: <b style="color:#FFFFFF;">{run['current_units']:,} / {run['target_unit
                         st.rerun()
                 st.markdown("---")
     else:
-        st.info("No active production runs assigned to you. Check with your Plant Manager.")
+        st.info(f"No active {target_run_type.lower()} runs at **{my_station}** right now. "
+                f"Check with your Plant Manager, or pick a different station above if you're working elsewhere this shift.")
 else:
     st.info("No production runs in database.")
 
@@ -651,13 +773,45 @@ if not st.session_state.get("auto_scrolled_to_logs", False):
     components.html(
         """
         <script>
-            // Wait a split-second for the charts and UI to finish rendering above
-            setTimeout(function() {
-                var target = window.parent.document.getElementById('log_action_area');
+        (function () {
+            // A single fixed-delay setTimeout used to be enough, but as more
+            // sections (top nav, KPI cards, checklist gate, expanders) got
+            // added above the log area, rendering above it can still be
+            // shifting layout well past a flat 800ms — the scroll fired
+            // before the page finished settling, landing in the wrong spot
+            // or appearing to do nothing. This instead polls for the target
+            // and waits for its position to stop moving before scrolling.
+            function getDoc() {
+                try {
+                    if (window.parent && window.parent.document) return window.parent.document;
+                } catch (e) { /* sandboxed iframe — fall back below */ }
+                return document;
+            }
+
+            var doc = getDoc();
+            var attempts = 0;
+            var maxAttempts = 60;   // ~6s at 100ms between checks
+            var lastTop = null;
+            var stableCount = 0;
+
+            var poll = setInterval(function () {
+                attempts++;
+                var target = doc.getElementById('log_action_area');
                 if (target) {
-                    target.scrollIntoView({behavior: 'smooth', block: 'start'});
+                    var top = target.getBoundingClientRect().top;
+                    stableCount = (lastTop !== null && Math.abs(top - lastTop) < 2) ? stableCount + 1 : 0;
+                    lastTop = top;
+                    if (stableCount >= 2 || attempts >= maxAttempts) {
+                        clearInterval(poll);
+                        try {
+                            target.scrollIntoView({behavior: 'smooth', block: 'start'});
+                        } catch (e) { /* give up quietly */ }
+                    }
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(poll);
                 }
-            }, 800); 
+            }, 100);
+        })();
         </script>
         """,
         height=0, width=0
@@ -708,7 +862,11 @@ if tab1 is not None:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### 📍 1. Station & Material Setup")
 
-        # Stacked inputs for maximum tap-target size on mobile
+        # Stacked inputs for maximum tap-target size on mobile.
+        # No `index=` here on purpose: st.session_state["h_pump"] is
+        # already seeded with the right default above, and this is the
+        # single source of truth for "my station" — changing it here is
+        # what updates Section 1's active-run list on the next rerun.
         station = st.selectbox("Pump Station", active_pumps, key="h_pump")
 
         cartridge = st.selectbox("Container Format",
@@ -717,30 +875,230 @@ if tab1 is not None:
         cart_code = "RPS" if "RPS" in cartridge else (
             "V1" if "V1" in cartridge else ("Pigment" if "Pigment" in cartridge else "V2"))
 
-        specs_df = get_all_resin_specs_df(cart_code)
-        if specs_df.empty:
-            specs_df = get_all_resin_specs_df("ALL")
-        resin_names = sorted(specs_df["resin_name"].unique().tolist())
+        # The Resin Formulation list must always show every resin on file,
+        # never just the ones whose master spec happens to be registered
+        # under this specific Container Format. A resin that's only ever
+        # been registered as, say, V2 can still legitimately get run
+        # through a V1 cartridge one day — and the operator has to be able
+        # to log that regardless of what the spec table says. cart_code
+        # is only used below to prefer a cartridge-matched spec for the
+        # target-weight display; it never gates which resins are selectable.
+        all_specs_df = get_all_resin_specs_df("ALL")
+        resin_names = sorted(all_specs_df["resin_name"].unique().tolist()) if not all_specs_df.empty else []
 
         resin = st.selectbox("Resin Formulation", resin_names, key="h_resin")
-        matched = specs_df[specs_df["resin_name"] == resin]
-        if not matched.empty:
-            spec_info = matched.iloc[0]
-            st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g**")
 
+        cart_matched = get_all_resin_specs_df(cart_code)
+        cart_matched = cart_matched[cart_matched["resin_name"] == resin] if not cart_matched.empty else cart_matched
+        if not cart_matched.empty:
+            spec_info = cart_matched.iloc[0]
+            st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g**")
+        else:
+            matched = all_specs_df[all_specs_df["resin_name"] == resin]
+            if not matched.empty:
+                spec_info = matched.iloc[0]
+                st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g** "
+                           f"_(no spec on file for {cartridge} — showing this resin's spec from another Container Format)_")
+            else:
+                st.caption("⚖️ No weight spec on file for this resin yet — logging is still allowed.")
+
+        # Case-/whitespace-insensitive match — pump/resin/cartridge all come
+        # from the same dropdowns as the Manager Cockpit's, but incidental
+        # differences (trailing space, casing) used to make this silently
+        # miss and fall back to a generic lot number that wouldn't match
+        # the real run, so bottle counts never reached its progress bar.
+        _norm = lambda s: str(s).strip().lower()
         station_active_run = df_runs[
-            (df_runs["pump_station"] == station) &
-            (df_runs["resin_type"] == resin) &
-            (df_runs["cartridge_type"] == cart_code) &
+            (df_runs["pump_station"].apply(_norm) == _norm(station)) &
+            (df_runs["resin_type"].apply(_norm) == _norm(resin)) &
+            (df_runs["cartridge_type"].apply(_norm) == _norm(cart_code)) &
             (df_runs["status"].isin(["Active", "Pouring"]))
             ]
         auto_lot = str(station_active_run.iloc[0].get("lot_number",
                                                       f"LOT-{datetime.now().strftime('%Y%m%d')}-01")) if not station_active_run.empty else f"LOT-{datetime.now().strftime('%Y%m%d')}-01"
 
-        lot_num = st.text_input("Batch Lot Number", value=auto_lot, help="Auto-fills from active run.", key="h_lot")
+        # ==================================================================
+        # 2. CARTRIDGE LOT VERIFICATION GATE
+        # ------------------------------------------------------------------
+        # The run's lot used to auto-fill an editable box right here, which
+        # meant the form answered its own question: an operator could log a
+        # full hour without ever turning a cartridge over. Now the expected
+        # lot is masked and the operator types what is actually stamped on
+        # the bottom of the cartridge in their hand, so nothing about this
+        # gate can be satisfied from what is on screen.
+        #
+        # A mismatch never dead-ends anyone - it demands a reason, flags the
+        # log, and alerts the manager. RPS is poured without lot labels, so
+        # the gate never applies to it.
+        # ==================================================================
+        GATED_FORMATS = ("V1", "V2", "Pigment")
+        gate_applies = cart_code in GATED_FORMATS
+        expected_lot = auto_lot
+        expected_is_real = not is_placeholder_lot(expected_lot)
 
         st.markdown("---")
-        st.markdown("#### 📊 2. Production Output")
+        st.markdown("#### 🔒 2. Cartridge Lot Verification")
+
+        lot_num = expected_lot
+        verification = None
+        pending_photo = None
+        gate_ok = False
+        gate_blockers = []
+        extra_note = ""
+
+        if not gate_applies:
+            st.info("**RPS bulk jugs carry no lot label** — nothing to verify on this format.")
+            lot_num = st.text_input("Batch Lot Number", value=auto_lot,
+                                    help="Auto-fills from the active run.", key="h_lot")
+            gate_ok = True
+
+        else:
+            gate_mem = st.session_state.setdefault("lot_gate_memory", {})
+            mem = gate_mem.get(station)
+
+            # The fast path exists so a per-log check doesn't decay into a
+            # reflex tap. It only survives while nothing physical has changed,
+            # and it re-arms into a full check every 10th log regardless.
+            fast_ok = False
+            if mem and expected_is_real and mem.get("entered"):
+                same_material = (mem.get("expected") == expected_lot
+                                 and mem.get("resin") == resin
+                                 and mem.get("cart") == cart_code)
+                fresh = (datetime.now() - mem.get("ts", datetime.min)) <= timedelta(hours=4)
+                spot_check_due = mem.get("since_full", 0) >= 9
+                fast_ok = bool(same_material and fresh and not spot_check_due)
+
+            base_v = {
+                "operator_name": current_user,
+                "pump_station": station,
+                "shift": current_shift,
+                "cartridge_type": cart_code,
+                "resin_type": resin,
+                "expected_lot": expected_lot if expected_is_real else None,
+            }
+
+            if fast_ok:
+                st.success(
+                    f"✅ Verified at **{mem['ts'].strftime('%I:%M %p').lstrip('0')}** "
+                    f"by {mem.get('by', 'this station')} — same run, same lot, same station.")
+                still_reads = st.checkbox(
+                    f"Cartridge in my hand still reads **L-{mem['entered']}**",
+                    key="h_lot_fast_confirm")
+                st.caption("A full check comes back on any change of run, lot, resin or station, "
+                           "after 4 hours, and on every 10th log.")
+                if still_reads:
+                    gate_ok = True
+                    lot_num = expected_lot
+                    verification = dict(base_v, entered_lot=mem["entered"],
+                                        result="verified", check_level="fast")
+                else:
+                    gate_blockers.append("confirm the cartridge still reads the lot shown above")
+
+            else:
+                if expected_is_real:
+                    st.markdown(
+                        "Expected lot for this run: &nbsp; `• • • • • • • • •` &nbsp; "
+                        "<span style='color:#94A3B8; font-size:0.85rem;'>"
+                        "hidden on purpose — read the cartridge, not the screen</span>",
+                        unsafe_allow_html=True)
+                else:
+                    st.warning(
+                        "No active run matched this station / resin / format, so there is no lot "
+                        "to check against. Read the stamp anyway — it gets recorded against this log "
+                        "instead of the placeholder the app would otherwise invent.")
+                st.caption("Turn the cartridge over. The bottom is stamped `L-` followed by the lot. "
+                           "Type it exactly as printed — spacing, case and the prefix don't matter.")
+
+                entered_lot = st.text_input("L- — lot stamped on the cartridge bottom",
+                                            key="h_lot_entered", placeholder="2411A0742")
+
+                typed = entered_lot.strip()
+                result = None
+                reason_kind, reason_detail = "", ""
+
+                # The E- expiry line printed under the lot is deliberately NOT typed.
+                # One field is all of the operator's time this check is worth, and a
+                # second one every hour is how a gate turns into a reflex. The expiry
+                # is already in the photo, so the offline OCR pass can fill
+                # entered_expiry / expiry_status later without adding a keystroke at
+                # the station - which is why those columns still exist on the table.
+                if typed:
+                    if not expected_is_real:
+                        result = "recorded"
+                    elif lots_match(expected_lot, typed):
+                        result = "verified"
+                    else:
+                        result = "mismatch"
+
+                if result == "verified":
+                    st.success("✅ **Lot matches this run.**")
+                elif result == "recorded":
+                    st.info(f"📝 Stamp recorded: **L-{typed}**. Nothing to compare it against.")
+                elif result == "mismatch":
+                    st.error("⛔ **STOP — DO NOT POUR.** This cartridge is not from the lot assigned "
+                             "to your run. Set it aside and get your lead.")
+
+                if result == "mismatch":
+                    st.markdown("**Pulled the cartridge instead? Log the catch — it belongs in the record.**")
+                    if st.button("❌ Wrong cartridge — pulled it, nothing poured",
+                                 use_container_width=True, key="h_lot_reject"):
+                        add_lot_verification(dict(
+                            base_v, entered_lot=typed, result="rejected", check_level="full",
+                            reason="Cartridge pulled at the station before pouring",
+                            photo_filename=save_lot_photo(pending_photo)))
+                        gate_mem.pop(station, None)
+                        st.toast("Catch recorded. Nothing was logged as poured.", icon="🛑")
+                        st.rerun()
+
+                    reason_kind = st.selectbox(
+                        "Logging it anyway? Say what happened.",
+                        ("", "Wrong pallet staged at the station", "Label misprint or unreadable",
+                         "Cartridge was relabeled", "Run lot in the MES is wrong",
+                         "Lead approved the pour", "Other"),
+                        key="h_lot_reason_kind")
+                    reason_detail = st.text_input("Details (required)", key="h_lot_reason_detail",
+                                                  placeholder="What did you and your lead decide?")
+
+                    # Evidence is only worth the upload wait on this branch. A flagged
+                    # pour is the one someone reviews later and may have to defend, and
+                    # the operator is already stopped talking to their lead, so the
+                    # 20-30 seconds costs nothing the situation wasn't costing anyway.
+                    # Note it is NOT required to pull the cartridge above: the safe
+                    # action must never be slower than the risky one.
+                    st.markdown("**Photograph the stamp** — required to log a pour against a flag.")
+                    photo_mode = st.radio("Stamp photo", ("Take photo", "Upload image"),
+                                          horizontal=True, key="h_lot_photo_mode")
+                    if photo_mode == "Take photo":
+                        pending_photo = st.camera_input("Photograph the stamp", key="h_lot_cam")
+                    else:
+                        pending_photo = st.file_uploader("Upload a photo of the stamp",
+                                                         type=["png", "jpg", "jpeg", "webp", "heic", "heif"],
+                                                         key="h_lot_upload")
+
+                if not typed:
+                    gate_blockers.append("type the L- lot from the cartridge")
+                if result == "mismatch" and not (reason_kind and reason_detail.strip()):
+                    gate_blockers.append("pick a reason and add details before logging a flagged pour")
+                if result == "mismatch" and pending_photo is None:
+                    gate_blockers.append("photograph the stamp")
+
+                gate_ok = not gate_blockers
+                if gate_ok:
+                    reason_text = " — ".join(p for p in (reason_kind, reason_detail.strip()) if p)
+                    # On a mismatch the log carries the lot that was physically in
+                    # the cartridge, not the one the run expected. The run's
+                    # progress bar not moving is the point: it surfaces the problem
+                    # instead of burying it under a correct-looking count.
+                    lot_num = typed if (result == "mismatch" or not expected_is_real) else expected_lot
+                    if result == "mismatch":
+                        extra_note = (f"⚠️ LOT MISMATCH — cartridge stamped L-{typed}, "
+                                      f"run expects {expected_lot}. {reason_text}")
+                    verification = dict(base_v, entered_lot=typed, result=result,
+                                        check_level="record" if result == "recorded" else "full",
+                                        reason=reason_text or None)
+
+        st.markdown("---")
+        st.markdown("#### 📊 3. Production Output")
 
         # Give the Good Units its own massive full-width input
         bottles_filled = st.number_input("✅ Good Units / Containers Filled", min_value=0, value=250, step=10,
@@ -757,8 +1115,19 @@ if tab1 is not None:
                              key="h_notes")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚀 SUBMIT POURING LOG", type="primary", use_container_width=True):
-            add_hourly_log(
+        if gate_blockers:
+            st.caption("Before you can submit: " + "; ".join(gate_blockers) + ".")
+        if st.button("🚀 SUBMIT POURING LOG", type="primary", use_container_width=True,
+                     disabled=not gate_ok):
+            # Written to disk here rather than on every rerun while they type.
+            if verification is not None and pending_photo is not None:
+                verification["photo_filename"] = save_lot_photo(pending_photo)
+
+            log_notes = (notes or "").strip()
+            if extra_note:
+                log_notes = f"{extra_note}\n{log_notes}".strip()
+
+            matched_run = add_hourly_log(
                 operator_name=current_user,
                 pump_station=station,
                 shift=current_shift,
@@ -768,10 +1137,40 @@ if tab1 is not None:
                 bottles=int(bottles_filled),
                 scrap_empty=int(scrap_empty),
                 scrap_filled=int(scrap_filled),
-                notes=notes,
-                log_type="Hourly Bottle Count"
+                notes=log_notes,
+                log_type="Hourly Bottle Count",
+                verification=verification
             )
-            st.toast(f"Recorded {bottles_filled} units of {resin}!", icon="🧪")
+
+            # Arm the fast path only after a clean check. A mismatch or an
+            # expired lot clears it, so the next log at this station starts
+            # over with the full check.
+            if gate_applies and verification is not None:
+                _mem = st.session_state.setdefault("lot_gate_memory", {})
+                if verification.get("result") == "verified":
+                    _prev = _mem.get(station) or {}
+                    _mem[station] = {
+                        "expected": expected_lot,
+                        "resin": resin,
+                        "cart": cart_code,
+                        "entered": verification.get("entered_lot", ""),
+                        "ts": datetime.now(),
+                        "by": current_user,
+                        "since_full": (_prev.get("since_full", 0) + 1)
+                                      if verification.get("check_level") == "fast" else 0,
+                    }
+                else:
+                    _mem.pop(station, None)
+
+            if verification and verification.get("result") in ("mismatch", "expired"):
+                st.toast("Logged and flagged for the manager — the lot did not check out.", icon="⚠️")
+            if matched_run:
+                st.toast(f"Recorded {bottles_filled} units of {resin}! Credited to your active run.", icon="🧪")
+            else:
+                st.toast(
+                    f"Recorded {bottles_filled} units of {resin} to Analytics — "
+                    f"no active run matched this station/resin/lot, so it won't move a progress bar above.",
+                    icon="⚠️")
             st.rerun()
 
 # --- PACKING TAB ---
@@ -788,14 +1187,17 @@ if tab_pack is not None:
         p_cart_code = "RPS" if "RPS" in pack_cartridge else (
             "V1" if "V1" in pack_cartridge else ("Pigment" if "Pigment" in pack_cartridge else "V2"))
 
-        p_specs_df = get_all_resin_specs_df(p_cart_code)
-        if p_specs_df.empty:
-            p_specs_df = get_all_resin_specs_df("ALL")
-        p_resin_names = sorted(p_specs_df["resin_name"].unique().tolist())
+        # Same reasoning as the Hourly Pouring tab: never let the Container
+        # Format filter hide a resin from the picker just because its
+        # master spec isn't registered for this specific format.
+        p_all_specs_df = get_all_resin_specs_df("ALL")
+        p_resin_names = sorted(p_all_specs_df["resin_name"].unique().tolist()) if not p_all_specs_df.empty else []
 
         pack_resin = st.selectbox("Resin Formulation", p_resin_names, key="p_resin")
 
-        matched_pack = p_specs_df[p_specs_df["resin_name"] == pack_resin]
+        p_cart_matched = get_all_resin_specs_df(p_cart_code)
+        p_cart_matched = p_cart_matched[p_cart_matched["resin_name"] == pack_resin] if not p_cart_matched.empty else p_cart_matched
+        matched_pack = p_cart_matched if not p_cart_matched.empty else p_all_specs_df[p_all_specs_df["resin_name"] == pack_resin]
         units_per_skid = 500
         if not matched_pack.empty:
             units_per_skid = int(matched_pack.iloc[0].get("units_per_skid", 500))
@@ -837,7 +1239,8 @@ if tab2 is not None:
         st.subheader("Station Downtime Event Logger")
         d_col1, d_col2 = st.columns(2)
         with d_col1:
-            dt_station = st.selectbox("Downtime Station", active_pumps, key="dt_stat")
+            _dt_pump_idx = active_pumps.index(my_station) if my_station in active_pumps else 0
+            dt_station = st.selectbox("Downtime Station", active_pumps, index=_dt_pump_idx, key="dt_stat")
             dt_reason = st.selectbox("Reason for Downtime", dt_reasons, key="dt_reason")
         with d_col2:
             dt_duration = st.number_input("Downtime Duration (Minutes)", min_value=1, max_value=240, value=15, step=5)
@@ -868,7 +1271,8 @@ if tab3 is not None:
                 "Audit Checklist Event",
                 ("Start Of Shift (Cleanliness Check)", "End Of Shift (Cleanliness Check)", "Station / Pump Transfer Check", "Resin Spill / Containment Issue")
             )
-            audit_station = st.selectbox("Pump / Workstation", active_pumps, key="aud_pump")
+            _aud_pump_idx = active_pumps.index(my_station) if my_station in active_pumps else 0
+            audit_station = st.selectbox("Pump / Workstation", active_pumps, index=_aud_pump_idx, key="aud_pump")
             is_spill_flag = st.checkbox("⚠️ Check if this is an active resin spill / leak incident", value=("Spill" in audit_type))
 
         with a_col2:
@@ -924,7 +1328,7 @@ if tab_chat is not None:
 
                     with st.chat_message(role, avatar=avatar):
                         st.markdown(
-                            f"**{row['sender_name']}** <span style='font-size:0.7rem; color:#94A3B8;'>{msg_time}</span>",
+                            f"**{esc(row['sender_name'])}** <span style='font-size:0.7rem; color:#94A3B8;'>{msg_time}</span>",
                             unsafe_allow_html=True)
                         st.write(row['message'])
             else:

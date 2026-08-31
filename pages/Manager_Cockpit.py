@@ -211,6 +211,7 @@ with col1:
 
 with col2:
     st.page_link("pages/Mgr_Cleanliness.py", label="📸 Cleanliness & Photo Audits", use_container_width=True)
+    st.page_link("pages/Mgr_Lot_Verification.py", label="🔒 Cartridge Lot Verification", use_container_width=True)
     st.page_link("pages/Mgr_Historical.py", label="📈 Historical Production Trends", use_container_width=True)
     st.page_link("pages/Mgr_Floor_Comms.py", label="💬 Floor Communications", use_container_width=True)
 
@@ -218,3 +219,4 @@ with col3:
     st.page_link("pages/Mgr_Roster.py", label="👥 Floor Staff Roster", use_container_width=True)
     st.page_link("pages/Mgr_Google_Sync.py", label="☁️ Google Cloud Sheets Sync", use_container_width=True)
     st.page_link("pages/Mgr_Shift_Handover.py", label="📤 PDF Shift Handover", use_container_width=True)
+    st.page_link("pages/Mgr_Log_Management.py", label="🗑️ Log Management & Cleanup", use_container_width=True)
