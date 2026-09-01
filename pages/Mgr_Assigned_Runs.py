@@ -14,6 +14,7 @@ from database import (
     reconcile_pouring_to_packing, get_all_users_df, get_all_pumps_df, do_logout
 )
 from database import esc
+from resin_palette import resin_chip, stored_color_map, style_resin_column
 
 st.set_page_config(page_title="Assigned Runs | Formlabs MES", page_icon="🎯", layout="wide")
 
@@ -41,6 +42,9 @@ df_users = get_all_users_df()
 df_pumps = get_all_pumps_df()
 active_operators_list = get_active_operators()
 active_pumps_list = get_active_pumps()
+# One colour lookup for the whole page, so a resin reads the same in the
+# dispatch form, on the run cards and in the completed work-order table.
+_resin_colours = stored_color_map(get_all_resin_specs_df("ALL"))
 
 col_k1, col_k2, col_k3, col_k4 = st.columns(4)
 total_target = df_runs["target_units"].sum() if not df_runs.empty else 0
@@ -103,6 +107,11 @@ with st.expander("➕ Create & Assign New Work Order", expanded=True):
                 specs_df = get_all_resin_specs_df("ALL")
             resin_list = sorted(specs_df["resin_name"].unique().tolist()) if not specs_df.empty else ["No Resins"]
             selected_resin = st.selectbox("Resin Formulation", resin_list)
+            if selected_resin and selected_resin != "No Resins":
+                st.markdown(
+                    resin_chip(selected_resin, _resin_colours.get(str(selected_resin)), size="lg"),
+                    unsafe_allow_html=True,
+                )
         with m_c3:
             default_target = int(reactor_size_val / 5.0) if cart_code == "RPS" and run_type_selection == "Pouring" else (int(reactor_size_val / 1.0) if run_type_selection == "Pouring" else 500)
             target_units = st.number_input("Target Units", min_value=1, max_value=50000, value=default_target, step=50)
@@ -156,7 +165,7 @@ with active_tab:
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <span style="background:{status_color}; color:#FFFFFF; font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:4px;">● {run['status'].upper()}</span>
-                            <span style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-left:8px;">{esc(run['resin_type'])}</span>
+                            <span style="margin-left:8px;">{resin_chip(run['resin_type'], _resin_colours.get(str(run['resin_type'])), size="lg")}</span>
                             <span style="color:#00D2FF; font-weight:700; font-size:0.85rem; margin-left:6px;">[{esc(run['cartridge_type'])}]</span>
                         </div>
                         <div style="color:#94A3B8; font-size:0.85rem;">
@@ -219,7 +228,8 @@ with completed_tab:
 
         if not comp_df.empty:
             display_cols = ["id", "created_at", "run_type", "resin_type", "cartridge_type", "lot_number", "target_units", "current_units", "assigned_operator", "pump_station"]
-            st.markdown(f'<div style="overflow-x: auto;">{comp_df[display_cols].to_html(index=False)}</div>', unsafe_allow_html=True)
+            st.dataframe(style_resin_column(comp_df[display_cols], "resin_type", _resin_colours),
+                         hide_index=True, use_container_width=True)
 
             st.markdown("---")
             with st.expander("🗑️ Delete a Completed Work Order"):

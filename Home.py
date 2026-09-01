@@ -33,6 +33,7 @@ from database import (
     do_logout,
 )
 from database import esc
+from resin_palette import resin_chip, stored_color_map, style_resin_column
 
 # Pull our external theme dictionary
 try:
@@ -582,6 +583,7 @@ df_logs = get_production_logs_df()
 df_dt = get_downtime_logs_df()
 df_runs = get_assigned_runs_df()
 specs_df = get_all_resin_specs_df("ALL")
+_resin_colours = stored_color_map(specs_df)
 
 spec_dict = {}
 if not specs_df.empty:
@@ -1077,7 +1079,7 @@ if show_packing:
                 f"<div style='display:flex; justify-content:space-between;"
                 " border-bottom:1px solid #1E2B45; padding-bottom:6px;"
                 " margin-bottom:6px;'><span><b"
-                f" style='color:#FFFFFF;'>{esc(row['resin_type'])}</b> <span"
+                f">{resin_chip(row['resin_type'], _resin_colours.get(str(row['resin_type'])))}</b> <span"
                 f" style='color:#94A3B8; font-size:0.8rem;'>({esc(row['lot_number'])})</span></span>"
                 f" <span><b style='color:#A855F7;'>{row['bottles_filled']:,}"
                 f" Units</b> <span style='color:#64748B;'>({skids:.1f}"
@@ -1140,10 +1142,9 @@ if not sorted_df.empty:
         "notes",
     ]]
 
-    st.markdown(
-        '<div style="overflow-x:'
-        f' auto;">{display_df.to_html(index=False)}</div>',
-        unsafe_allow_html=True,
+    st.dataframe(
+        style_resin_column(display_df, "resin_type", _resin_colours),
+        use_container_width=True, hide_index=True,
     )
 else:
     st.info("No records match the current filter selection.")

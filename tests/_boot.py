@@ -33,9 +33,20 @@ def _production_url():
     return None
 
 
-def boot(fresh=True):
-    """Return (server_or_None, uri) with os.environ['DB_URL'] pointed at it."""
+def boot(fresh=True, db_name=None):
+    """Return (server_or_None, uri) with os.environ['DB_URL'] pointed at it.
+
+    fresh=False deliberately reuses whatever the previous script left behind:
+    test_ui and test_pages run against the shift that test_workflow simulates,
+    rather than each rebuilding a fortnight of data.
+
+    db_name asks for a SEPARATE scratch database, for a script that needs to
+    start from nothing without destroying that shared fixture. Without it, a
+    fresh=True script run in the middle of the suite wipes the database the
+    two fresh=False scripts are relying on, and they fail somewhere confusing.
+    """
     prod = _production_url()
+    name = db_name or TEST_DB_NAME
 
     uri = os.environ.get("TEST_DB_URL")
     srv = None
@@ -55,13 +66,13 @@ def boot(fresh=True):
             # WITH (FORCE) so a connection left open by an earlier test run
             # can't block the drop; fall back for older servers.
             try:
-                srv.psql(f"DROP DATABASE IF EXISTS {TEST_DB_NAME} WITH (FORCE);")
+                srv.psql(f"DROP DATABASE IF EXISTS {name} WITH (FORCE);")
             except Exception:
                 srv.psql("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                         f"WHERE datname = '{TEST_DB_NAME}';")
-                srv.psql(f"DROP DATABASE IF EXISTS {TEST_DB_NAME};")
-            srv.psql(f"CREATE DATABASE {TEST_DB_NAME};")
-        uri = f"postgresql+psycopg2://postgres@/{TEST_DB_NAME}?host={pgdata}"
+                         f"WHERE datname = '{name}';")
+                srv.psql(f"DROP DATABASE IF EXISTS {name};")
+            srv.psql(f"CREATE DATABASE {name};")
+        uri = f"postgresql+psycopg2://postgres@/{name}?host={pgdata}"
 
     if prod and uri and prod.strip() == uri.strip():
         raise SystemExit("REFUSING TO RUN: the test URL is your production DB_URL.")

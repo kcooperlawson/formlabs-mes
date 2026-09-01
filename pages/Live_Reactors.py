@@ -27,6 +27,7 @@ from database import (
     check_authentication,
 )
 from database import esc
+from resin_palette import resin_chip, stored_color_map
 
 
 def get_base64_image(image_path):
@@ -264,6 +265,7 @@ if not specs_df.empty:
     for _, r in specs_df.iterrows():
         spec_dict[f"{str(r['cartridge_type']).strip().lower()}_{str(r['resin_name']).strip().lower()}"] = float(r["actual_spec_g"])
 
+_resin_colours = stored_color_map(specs_df)
 all_resins = ["None"] + sorted(specs_df["resin_name"].unique().tolist()) if not specs_df.empty else ["None"]
 all_pumps = ["None"] + get_active_pumps()
 
@@ -352,7 +354,14 @@ if not df_reactors.empty:
                 remaining_kg = max(0.0, total_capacity_kg - poured_kg)
 
                 tank_color = "linear-gradient(0deg, #EF4444 0%, #F87171 100%)" if fill_pct < 10 else "linear-gradient(0deg, #3B82F6 0%, #00D2FF 100%)"
-                status_html = f"<span style='color:#00D2FF; font-weight:800;'>{r_resin}</span><br><span style='color:#64748B; font-size:0.7rem;'>Station: {target_pump if target_pump else 'Any'} | Op: {op}</span>"
+                # The tank's resin as a coloured chip rather than cyan text.
+                # This wall of tanks is read from across the room, and colour
+                # is the only thing legible at that distance.
+                status_html = (
+                    resin_chip(r_resin, _resin_colours.get(str(r_resin)))
+                    + f"<br><span style='color:#64748B; font-size:0.7rem;'>"
+                      f"Station: {esc(target_pump) if target_pump else 'Any'} | Op: {esc(op)}</span>"
+                )
                 rem_display = f"{remaining_l:,.0f} L"
             else:
                 fill_pct = 0.0

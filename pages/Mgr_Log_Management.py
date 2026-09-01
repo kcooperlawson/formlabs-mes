@@ -6,9 +6,11 @@ from datetime import datetime, date, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 import pandas as pd
+from resin_palette import resin_dot, stored_color_map
 from database import (
     get_production_logs_df, get_downtime_logs_df,
     delete_production_log, delete_downtime_log,
+    get_all_resin_specs_df,
     do_logout,
 )
 
@@ -60,6 +62,7 @@ def _confirm_bulk_delete(key_prefix: str, match_count: int):
 # ===================== 💧 PRODUCTION LOGS =====================
 with log_tab:
     all_logs = get_production_logs_df()
+    _resin_colours = stored_color_map(get_all_resin_specs_df("ALL"))
 
     if all_logs.empty:
         st.info("No production logs exist yet.")
@@ -119,7 +122,12 @@ with log_tab:
                 rc[0].caption(str(row.get("timestamp_disp", row.get("timestamp", ""))))
                 rc[1].caption(str(row.get("log_type", "")))
                 rc[2].caption(str(row.get("pump_station", "")))
-                rc[3].caption(str(row.get("resin_type", "")))
+                # A dot rather than a full pill: this grid is dense and a
+                # pill per row would push the delete button off the edge.
+                rc[3].markdown(
+                    f"<span style='font-size:0.85rem;opacity:0.85;'>"
+                    f"{resin_dot(row.get('resin_type', ''), _resin_colours.get(str(row.get('resin_type', ''))))}"
+                    f"</span>", unsafe_allow_html=True)
                 rc[4].caption(str(row.get("operator_name", "")))
                 rc[5].caption(f"{int(row.get('bottles_filled', 0) or 0):,}")
                 if rc[6].button("🗑️", key=f"del_plog_{row['id']}", help=f"Delete log #{row['id']}"):

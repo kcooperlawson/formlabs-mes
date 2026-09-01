@@ -34,8 +34,8 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # --- BASELINE DATA ---
 MASTER_FORMLABS_CATALOG = (
-    ("V2", "RS-C2-GPCL-05", "FLGPCL05", "24", "Standard Clear V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
-    ("V2", "RS-C2-GPBK-05", "FLGPBK05", "24", "Standard Black V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
+    ("V2", "RS-C2-GPCL-05", "FLGPCL05", "24", "Standard Clear V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, None),
+    ("V2", "RS-C2-GPBK-05", "FLGPBK05", "24", "Standard Black V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, None),
 )
 
 # Set True by init_db() after its first successful run in this process — see
@@ -474,6 +474,12 @@ def bulk_update_resin_specs(df_updated: pd.DataFrame):
                 spec.acceptable_range = f"{int(spec.min_weight_g)}-{int(spec.max_weight_g)}"
                 spec.multiplier = float(row.get("multiplier", spec.multiplier))
                 spec.lifetime_months = str(row.get("lifetime_months", spec.lifetime_months))
+                # Only overwrite the colour when the caller actually sent one.
+                # This function is fed a hand-built dict from more than one
+                # screen, and a form that doesn't show the colour field must
+                # not blank out a colour somebody chose on another screen.
+                if "color_tag" in row and str(row.get("color_tag") or "").strip():
+                    spec.color_tag = str(row["color_tag"]).strip()
         session.commit()
     finally:
         session.close()
@@ -1455,8 +1461,15 @@ def delete_user_by_username(username: str) -> bool:
 def add_resin_spec(cartridge_type: str, sku: str, resin_code: str, resin_name: str,
                    actual_spec_g: float, min_weight_g: float, max_weight_g: float,
                    lifetime_months: str = "24", multiplier: float = 1.0,
-                   color_tag: str = "#EA580C", units_per_skid: int = 500) -> bool:
-    """Inserts a new proprietary resin formulation directly into PostgreSQL."""
+                   color_tag: str = None, units_per_skid: int = 500) -> bool:
+    """Inserts a new proprietary resin formulation directly into PostgreSQL.
+
+    color_tag defaults to None rather than a colour on purpose. A caller that
+    doesn't care leaves it unset, and resin_palette derives the colour from
+    the name - which for a new revision of an existing family (Black V6, say)
+    is already the right answer. Storing a colour here is for the case where
+    somebody deliberately picked one.
+    """
     session = ScopedSession()
     try:
         acceptable_range = f"{int(min_weight_g)}-{int(max_weight_g)}"

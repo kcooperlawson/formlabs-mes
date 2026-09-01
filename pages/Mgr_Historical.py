@@ -13,6 +13,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import get_production_logs_df, do_logout, get_all_users_df
+from database import get_all_resin_specs_df
+from resin_palette import resin_chip, stored_color_map
 
 st.set_page_config(page_title="Historical Analytics | Formlabs MES", page_icon="📈", layout="wide")
 
@@ -60,6 +62,11 @@ with col_f1:
     date_range = st.selectbox("📅 Time Horizon", ["Past 7 Days", "Past 30 Days", "Year to Date", "All Time"])
 with col_f2:
     selected_resin = st.selectbox("🧪 Resin Filter", ["All Resins"] + sorted(df_logs["resin_type"].dropna().unique().tolist()) if not df_logs.empty else ["All Resins"])
+    if selected_resin and selected_resin != "All Resins":
+        st.markdown(
+            resin_chip(selected_resin, stored_color_map(get_all_resin_specs_df("ALL")).get(str(selected_resin))),
+            unsafe_allow_html=True,
+        )
 with col_f3:
     selected_op = st.selectbox("👤 Operator Filter", operator_options)
 

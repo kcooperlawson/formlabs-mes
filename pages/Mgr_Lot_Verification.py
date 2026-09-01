@@ -10,6 +10,8 @@ from database import get_lot_verifications_df, LOT_PHOTO_DIR, do_logout
 
 st.set_page_config(page_title="Lot Verification | Formlabs MES", page_icon="🔒", layout="wide")
 from database import esc
+from database import get_all_resin_specs_df
+from resin_palette import resin_chip, stored_color_map, style_resin_column
 
 
 try:
@@ -34,6 +36,7 @@ st.caption("Every lot check completed at a pouring station. The passes are what 
 win = st.selectbox("Window", (7, 14, 30, 90), index=2,
                    format_func=lambda d: f"Last {d} days", key="lv_window")
 df = get_lot_verifications_df(days=win)
+_resin_colours = stored_color_map(get_all_resin_specs_df("ALL"))
 
 if df.empty:
     st.info("No lot checks recorded in this window yet. Checks start appearing as soon as "
@@ -82,6 +85,11 @@ with tab_flag:
                         "expired": "EXPIRED LOT — poured anyway",
                         "rejected": "CARTRIDGE PULLED — nothing poured"}.get(row["result"], row["result"].upper())
             with st.container():
+                _resin_html = (
+                    resin_chip(row["resin_type"], _resin_colours.get(str(row["resin_type"])))
+                    if row["resin_type"] else
+                    "<span style='color:#64748B; font-size:0.85rem;'>no resin recorded</span>"
+                )
                 st.markdown(
                     f"<div style='border-left:4px solid {tone}; border-radius:6px; padding:10px 14px; "
                     f"background-color:#0F172A; margin-bottom:6px;'>"
@@ -90,7 +98,7 @@ with tab_flag:
                     f"{row['timestamp'].strftime('%b %d, %I:%M %p')}</span><br>"
                     f"<span style='color:#E2E8F0; font-size:0.85rem;'>"
                     f"{esc(row['operator_name'])} · {esc(row['pump_station'])} · {esc(row['cartridge_type'])} · "
-                    f"{row['resin_type'] or 'no resin recorded'}</span></div>",
+                    f"</span>{_resin_html}</div>",
                     unsafe_allow_html=True)
                 st.markdown(
                     f"**Run expected:** `{row['expected_lot'] or '—'}`  \n"
@@ -144,7 +152,8 @@ with tab_all:
                          "resin_type": "Resin", "expected_lot": "Run lot",
                          "entered_lot": "Cartridge lot",
                          "result": "Result", "check_level": "Level", "reason": "Reason",
-                         "production_log_id": "Log #"}),
+                         "production_log_id": "Log #"})
+        .pipe(style_resin_column, "Resin", _resin_colours),
         use_container_width=True, hide_index=True)
     st.download_button("⬇️ Export this window as CSV",
                        data=df.to_csv(index=False).encode("utf-8"),

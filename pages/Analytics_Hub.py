@@ -21,8 +21,9 @@ from database import (
     get_production_logs_df,
     get_downtime_logs_df,
     get_plant_settings, do_logout, check_authentication,
-    get_all_users_df,
+    get_all_users_df, get_all_resin_specs_df,
 )
+from resin_palette import resin_color_map, stored_color_map
 
 
 cookie_manager = stx.CookieManager(key="analytics_cookies")
@@ -441,7 +442,12 @@ with c2:
     st.markdown("<h4 style='color:#E2E8F0;'>🧪 Formulation Output</h4>", unsafe_allow_html=True)
     if not pour_7d.empty:
         resin_grp = pour_7d.groupby("resin_type")["bottles_filled"].sum().reset_index()
-        fig_donut = px.pie(resin_grp, names="resin_type", values="bottles_filled", hole=0.7)
+        # Same colours as everywhere else the resin is named, so a segment can
+        # be matched to a cartridge without reading the legend.
+        _donut_colours = resin_color_map(resin_grp["resin_type"].tolist(),
+                                         stored_color_map(get_all_resin_specs_df("ALL")))
+        fig_donut = px.pie(resin_grp, names="resin_type", values="bottles_filled", hole=0.7,
+                           color="resin_type", color_discrete_map=_donut_colours)
         fig_donut.update_traces(
             hoverinfo='label+percent',
             textinfo='none',

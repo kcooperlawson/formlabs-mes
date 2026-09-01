@@ -20,6 +20,7 @@ from database import (
     get_all_users_df,
 )
 from database import esc
+from resin_palette import resin_chip, stored_color_map
 import base64
 
 def get_base64_image(image_path):
@@ -450,6 +451,7 @@ if packing_enabled:
             unsafe_allow_html=True)
         if not df_today_pack.empty:
             specs_df = get_all_resin_specs_df("ALL")
+            _pack_colours = stored_color_map(specs_df)
             pack_grp = df_today_pack.groupby(["resin_type", "lot_number"])["bottles_filled"].sum().reset_index()
 
             for _, row in pack_grp.iterrows():
@@ -465,7 +467,7 @@ if packing_enabled:
 
                 skids = qty / skid_size if skid_size > 0 else 0
                 st.markdown(
-                    f"<div style='text-align:left; margin-bottom: 8px; border-bottom:1px solid #1E2B45; padding-bottom:6px;'><b style='color:white; font-size:1.1rem;'>{res}</b> &nbsp;<span style='color:#94A3B8; font-size:0.8rem;'>({lot})</span><div style='float:right;'><span style='color:#A855F7; font-weight:bold; font-size:1.1rem;'>{qty:,} Units</span> <span style='color:#64748B; font-size:0.9rem;'>({skids:.1f} Skids)</span></div></div>",
+                    f"<div style='text-align:left; margin-bottom: 8px; border-bottom:1px solid #1E2B45; padding-bottom:6px;'>{resin_chip(res, _pack_colours.get(str(res)), size='lg')} &nbsp;<span style='color:#94A3B8; font-size:0.8rem;'>({esc(lot)})</span><div style='float:right;'><span style='color:#A855F7; font-weight:bold; font-size:1.1rem;'>{qty:,} Units</span> <span style='color:#64748B; font-size:0.9rem;'>({skids:.1f} Skids)</span></div></div>",
                     unsafe_allow_html=True)
         else:
             st.caption("No packing data logged yet today.")
@@ -476,13 +478,14 @@ with b3:
         "<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>⚙️ ACTIVE REACTOR WORK ORDERS</div>",
         unsafe_allow_html=True)
     df_runs = get_assigned_runs_df()
+    _run_colours = stored_color_map(get_all_resin_specs_df("ALL"))
     if not df_runs.empty:
         active_runs = df_runs[df_runs["status"].isin(["Active", "Pouring"])]
         if not active_runs.empty:
             for _, run in active_runs.iterrows():
                 prog_pct = min(1.0, run["current_units"] / run["target_units"]) if run["target_units"] > 0 else 0.0
                 st.markdown(
-                    f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'><b style='color:white; font-size:1.1rem;'>{esc(run['resin_type'])}</b> &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
+                    f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'>{resin_chip(run['resin_type'], _run_colours.get(str(run['resin_type'])), size='lg')} &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
                     unsafe_allow_html=True)
                 st.progress(prog_pct)
         else:

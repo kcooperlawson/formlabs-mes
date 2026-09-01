@@ -47,6 +47,7 @@ from database import (
     check_authentication,
 )
 from database import esc
+from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
 import base64
 
 import extra_streamlit_components as stx
@@ -495,6 +496,12 @@ df_runs = get_assigned_runs_df()
 active_pumps = get_active_pumps()
 dt_reasons = get_downtime_reasons()
 
+# Resin colours for this render. get_all_resin_specs_df is cached, so this
+# costs nothing extra, and resolving them in one place means every resin on
+# this page - run cards, tank cards, the pouring selection, the packing tab -
+# carries the same colour it carries on every other screen.
+resin_colour_map = stored_color_map(get_all_resin_specs_df("ALL"))
+
 # ===================== MY STATION (multi-pourer support) =====================
 # Which station's runs show in Section 1 below. Deliberately independent
 # of AssignedRun.assigned_operator: any number of operators can point at
@@ -601,9 +608,12 @@ with st.expander("👀 Calibrate Tank Level (Visual Level Check)", expanded=Fals
                 tank_info = active_tanks[
                     active_tanks["reactor_name"] == selected_tank
                 ].iloc[0]
-                st.info(
-                    f"Resin: **{tank_info['current_resin']}** | Max Cap:"
-                    f" **{tank_info['max_capacity_l']:,} L**"
+                st.markdown(
+                    "Resin: &nbsp;"
+                    + resin_chip(tank_info["current_resin"],
+                                 resin_colour_map.get(str(tank_info["current_resin"])))
+                    + f"&nbsp; | &nbsp; Max Cap: <b>{tank_info['max_capacity_l']:,} L</b>",
+                    unsafe_allow_html=True,
                 )
 
             with v_col2:
@@ -663,8 +673,10 @@ with st.expander("⚖️ Master Resin Specification Lookup", expanded=False):
             ]
 
     st.dataframe(
-        op_specs_df[
-            ["cartridge_type", "sku", "resin_name", "actual_spec_g", "min_weight_g", "max_weight_g", "Target (kg)"]],
+        style_resin_column(
+            op_specs_df[
+                ["cartridge_type", "sku", "resin_name", "actual_spec_g", "min_weight_g", "max_weight_g", "Target (kg)"]],
+            "resin_name", resin_colour_map),
         column_config={
             "cartridge_type": "Format",
             "sku": "SKU",
@@ -709,7 +721,7 @@ if not df_runs.empty:
 <div style="display:flex; justify-content:space-between; align-items:center;">
 <div>
 <span style="background:rgba(16, 185, 129, 0.1); color:{status_color}; font-size:0.75rem; font-weight:800; padding:4px 8px; border-radius:4px; border: 1px solid {status_color};">{status_badge}</span>
-<span style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-left:8px;">{esc(run['resin_type'])}</span>
+<span style="margin-left:8px;">{resin_chip(run['resin_type'], resin_colour_map.get(str(run['resin_type'])), size="lg")}</span>
 <span style="color:#00D2FF; font-weight:700; font-size:0.85rem; margin-left:6px;">[{esc(run['cartridge_type'])}]</span>
 </div>
 <div style="color:#94A3B8; font-size:0.85rem;">
@@ -876,6 +888,14 @@ if tab1 is not None:
         resin_names = sorted(all_specs_df["resin_name"].unique().tolist()) if not all_specs_df.empty else []
 
         resin = st.selectbox("Resin Formulation", resin_names, key="h_resin")
+        # The selected formulation, in its own colour, directly under the
+        # dropdown. A dropdown shows the same grey text whatever is chosen,
+        # so this is the one place on the screen where what the operator
+        # picked can be compared at a glance against the cartridge in their
+        # hand rather than by reading two lines of similar-looking text.
+        if resin:
+            st.markdown(resin_chip(resin, resin_colour_map.get(str(resin)), size="lg"),
+                        unsafe_allow_html=True)
 
         cart_matched = get_all_resin_specs_df(cart_code)
         cart_matched = cart_matched[cart_matched["resin_name"] == resin] if not cart_matched.empty else cart_matched
@@ -1183,6 +1203,9 @@ if tab_pack is not None:
         p_resin_names = sorted(p_all_specs_df["resin_name"].unique().tolist()) if not p_all_specs_df.empty else []
 
         pack_resin = st.selectbox("Resin Formulation", p_resin_names, key="p_resin")
+        if pack_resin:
+            st.markdown(resin_chip(pack_resin, resin_colour_map.get(str(pack_resin)), size="lg"),
+                        unsafe_allow_html=True)
 
         p_cart_matched = get_all_resin_specs_df(p_cart_code)
         p_cart_matched = p_cart_matched[p_cart_matched["resin_name"] == pack_resin] if not p_cart_matched.empty else p_cart_matched

@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from database import get_production_logs_df, get_downtime_logs_df, do_logout
+from database import get_production_logs_df, get_downtime_logs_df, get_all_resin_specs_df, do_logout
+from resin_palette import resin_color_map, stored_color_map
 
 st.set_page_config(page_title="Scrap Intelligence | Formlabs MES", page_icon="📊", layout="wide")
 
@@ -48,7 +49,13 @@ c1, c2 = st.columns(2)
 with c1:
     if not df_logs.empty:
         resin_grp = df_logs.groupby("resin_type")["bottles_filled"].sum().reset_index()
-        fig_resin = px.bar(resin_grp, x="resin_type", y="bottles_filled", color="resin_type", title="Output by Formulation")
+        # Bars carry each resin's own colour instead of Plotly's default
+        # sequence. A chart that invents its own palette teaches a second,
+        # conflicting colour language for the same set of things.
+        _bar_colours = resin_color_map(resin_grp["resin_type"].tolist(),
+                                       stored_color_map(get_all_resin_specs_df("ALL")))
+        fig_resin = px.bar(resin_grp, x="resin_type", y="bottles_filled", color="resin_type",
+                           color_discrete_map=_bar_colours, title="Output by Formulation")
         fig_resin.update_layout(height=320, showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#94A3B8"))
         st.plotly_chart(fig_resin, use_container_width=True)
 with c2:

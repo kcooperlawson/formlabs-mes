@@ -109,7 +109,12 @@ class ResinSpec(Base):
     max_weight_g = Column(Float, nullable=False)
     acceptable_range = Column(String(50), nullable=True)
     multiplier = Column(Float, default=1.0)
-    color_tag = Column(String(20), default="#EA580C")
+    # The resin's display colour, shown everywhere the name appears. Left NULL
+    # rather than defaulted: a default here means every row holds the same
+    # value and the column stops carrying any information, which is exactly
+    # what happened before migration 0005. NULL means "nobody chose one", and
+    # resin_palette.resin_color() derives one from the name instead.
+    color_tag = Column(String(20), nullable=True)
     units_per_skid = Column(Integer, default=500)
 
 class PumpStation(Base):
@@ -258,8 +263,8 @@ class LotVerification(Base):
 
 # Generic public placeholders (Safe for source code)
 MASTER_FORMLABS_CATALOG = (
-    ("V2", "RS-C2-GPCL-05", "FLGPCL05", "24", "Standard Clear V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
-    ("V2", "RS-C2-GPBK-05", "FLGPBK05", "24", "Standard Black V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, "#EA580C"),
+    ("V2", "RS-C2-GPCL-05", "FLGPCL05", "24", "Standard Clear V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, None),
+    ("V2", "RS-C2-GPBK-05", "FLGPBK05", "24", "Standard Black V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, None),
 )
 
 
