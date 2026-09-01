@@ -25,14 +25,18 @@ Where a colour comes from, in order:
    "Black V6" tomorrow and it is the right grey-black immediately, with
    nobody editing anything.
 
-4. **A hash of the name.** Only reached by something that matches no family
+4. **A colour word in the name.** "Cyan Pigment" should be cyan. Checked
+   after the family rules, never before - the material family always
+   outranks a colour word.
+
+5. **A hash of the name.** Only reached by something that matches no family
    at all - a genuinely new material, or a custom formulation. The name is
    hashed onto one of forty prepared swatches, so it is stable (the same
    name is always the same colour, on every machine and after every
    restart), clearly distinct from its neighbours, and still looks like it
    belongs to the set. Then a manager can override it if they care.
 
-The point of 3 and 4 together is that there is no such thing as an
+The point of 3, 4 and 5 together is that there is no such thing as an
 uncoloured resin on screen, and no step anyone has to remember to perform
 when a resin is added.
 
@@ -135,6 +139,29 @@ _FAMILY_RULES = (
     ("grey", "#666B6D"),
     ("gray", "#666B6D"),
     ("clear", "#EBF5FA"),
+)
+
+# Last resort before hashing: a resin literally named after a colour should
+# be that colour. Checked only AFTER every family rule, so "Tough Red V1" is
+# still a Tough - the material family always outranks a colour word in the
+# name. This is what stops the pigment line ("Cyan Pigment", "Magenta
+# Pigment") from landing on arbitrary swatches when the plant already knows
+# perfectly well what colour those are.
+_COLOUR_WORDS = (
+    ("cyan", "#22B8CF"),
+    ("magenta", "#D6336C"),
+    ("yellow", "#FCC419"),
+    ("amber", "#F59F00"),
+    ("orange", "#FD7E14"),
+    ("violet", "#845EF7"),
+    ("purple", "#9C36B5"),
+    ("pink", "#F783AC"),
+    ("green", "#40C057"),
+    ("blue", "#4C6EF7"),
+    ("red", "#E03131"),
+    ("gold", "#E8B923"),
+    ("silver", "#C8CDD3"),
+    ("bronze", "#B07A4B"),
 )
 
 _FALLBACK = "#9AA3AE"
@@ -255,6 +282,10 @@ def resin_color(name, stored=None) -> str:
         if needle in key:
             return colour
 
+    for needle, colour in _COLOUR_WORDS:
+        if needle in key:
+            return colour
+
     return _hash_colour(key)
 
 
@@ -347,11 +378,19 @@ def stored_color_map(specs_df) -> dict:
             return {}
         if "resin_name" not in specs_df.columns or "color_tag" not in specs_df.columns:
             return {}
-        return {
-            str(r): c
-            for r, c in zip(specs_df["resin_name"], specs_df["color_tag"])
-            if r is not None
-        }
+        # First non-empty value wins per name. The same material legitimately
+        # has one row per container format, so a name can arrive more than
+        # once; "last one in the frame wins" would make a resin's colour
+        # depend on row order, which is a colour that moves for no reason
+        # anyone can see.
+        out = {}
+        for r, c in zip(specs_df["resin_name"], specs_df["color_tag"]):
+            if r is None:
+                continue
+            name = str(r)
+            if name not in out or not out[name]:
+                out[name] = c
+        return out
     except Exception:
         return {}
 

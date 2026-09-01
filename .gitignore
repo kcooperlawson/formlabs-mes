@@ -40,3 +40,8 @@ resin_backups/
 *.bak
 *.bak_*
 *.bak[0-9]*
+
+# Move-to-new-PC build artefacts: pip download cache and the package itself
+wheels/
+_MOVE_PACKAGE/
+formlabs_mes_move_*.zip

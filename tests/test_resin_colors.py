@@ -16,16 +16,23 @@ hand - so the properties that make that safe are worth asserting explicitly:
 
 Run: python tests/test_resin_colors.py
 """
+import os
 import sys
 import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import _boot  # noqa: E402
 
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 # Its own scratch database: this script needs to watch the migrations run
 # against an empty schema, and must not wipe the shift that test_workflow
 # builds for test_ui and test_pages to read.
 _boot.boot(fresh=True, db_name="formlabs_test_colours")
+
+# A second scratch database, so section 8 can watch the migration run against
+# a table shaped like production without disturbing anything else.
+_srv, MIGRATION_URI = _boot.boot(fresh=True, db_name="formlabs_test_migration")
 
 import sqlalchemy as sa  # noqa: E402
 from resin_palette import (  # noqa: E402
@@ -163,40 +170,100 @@ check(resin_color_map(["Black V4", None, "Clear V5"], {"Black V4": "#000000"})
 print("  every helper degrades to 'uncoloured' rather than taking a page down")
 
 # -------------------------------------------------------------- migration --
-section("8. MIGRATION 0005 FILLS THE COLUMN IN")
-import crud  # noqa: E402
-from db_core import engine  # noqa: E402
+section("8. MIGRATION 0005 REPLACES GROUP COLOURS, KEEPS REAL ONES")
+# Run the real migration against a table shaped the way the production
+# database actually is: color_tag there was never a per-resin colour, it was
+# the CONTAINER FORMAT's colour - one green on every RPS row, one blue on
+# every V1 - plus a handful of genuine per-resin choices. Asserting against
+# that shape rather than an empty table is the whole point; an empty-table
+# test passes happily while every resin on screen renders the same green.
+import subprocess  # noqa: E402
 
-crud.init_db()
-crud.seed_initial_data()
+os.environ["DB_URL"] = MIGRATION_URI
+subprocess.run([sys.executable, "-m", "alembic", "upgrade", "0004_checklist_station"],
+               check=True, capture_output=True, cwd=str(ROOT))
 
-with engine.connect() as conn:
-    version = conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
-    check(version == "0005_resin_colors", f"schema is at 0005 (found {version})")
-
-    # A row that predates colours: NULL, and one still holding the old default.
-    conn.execute(sa.text(
-        "INSERT INTO resin_specs (cartridge_type, resin_name, actual_spec_g, "
-        "min_weight_g, max_weight_g, color_tag) VALUES "
-        "('V2', 'Grey Pro V1', 1080, 1070, 1090, NULL), "
-        "('V2', 'Castable Wax 40 V1', 1010, 1000, 1020, '#EA580C')"
-    ))
+FIXTURE = [
+    # (name, format, colour as the old app would have stored it)
+    ("Black V4", "V1", "#1E3A8A"), ("Clear V4", "V1", "#1E3A8A"),
+    ("Grey V4", "V1", "#1E3A8A"), ("White V4", "V1", "#1E3A8A"),
+    ("Draft V2", "V1", "#1E3A8A"),          # 5 different resins, one V1 blue
+    ("Tough 1500 V1", "RPS", "#16A34A"), ("High Temp V2", "RPS", "#16A34A"),
+    ("ESD V1", "RPS", "#16A34A"),           # 3 different resins, one RPS green
+    ("Cyan Pigment", "Pigment", "#E11D48"),
+    ("Magenta Pigment", "Pigment", "#E11D48"),
+    ("Yellow Pigment", "Pigment", "#E11D48"),
+    ("Castable Wax V1", "V2", "#6B3382"),   # a real per-resin choice, 1 name
+    ("Color Base V1", "V2", "#CCB4E4"),     # another, deliberately non-palette
+    ("Alumina 4N V1", "V2", None),          # never set
+    ("Silicone 40A V1", "V2", "#EA580C"),   # the old shared default
+    # the same material in two formats is not evidence of a shared colour
+    ("Clear V5", "V1", "#907DCA"), ("Clear V5", "V2", "#907DCA"),
+]
+mig_engine = sa.create_engine(MIGRATION_URI)
+with mig_engine.connect() as conn:
+    for name, fmt, colour in FIXTURE:
+        conn.execute(sa.text(
+            "INSERT INTO resin_specs (cartridge_type, resin_name, actual_spec_g, "
+            "min_weight_g, max_weight_g, color_tag) "
+            "VALUES (:f, :n, 1110, 1100, 1120, :c)"),
+            {"f": fmt, "n": name, "c": colour})
     conn.commit()
 
-    rows = conn.execute(sa.text("SELECT resin_name, color_tag FROM resin_specs")).fetchall()
+subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
+               check=True, capture_output=True, cwd=str(ROOT))
 
-check(len(rows) >= 2, "seeded specs exist")
-for name, stored in rows:
-    check(rp._HEX_RE.match(resin_color(name, stored)),
-          f"{name} renders a colour whatever is stored ({stored!r})")
-# The two rows written the old way still come out right, because the resolver
-# treats NULL and the legacy default as "nobody chose one".
-by_name = dict(rows)
-check(resin_color("Grey Pro V1", by_name.get("Grey Pro V1")) == "#545454",
-      "a NULL colour resolves from the name")
-check(resin_color("Castable Wax 40 V1", by_name.get("Castable Wax 40 V1")) == "#D1B4DE",
-      "a legacy-default colour resolves from the name")
-print(f"  {len(rows)} spec rows, every one renders a real per-resin colour")
+with mig_engine.connect() as conn:
+    check(conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
+          == "0005_resin_colors", "schema reached 0005")
+    after = {}
+    for name, fmt, colour in conn.execute(sa.text(
+            "SELECT resin_name, cartridge_type, color_tag FROM resin_specs")):
+        after[(name, fmt)] = colour
+
+check(all(c for c in after.values()), "no row is left without a colour")
+
+# The group colours are gone, and each of those resins now carries its own.
+for name, fmt, _old in FIXTURE:
+    if _old in ("#1E3A8A", "#16A34A", "#E11D48", "#EA580C", None):
+        check(after[(name, fmt)] == resin_color(name),
+              f"{name} [{fmt}] replaced its group colour with its own")
+check(after[("Black V4", "V1")] == "#3B3C3C", "V1 blue became the Black colour")
+check(after[("Cyan Pigment", "Pigment")] == "#22B8CF", "pigment rose became cyan")
+check(after[("Alumina 4N V1", "V2")] == "#FDECEC", "a NULL colour got filled in")
+check(after[("Silicone 40A V1", "V2")] == "#A2E3D6", "the old default got replaced")
+check(len({after[(n, f)] for n, f, o in FIXTURE if o == "#1E3A8A"}) == 5,
+      "the five resins that shared one blue are now five different colours")
+
+# A colour only one or two resins wear is a decision, and survives untouched.
+check(after[("Castable Wax V1", "V2")] == "#6B3382", "a per-resin choice is kept")
+check(after[("Color Base V1", "V2")] == "#CCB4E4",
+      "a per-resin choice is kept even when it isn't a palette colour")
+check(after[("Clear V5", "V1")] == "#907DCA" and after[("Clear V5", "V2")] == "#907DCA",
+      "one material across two formats is not treated as a shared colour")
+print(f"  {len(FIXTURE)} rows: group colours replaced, {2} deliberate choices kept")
+
+# Family colours ARE shared afterwards - every Tough is one grey - so the rule
+# must converge rather than fight itself if it is ever applied again.
+before_second = dict(after)
+import importlib.util  # noqa: E402
+spec = importlib.util.spec_from_file_location(
+    "mig0005", str(ROOT / "migrations" / "versions" / "0005_resin_colors.py"))
+mig = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mig)
+with mig_engine.connect() as conn:
+    rows = conn.execute(sa.text("SELECT id, resin_name, color_tag FROM resin_specs")).fetchall()
+    from collections import defaultdict
+    per = defaultdict(set)
+    for _i, n, c in rows:
+        per[(c or "").strip().upper()].add((n or "").strip().lower())
+    for _i, n, c in rows:
+        k = (c or "").strip().upper()
+        if k and k != "#EA580C" and len(per[k]) < mig.SHARED_THRESHOLD:
+            continue
+        check(resin_color(n) == c,
+              f"re-applying the rule to {n} would not change it")
+print("  the rule converges: applying it twice changes nothing")
 
 section("RESULT")
 print(f"ALL {CHECKS} RESIN COLOUR ASSERTIONS PASSED")
