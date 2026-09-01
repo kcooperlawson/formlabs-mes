@@ -135,6 +135,21 @@ if not defined LATEST_DUMP (
     pause
     exit /b 1
 )
+python _migration_helper.py check_dump_compat "%LATEST_DUMP%"
+if errorlevel 1 (
+    echo.
+    echo [STOP] The PostgreSQL installed on this PC is OLDER than the one the
+    echo        backup came from, and cannot read this dump. The restore would
+    echo        fail partway through with a message about an "invalid command"
+    echo        that says nothing about the real problem.
+    echo.
+    echo        Install a PostgreSQL at least as new as the version shown
+    echo        above from https://www.postgresql.org/download/windows/
+    echo        then run this script again.
+    pause
+    exit /b 1
+)
+
 echo     Restoring %LATEST_DUMP% ...
 python _migration_helper.py restore "%LATEST_DUMP%"
 if errorlevel 1 (

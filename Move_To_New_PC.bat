@@ -94,6 +94,9 @@ powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationP
 if not exist "%ZIPNAME%" (
     echo.
     echo [ERROR] Zip creation failed.
+    echo         If you included the offline packages, the zip is large and
+    echo         Compress-Archive can struggle with it - re-run and answer N,
+    echo         or just copy the _MOVE_PACKAGE folder across as a folder.
     pause
     exit /b 1
 )
