@@ -29,6 +29,7 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 from ui_shell import render_shell
+from components import empty_state
 cookie_manager = render_shell()
 current_role = st.session_state.get("user_role", "operator")
 
@@ -47,6 +48,12 @@ with s_col4: st.metric("Yield Severity Status", "Optimal", delta="0% Resin Loss"
 
 c1, c2 = st.columns(2)
 with c1:
+    if df_logs.empty:
+        empty_state(
+            "No production logged in this window",
+            "Output by formulation appears here once operators start logging pouring. "
+            "Widen the date range above if you are looking at a quiet period.",
+            icon="🧪")
     if not df_logs.empty:
         resin_grp = df_logs.groupby("resin_type")["bottles_filled"].sum().reset_index()
         # Bars carry each resin's own colour instead of Plotly's default
@@ -59,6 +66,13 @@ with c1:
         fig_resin.update_layout(height=320, showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#94A3B8"))
         st.plotly_chart(fig_resin, use_container_width=True)
 with c2:
+    if df_dt.empty:
+        empty_state(
+            "No downtime recorded",
+            "Every stoppage an operator logs is broken down here by reason, which is "
+            "what turns a vague sense that a pump is troublesome into a ranked list.",
+            action="Downtime is logged from the operator workstation, under Downtime.",
+            icon="⏱️")
     if not df_dt.empty:
         dt_grp = df_dt.groupby("reason")["duration_min"].sum().reset_index()
         fig_dt = px.pie(dt_grp, names="reason", values="duration_min", title="Downtime Reasons")

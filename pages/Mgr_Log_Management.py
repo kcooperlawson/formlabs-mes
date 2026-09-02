@@ -29,6 +29,7 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 from ui_shell import render_shell
+from components import empty_state
 cookie_manager = render_shell(show_settings=False)
 current_role = st.session_state.get("user_role", "operator")
 
@@ -65,7 +66,11 @@ with log_tab:
     _resin_colours = stored_color_map(get_all_resin_specs_df("ALL"))
 
     if all_logs.empty:
-        st.info("No production logs exist yet.")
+        empty_state(
+            "No production logs yet",
+            "This page is for finding and removing bad or test entries. Nothing has "
+            "been logged, so there is nothing to clean up.",
+            icon="\U0001F5D1\uFE0F")
     else:
         all_logs["date_obj"] = pd.to_datetime(all_logs["date"]).dt.date
         # Same UTC -> plant-local conversion used everywhere else on the

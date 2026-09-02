@@ -9,6 +9,7 @@ from database import get_cleanliness_audits_df, delete_cleanliness_audit, UPLOAD
 
 st.set_page_config(page_title="Cleanliness Gallery | Formlabs MES", page_icon="📸", layout="wide")
 from database import esc
+from components import empty_state
 
 
 try:
@@ -42,6 +43,14 @@ with k3: st.metric("End Shift Checks", f"{end_checks} shutdowns")
 with k4: st.metric("Pump Transfers", f"{transfers} line changes")
 with k5: st.metric("Spills / Issues", f"{spills} flags", delta="Attention Needed" if spills > 0 else "Clear", delta_color="inverse")
 st.markdown("---")
+
+if df_audits.empty:
+    empty_state(
+        "No photo audits yet",
+        "Start-of-shift, end-of-shift, station transfer and spill checks appear here "
+        "with their photograph, station, operator and timestamp.",
+        action="Operators submit these from the workstation, under Station Cleanliness.",
+        icon="📸")
 
 if not df_audits.empty:
     ac1, ac2, ac3 = st.columns(3)

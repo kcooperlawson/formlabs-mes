@@ -30,6 +30,7 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 from ui_shell import render_shell
+from components import empty_state
 cookie_manager = render_shell()
 current_role = st.session_state.get("user_role", "operator")
 
@@ -146,7 +147,13 @@ if not specs_filtered.empty:
         unsafe_allow_html=True,
     )
 else:
-    st.info("No resins found for the current filter.")
+    empty_state(
+        "No resins in this container format",
+        "The master table holds the target fill weight and tolerance window every "
+        "pour is checked against, per resin and per format.",
+        action="Try \u201cALL\u201d above, or add one under \u201cAdd New Proprietary "
+               "Resin Formulation\u201d.",
+        icon="\u2696\uFE0F")
 
 with st.expander("✏️ Edit or Delete Resin Specifications"):
     all_specs_df = get_all_resin_specs_df("ALL")

@@ -14,6 +14,7 @@ from database import (
     reconcile_pouring_to_packing, get_all_users_df, get_all_pumps_df, do_logout
 )
 from database import esc
+from components import empty_state
 from resin_palette import resin_chip, stored_color_map, style_resin_column
 
 st.set_page_config(page_title="Assigned Runs | Formlabs MES", page_icon="🎯", layout="wide")
@@ -210,7 +211,13 @@ with active_tab:
                             st.rerun()
                 st.markdown("---")
     else:
-        st.info("No assigned runs currently active.")
+        empty_state(
+            "No runs dispatched yet",
+            "A work order tells an operator which resin, container format and lot to "
+            "pour at which station, and gives their screen something to count against. "
+            "Until one exists, their terminal has nothing to show.",
+            action="Use \u201cCreate & Assign New Work Order\u201d above.",
+            icon="\U0001F3AF")
 
 with completed_tab:
     st.markdown("### 📚 Completed Work Order History")
@@ -250,4 +257,8 @@ with completed_tab:
         else:
             st.info("No completed orders match the current filters.")
     else:
-        st.info("No completed work orders logged yet.")
+        empty_state(
+            "Nothing completed yet",
+            "Work orders land here once they reach their target or are marked done, "
+            "with the units actually poured against the units ordered.",
+            icon="\u2705")

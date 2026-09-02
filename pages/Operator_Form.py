@@ -48,6 +48,7 @@ from database import (
     undo_own_log, UNDO_WINDOW_SECONDS,
 )
 from database import esc
+from components import empty_state, save_state
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
 from shifts import picker_options as shift_picker_options
 import fill_weight
@@ -445,7 +446,7 @@ if current_role in ["operator", "packer"]:
                             audit_type="Start Of Shift (Cleanliness Check)",
                             operator_name=current_user,
                             pump_station=audit_station,
-                            shift=current_shift,
+                                shift=current_shift,
                             resin_type="",
                             notes=audit_notes,
                             is_spill=False,
@@ -664,7 +665,12 @@ with st.expander("👀 Calibrate Tank Level (Visual Level Check)", expanded=Fals
                         )
                         st.rerun()
         else:
-            st.info("No active reactor tanks currently configured with resin.")
+            empty_state(
+                "No tanks have a resin assigned",
+                "Reactor levels are reconciled against what has been poured from them, "
+                "so a tank needs a resin on it before there is anything to reconcile.",
+                action="A manager sets this under Live Reactors.",
+                icon="\U0001F6E2\uFE0F")
     else:
         st.info("No reactor tanks registered in database.")
 
@@ -703,6 +709,74 @@ with st.expander("⚖️ Master Resin Specification Lookup", expanded=False):
 
 st.markdown("---")
 # ===================== SECTION 1: ACTIVE ASSIGNED RUNS =====================
+# ===================== FOCUS MODE =====================
+# Four numbers, large enough to read from a few feet away, and nothing else.
+#
+# During a pour the operator is at the pump, not at the screen. Everything
+# they need mid-run is which resin, which lot, how many so far and how far to
+# go - and on the full page those four facts are scattered between a card, a
+# progress bar and a form, at a size that means walking over and leaning in.
+# This is the same data, laid out to be read at a glance and then ignored.
+#
+# Deliberately a toggle rather than a separate page: it has to be one tap to
+# leave, because the moment they need it is the moment they need to log.
+_focus = st.toggle("🔍 Focus mode — big numbers, nothing else", value=False,
+                   key="focus_mode",
+                   help="For reading from across the station while you pour.")
+
+if _focus:
+    _my_runs = df_runs[
+        (df_runs["pump_station"].astype(str).str.strip().str.lower() == str(my_station).strip().lower())
+        & (df_runs["status"].isin(["Active", "Pouring"]))
+    ] if not df_runs.empty else df_runs
+
+    if _my_runs.empty:
+        empty_state(
+            f"Nothing running at {my_station}",
+            "Focus mode shows the run you are pouring against. There isn't one at "
+            "this station right now.",
+            action="Pick a different station above, or ask your manager to dispatch a run.",
+            icon="🔍")
+    else:
+        for _, _r in _my_runs.iterrows():
+            _target = int(_r["target_units"] or 0)
+            _done = int(_r["current_units"] or 0)
+            _left = max(0, _target - _done)
+            _pct = min(100.0, (_done / _target * 100.0)) if _target else 0.0
+            _bg, _fg, _bd = resin_colors(_r["resin_type"], resin_colour_map.get(str(_r["resin_type"])))
+            st.markdown(f"""
+<div style="border:2px solid {_bd};border-radius:14px;padding:22px 26px;margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+    <div>
+      <div style="font-size:0.75rem;letter-spacing:.16em;text-transform:uppercase;opacity:.6;">Resin</div>
+      <div style="background-color:{_bg};color:{_fg};border:1px solid {_bd};border-radius:10px;
+                  padding:6px 18px;font-size:2.0rem;font-weight:800;display:inline-block;margin-top:4px;">
+        {esc(_r['resin_type'])}</div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem;letter-spacing:.16em;text-transform:uppercase;opacity:.6;">Lot</div>
+      <div style="font-size:2.0rem;font-weight:800;font-family:monospace;margin-top:6px;">
+        {_display_lot(_r.get('lot_number'), _r.get('cartridge_type'))}</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:0.75rem;letter-spacing:.16em;text-transform:uppercase;opacity:.6;">Poured</div>
+      <div style="font-size:3.4rem;font-weight:900;line-height:1;margin-top:2px;">{_done:,}</div>
+      <div style="font-size:0.95rem;opacity:.7;">of {_target:,}</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:0.75rem;letter-spacing:.16em;text-transform:uppercase;opacity:.6;">Left</div>
+      <div style="font-size:3.4rem;font-weight:900;line-height:1;margin-top:2px;">{_left:,}</div>
+      <div style="font-size:0.95rem;opacity:.7;">{_pct:.0f}% done</div>
+    </div>
+  </div>
+  <div style="background:rgba(128,128,128,0.25);border-radius:10px;height:22px;margin-top:20px;overflow:hidden;">
+    <div style="width:{_pct}%;height:100%;background:{_bd};transition:width .4s ease;"></div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+    st.caption("Turn focus mode off to log, record downtime or run a cleanliness check.")
+    st.stop()
+
 st.subheader("🎯 Active Assigned Production Runs (Assigned by Manager)")
 
 if not df_runs.empty:
@@ -1215,21 +1289,36 @@ if tab1 is not None:
             if extra_note:
                 log_notes = f"{extra_note}\n{log_notes}".strip()
 
-            matched_run = add_hourly_log(
-                operator_name=current_user,
-                pump_station=station,
-                shift=current_shift,
-                cartridge_type=cart_code,
-                resin_type=resin,
-                lot_number=lot_num,
-                bottles=int(bottles_filled),
-                scrap_empty=int(scrap_empty),
-                scrap_filled=int(scrap_filled),
-                notes=log_notes,
-                log_type="Hourly Bottle Count",
-                verification=verification,
-                weight=weight_reading,
-            )
+            # The write, with the outcome actually reported. On this plant's
+            # network - which drops in parts of the building - "did that
+            # submit?" is a real question, and a page that silently re-runs
+            # answers it badly: an operator who is unsure submits again, and
+            # a duplicated hourly count is worse than a missing one because
+            # nothing about it looks wrong afterwards.
+            _save_ok, _save_err = True, ""
+            matched_run = False
+            try:
+                matched_run = add_hourly_log(
+                    operator_name=current_user,
+                    pump_station=station,
+                    shift=current_shift,
+                    cartridge_type=cart_code,
+                    resin_type=resin,
+                    lot_number=lot_num,
+                    bottles=int(bottles_filled),
+                    scrap_empty=int(scrap_empty),
+                    scrap_filled=int(scrap_filled),
+                    notes=log_notes,
+                    log_type="Hourly Bottle Count",
+                    verification=verification,
+                    weight=weight_reading,
+                )
+            except Exception as _e:
+                _save_ok, _save_err = False, str(_e)[:160]
+
+            if not _save_ok:
+                save_state("failed", _save_err)
+                st.stop()
 
             # Arm the fast path only after a clean check. A mismatch or an
             # expired lot clears it, so the next log at this station starts

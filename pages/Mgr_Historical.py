@@ -31,6 +31,7 @@ if not st.session_state.get("authenticated", False) or st.session_state.get("use
 
 # ===================== UNIVERSAL NAVIGATION & SIDEBAR =====================
 from ui_shell import render_shell
+from components import empty_state
 cookie_manager = render_shell()
 current_role = st.session_state.get("user_role", "operator")
 
@@ -87,6 +88,14 @@ hist_df = get_production_logs_df(
     start_date=start_date_filter, end_date=today_d, resin=selected_resin,
     operator=selected_operator_name, operator_id=selected_operator_id
 )
+
+if hist_df.empty:
+    empty_state(
+        "Nothing logged in this range",
+        "Historical trends compare output, scrap and yield over time, so they need at "
+        "least a few days of logs before the shape means anything.",
+        action="Widen the date range, or clear the operator and resin filters above.",
+        icon="📈")
 
 if not hist_df.empty:
     hist_df['date_str'] = pd.to_datetime(hist_df['date']).dt.strftime('%Y-%m-%d')

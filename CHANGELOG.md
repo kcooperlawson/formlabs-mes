@@ -6,6 +6,18 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 4.2 — Wednesday, September 2, 2026
+**Shared components, empty states that say what to do, save feedback, focus mode, and visual regression**
+
+- **Pulled the repeated markup into `components.py`.** Cards, stat tiles, notes and section headers were hand-written HTML in f-strings, copied page to page and drifting a little each time — the same duplication that once put a 131-line navigation block into eleven files and hid a crash in eight of them. Escaping now happens inside the component too, so a note containing a `<` cannot break the card it sits in and no future caller has to remember.
+- **An empty-state pass.** Five pages rendered *nothing at all* when they had no data — Scrap Intelligence, Historical Trends, Cleanliness, and both charts on the yield page. Most of the rest said something like "No assigned runs currently active", which is a statement of the obvious that leaves the reader stuck. Every empty screen now says what will make it fill up and, where there is one, the concrete next step: *"A work order tells an operator which resin, format and lot to pour at which station… Use Create & Assign New Work Order above."* Deliberately not styled as an error — having no data yet is normal on a system installed last week, and painting that red teaches people to ignore red.
+- **The pouring form now says whether the log actually saved.** The write was unguarded: if the database was unreachable the page raised or silently re-ran, and an operator who is unsure re-submits. A duplicated hourly count is worse than a missing one, because nothing about it looks wrong afterwards. Now a failure says plainly that nothing was recorded, so nothing is duplicated, and to try again — which matters on a network that drops in parts of this building.
+- **Focus mode.** During a pour the operator is at the pump, not at the screen, and the four things they need mid-run — resin, lot, count so far, how many left — are scattered across a card, a progress bar and a form at a size that means walking over and leaning in. One toggle replaces the page with those four, large enough to read from across the station. A toggle rather than a separate page, because the moment they need it is the moment they need to log.
+- **Visual regression screenshots** (`tests/visual_regression.py`). The page sweep proves every page renders without raising, and it has caught real crashes — but a page can render perfectly and still be wrong: a card that lost its border, a chart that came back empty, a nav bar that wrapped. None of that raises, and on the wall display it might go unnoticed for days. This drives a real browser through every page and diffs against the last approved set. Verified both directions: a deliberately broken card reports 6.5% of pixels changed while an untouched page reports 0.00%.
+- Comparison has a tolerance rather than demanding an exact match, because antialiasing shifts a pixel or two between runs and a check that cries wolf gets switched off within a week. The baseline is **not** committed — it is photographs of one database on one machine, so a baseline captured here would report every page as changed on yours. Run it once with `--approve` on your own install and it becomes meaningful from then on.
+
+---
+
 ## 4.1 — Wednesday, September 2, 2026
 **Two shifts, ten new themes, textures on the resin chips, glove mode, and undo**
 

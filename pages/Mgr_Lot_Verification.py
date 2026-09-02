@@ -10,6 +10,7 @@ from database import get_lot_verifications_df, LOT_PHOTO_DIR, do_logout
 
 st.set_page_config(page_title="Lot Verification | Formlabs MES", page_icon="🔒", layout="wide")
 from database import esc
+from components import empty_state
 from database import get_all_resin_specs_df
 from resin_palette import resin_chip, stored_color_map, style_resin_column
 
@@ -107,7 +108,8 @@ with tab_flag:
                 if pd.notna(row["production_log_id"]):
                     st.caption(f"Production log #{int(row['production_log_id'])} carries this flag.")
                 else:
-                    st.caption("No production logged against this check.")
+                    st.caption("No production logged against this check \u2014 the cartridge was "
+                               "pulled before pouring, which is the outcome this control is for.")
                 # Historic checks may still carry a stamp photo from before capture
                 # was removed; show it when one exists rather than losing the evidence.
                 if row["photo_filename"]:

@@ -45,3 +45,10 @@ resin_backups/
 wheels/
 _MOVE_PACKAGE/
 formlabs_mes_move_*.zip
+
+# Visual regression screenshots: photographs of one database on one machine.
+# A baseline captured elsewhere reports every page as changed on yours, so
+# each install generates its own with `visual_regression.py --approve`.
+tests/visual_baseline/
+tests/visual_current/
+tests/visual_diffs/
