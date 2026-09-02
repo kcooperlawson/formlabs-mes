@@ -20,6 +20,7 @@ from database import (
     check_authentication
 )
 from database import esc
+from shifts import picker_options as shift_picker_options
 
 st.set_page_config(page_title="IT Admin Console | Formlabs MES", page_icon="🛡️", layout="wide")
 
@@ -36,6 +37,11 @@ active_theme = st.session_state.get("preferred_theme", "Default Dark")
 st.markdown(THEMES.get(active_theme, THEMES["Default Dark"]), unsafe_allow_html=True)
 
 cookie_manager = stx.CookieManager(key="admin_cookies")
+try:
+    from ui_shell import apply_display_preferences
+    apply_display_preferences(locals().get('cookie_manager'))
+except Exception:
+    pass
 check_authentication(cookie_manager)
 
 if not st.session_state.get("authenticated", False):
@@ -246,7 +252,10 @@ with tab_roster:
         if not df_users.empty:
             modify_user = st.selectbox("Select Personnel", df_users["username"].tolist(), key="mod_user")
             mod_role = st.selectbox("New Role", ("operator", "packer", "manager", "admin"))
-            mod_shift = st.selectbox("New Shift", ("Shift 1", "Shift 2", "Shift 3", "Floater"))
+            _mod_current = str(df_users[df_users["username"] == modify_user]["shift"].iloc[0]) \
+                if "shift" in df_users.columns else ""
+            mod_shift = st.selectbox("New Shift",
+                                     shift_picker_options(get_plant_settings(), _mod_current))
             if st.button("💾 Apply Changes", type="primary"):
                 user_row = df_users[df_users["username"] == modify_user].iloc[0]
                 update_user_role_and_shift(int(user_row["id"]), mod_role, mod_shift)
@@ -366,6 +375,15 @@ with tab_settings:
                                      step=15, key="s2_brk_input")
         with c3:
             st.markdown("##### 🎯 Performance Targets")
+            # The app was written assuming three shifts; this plant runs two.
+            # A number here rather than a constant in source, because adding a
+            # shift is an operational decision, not a code change.
+            s_count = st.number_input("Shifts run per day", min_value=1, max_value=3,
+                                      value=int(current_settings.get("shift_count", 2)),
+                                      step=1, key="shift_count_input",
+                                      help="Existing logs on a shift you stop running keep their "
+                                           "label and stay in every report - the pickers just stop "
+                                           "offering it for new entries.")
             t_lph = st.number_input("Global Target Rate (L/h)", value=float(current_settings.get("target_lph", 400.0)),
                                     step=10.0, key="t_lph_input")
             t_yield = st.number_input("Yield Target (%)", value=float(current_settings.get("yield_target_pct", 99.0)),
@@ -382,6 +400,7 @@ with tab_settings:
             update_dict = {
                 "shift_1_start": s1_start, "shift_1_hours": s1_hrs, "shift_1_break_mins": s1_brk,
                 "shift_2_start": s2_start, "shift_2_hours": s2_hrs, "shift_2_break_mins": s2_brk,
+                "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
                 "handover_emails": emails
             }

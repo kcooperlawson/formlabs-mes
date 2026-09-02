@@ -135,7 +135,7 @@ THEMES = {
         .system-badge { background: rgba(0, 210, 255, 0.08); color: #00D2FF; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(0, 210, 255, 0.25); text-transform: uppercase; margin-left: 14px; }
         .telemetry-grid-card { background: linear-gradient(180deg, #091224 0%, #050B17 100%); border: 1px solid #142542; border-radius: 8px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; }
         .telemetry-grid-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0, 210, 255, 0.15), 0 4px 14px rgba(0, 0, 0, 0.6); border-color: #00D2FF; }
-        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #64748B; text-transform: uppercase; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #94A3B8; text-transform: uppercase; }   /* was #64748B: 3.9:1 on the card, below WCAG AA */
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: #0B1220 !important; color: #00D2FF !important; border: 1px solid #1E293B !important; border-radius: 6px !important; font-family: monospace !important; letter-spacing: 0.05em; }
         .stButton>button { background: linear-gradient(180deg, #0066FF 0%, #0044CC 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: 1px solid #00D2FF !important; border-radius: 6px !important; box-shadow: 0 0 10px rgba(0, 102, 255, 0.4) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
@@ -355,7 +355,7 @@ THEMES = {
         .system-badge { background: rgba(189, 147, 249, 0.15); color: #BD93F9; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; border: 1px solid #BD93F9; text-transform: uppercase; margin-left: 14px; }
         .telemetry-grid-card { background: #282A36; border: 1px solid #44475A; border-radius: 10px; padding: 12px 16px; min-height: 96px; transition: all 0.2s ease; box-shadow: 4px 4px 0px #44475A; }
         .telemetry-grid-card:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0px #FF79C6; border-color: #FF79C6; }
-        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #6272A4; text-transform: uppercase; }
+        .telemetry-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: #9AA3CC; text-transform: uppercase; }   /* was #6272A4: 3.0:1 on the card, below WCAG AA */
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #50FA7B; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: #44475A !important; color: #F8F8F2 !important; border: 1px solid #6272A4 !important; border-radius: 6px !important; }
         .stTextInput > div > div > input:focus { border-color: #8BE9FD !important; box-shadow: 0 0 0 2px rgba(139, 233, 253, 0.3) !important; }
@@ -726,3 +726,120 @@ THEMES = {
     </style>
     """ + BASE_UI_CSS
 }
+
+# ===========================================================================
+# GENERATED THEMES
+#
+# The twenty-four above are hand-written and stay that way: people have
+# preferences saved against them by name, and rewriting somebody's design
+# work to prove a tidiness point would risk twenty-four regressions for no
+# operational gain.
+#
+# Everything below is generated from a palette by theme_engine.build(), so a
+# new component gets styled once rather than twenty-four times. Both kinds
+# land in the same THEMES dict and nothing downstream can tell them apart.
+#
+# The light ones exist because not one of the original twenty-four was: on a
+# brightly lit pouring floor a dark screen is a mirror, and the whole set
+# also had to be lightened by hand when the handbook went to print.
+# ===========================================================================
+from theme_engine import Palette, SANS, MONO, SERIF, build as _build_theme
+
+_GENERATED = (
+    # ---------------------------------------------------------------- light
+    Palette(
+        name="Daylight",
+        ground="#FFFFFF", surface="#F6F8FA", raised="#EDF1F5", line="#D6DEE7",
+        ink="#0B1727", body="#33445A", muted="#5C6E85",
+        accent="#0B62D6", accent_2="#0A56BC",
+        light=True, tags=("light", "everyday"),
+    ),
+    Palette(
+        name="Forge Light",
+        ground="#FFFFFF", surface="#F7F5F3", raised="#F0EBE7", line="#DED6CF",
+        ink="#1B1917", body="#3D3833", muted="#6B625A",
+        accent="#C2410C", accent_2="#EA580C",
+        light=True, tags=("light", "brand"),
+    ),
+    Palette(
+        name="Paper White",
+        # Warm, low-chroma and deliberately flat: the closest thing on screen
+        # to reading a printed sheet, which is what most of this plant's
+        # paperwork still is.
+        ground="#FBF9F4", surface="#F4F0E8", raised="#EAE4D9", line="#D8D0C2",
+        ink="#231F1A", body="#463F36", muted="#6E655A",
+        accent="#8A5A2B", accent_2="#A66C33",
+        light=True, font=SERIF, radius="4px", upper_buttons=False,
+        tags=("light", "print-like"),
+    ),
+    Palette(
+        name="Blueprint",
+        ground="#EEF3F8", surface="#E1EAF3", raised="#D3E0EE", line="#B6C8DB",
+        ink="#0A2540", body="#1F3E5E", muted="#4C6C8C",
+        accent="#1B6AA5", accent_2="#EA580C",
+        light=True, font=MONO, radius="2px",
+        tags=("light", "technical"),
+    ),
+    Palette(
+        name="Clean Room",
+        ground="#F7FBFB", surface="#ECF5F5", raised="#DDEDEC", line="#C3DBDA",
+        ink="#0C2422", body="#254541", muted="#4E6E6A",
+        accent="#0E8074", accent_2="#0B6B61",
+        light=True, tags=("light", "clinical"),
+    ),
+    Palette(
+        name="High Contrast Light",
+        # Built to the accessibility floor rather than to taste: pure ground,
+        # near-black ink, heavy borders. Also the best choice under glare or
+        # for anyone whose eyes are tired at the end of a shift.
+        ground="#FFFFFF", surface="#FFFFFF", raised="#EFEFEF", line="#1A1A1A",
+        ink="#000000", body="#111111", muted="#3A3A3A",
+        accent="#0033CC", accent_2="#0022AA",
+        light=True, radius="4px", tags=("light", "accessible", "high-contrast"),
+    ),
+
+    # ----------------------------------------------------------------- dark
+    Palette(
+        name="Nordic Frost",
+        ground="#2E3440", surface="#3B4252", raised="#434C5E", line="#4C566A",
+        ink="#ECEFF4", body="#D8DEE9", muted="#A8B3C4",
+        accent="#88C0D0", accent_2="#8FBCBB",
+        tags=("dark", "calm"),
+    ),
+    Palette(
+        name="Solarized Deep",
+        ground="#002B36", surface="#073642", raised="#0B4653", line="#175A67",
+        ink="#FDF6E3", body="#D3CBB7", muted="#93A1A1",
+        accent="#B58900", accent_2="#CB4B16",
+        tags=("dark", "classic"),
+    ),
+    Palette(
+        name="Workshop Retro",
+        ground="#282828", surface="#32302F", raised="#3C3836", line="#504945",
+        ink="#FBF1C7", body="#EBDBB2", muted="#BDAE93",
+        accent="#D79921", accent_2="#FE8019",
+        font=MONO, radius="3px", tags=("dark", "warm"),
+    ),
+    Palette(
+        name="High Contrast Dark",
+        ground="#000000", surface="#0A0A0A", raised="#1A1A1A", line="#E8E8E8",
+        ink="#FFFFFF", body="#F2F2F2", muted="#C9C9C9",
+        accent="#FFD400", accent_2="#FFE44D",
+        radius="4px", tags=("dark", "accessible", "high-contrast"),
+    ),
+)
+
+for _p in _GENERATED:
+    _css = _build_theme(_p) + "\n" + BASE_UI_CSS.strip()
+    if _p.light:
+        # BASE_UI_CSS paints nav pills in translucent white and pins tab
+        # labels to slate/white - fine when every theme was dark, invisible
+        # on a pale ground. Appended after it so it wins.
+        from theme_engine import _light_mode_fixes as _lmf
+        _css += "\n" + _lmf(_p)
+    THEMES[_p.name] = _css
+
+# What each generated theme is for, so the gallery can group them and the
+# picker can say something more useful than a list of names.
+THEME_TAGS = {p.name: p.tags for p in _GENERATED}
+PALETTES = {p.name: p for p in _GENERATED}

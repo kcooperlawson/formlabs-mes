@@ -189,6 +189,10 @@ class PlantSettings(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     target_lph = Column(Float, default=400.0)
     packing_target_uph = Column(Float, default=500.0)
+    # How many shifts this plant runs. A setting, not a constant: the app
+    # was written assuming three and this plant runs two, and hardcoding
+    # two would only move the wrong assumption. See shifts.py.
+    shift_count = Column(Integer, default=2)
     shift_1_start = Column(String(10), default="06:00")
     shift_1_hours = Column(Float, default=8.5)
     shift_2_start = Column(String(10), default="14:30")

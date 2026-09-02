@@ -63,6 +63,11 @@ def auto_refresh_reactors():
 auto_refresh_reactors()
 
 cookie_manager = stx.CookieManager(key="reactors_cookies")
+try:
+    from ui_shell import apply_display_preferences
+    apply_display_preferences(locals().get('cookie_manager'))
+except Exception:
+    pass
 check_authentication(cookie_manager)
 
 if not st.session_state.get("authenticated", False):

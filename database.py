@@ -120,3 +120,4 @@ delete_user = _invalidating(_crud.delete_user)
 delete_user_by_username = _invalidating(_crud.delete_user_by_username)
 update_user_role_and_shift = _invalidating(_crud.update_user_role_and_shift)
 update_plant_settings = _invalidating(_crud.update_plant_settings)
+

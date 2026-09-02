@@ -37,6 +37,11 @@ st.logo("assets/formlabs_logo.png")
 from database import do_logout, check_authentication
 
 cookie_manager = stx.CookieManager(key="mgr_cookies")
+try:
+    from ui_shell import apply_display_preferences
+    apply_display_preferences(locals().get('cookie_manager'))
+except Exception:
+    pass
 check_authentication(cookie_manager)
 
 if not st.session_state.get("authenticated", False):

@@ -24,9 +24,65 @@ except ImportError:
     THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; }</style>"}
 
 
+def apply_display_preferences(cookie_manager=None):
+    """Inject glove mode and night dimming for this render, if active.
+
+    Public because seven pages predate the shared shell and build their own
+    cookie manager - they call this directly with it. Reading the cookie here
+    rather than relying on session state matters: an operator who lands
+    straight on the workstation page has no session state from anywhere else,
+    and glove mode is exactly the setting that must survive that.
+    """
+    try:
+        if cookie_manager is not None:
+            try:
+                if "glove_mode" not in st.session_state:
+                    st.session_state["glove_mode"] = cookie_manager.get("formlabs_mes_glove") == "1"
+                if "night_dim" not in st.session_state:
+                    _c = cookie_manager.get("formlabs_mes_dim")
+                    st.session_state["night_dim"] = True if _c is None else _c == "1"
+            except Exception:
+                pass
+    except Exception:
+        pass
+    try:
+        from display_modes import display_css
+        from shifts import is_outside_day_shift
+        night = False
+        if st.session_state.get("night_dim", True):
+            try:
+                from database import get_plant_settings
+                night = is_outside_day_shift(get_plant_settings())
+            except Exception:
+                night = False
+        css = display_css(glove=st.session_state.get("glove_mode", False), night=night)
+        if css:
+            st.markdown(css, unsafe_allow_html=True)
+    except Exception:
+        pass
+
+
 def render_shell(show_settings: bool = True):
     """Draw the nav bar and sidebar. Returns the page's cookie manager."""
     cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
+
+    # Display adjustments ride on top of whichever of the 34 themes is
+    # selected, so they compose with all of them instead of being a 35th.
+    # Read from the cookie because both are properties of this terminal.
+    try:
+        if "glove_mode" not in st.session_state:
+            st.session_state["glove_mode"] = cookie_manager.get("formlabs_mes_glove") == "1"
+        if "night_dim" not in st.session_state:
+            _c = cookie_manager.get("formlabs_mes_dim")
+            st.session_state["night_dim"] = True if _c is None else _c == "1"
+    except Exception:
+        # A cookie manager that is not ready yet must never stop a page
+        # rendering - the operator terminal is the one screen that has to
+        # come up no matter what.
+        st.session_state.setdefault("glove_mode", False)
+        st.session_state.setdefault("night_dim", True)
+
+    apply_display_preferences()
     current_role = st.session_state.get("user_role", "operator")
 
     # --- TOP NAVIGATION BAR ---
@@ -117,6 +173,39 @@ def render_shell(show_settings: bool = True):
                         update_user_theme(st.session_state["user_id"], chosen_t)
                         st.session_state["preferred_theme"] = chosen_t
                         cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                        st.rerun()
+
+                    st.markdown("---")
+                    st.markdown("#### Display")
+                    # Stored on the DEVICE, not the account. Glove mode is a
+                    # property of where you are standing, not of who you are:
+                    # a shared floor terminal wants big targets for whoever
+                    # signs in next, and the same person at a desk with a
+                    # mouse wants the density back. Tying it to the login
+                    # would get it wrong for both.
+                    _glove_now = st.session_state.get("glove_mode", False)
+                    _glove = st.toggle(
+                        "🧤 Glove mode", value=_glove_now,
+                        help="Larger buttons, inputs and steppers for gloved hands. "
+                             "Remembered for this terminal, not for your account.")
+                    if _glove != _glove_now:
+                        st.session_state["glove_mode"] = _glove
+                        cookie_manager.set("formlabs_mes_glove", "1" if _glove else "0",
+                                           expires_at=datetime.now() + timedelta(days=365),
+                                           key="glove_cookie_set")
+                        st.rerun()
+
+                    _dim_now = st.session_state.get("night_dim", True)
+                    _dim = st.toggle(
+                        "🌙 Dim outside the day shift", value=_dim_now,
+                        help="Takes the glare off the screen once the day shift ends, "
+                             "using the shift times set in the admin panel. Colours are "
+                             "kept intact so the lot check still reads correctly.")
+                    if _dim != _dim_now:
+                        st.session_state["night_dim"] = _dim
+                        cookie_manager.set("formlabs_mes_dim", "1" if _dim else "0",
+                                           expires_at=datetime.now() + timedelta(days=365),
+                                           key="dim_cookie_set")
                         st.rerun()
 
                     st.markdown("---")

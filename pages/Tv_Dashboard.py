@@ -63,6 +63,11 @@ if active_theme not in THEMES:
     active_theme = "Default Dark"
 
 st.markdown(THEMES[active_theme], unsafe_allow_html=True)
+try:
+    from ui_shell import apply_display_preferences
+    apply_display_preferences(locals().get('cookie_manager'))
+except Exception:
+    pass
 # ===================================================================
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")

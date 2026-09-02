@@ -240,6 +240,11 @@ else:
     current_css_theme = active_theme
 
 st.markdown(THEMES[current_css_theme], unsafe_allow_html=True)
+try:
+    from ui_shell import apply_display_preferences
+    apply_display_preferences(locals().get('cookie_manager'))
+except Exception:
+    pass
 # ===================================================================
 
 init_db()

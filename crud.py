@@ -1215,6 +1215,79 @@ def delete_production_log(log_id: int) -> bool:
         session.close()
 
 
+UNDO_WINDOW_SECONDS = 120
+
+
+def undo_own_log(log_id: int, operator_name: str,
+                 window_seconds: int = UNDO_WINDOW_SECONDS) -> tuple:
+    """Let an operator reverse their own most recent entry. Returns (ok, message).
+
+    A typo on an hourly count - 2500 where 250 was meant - currently needs a
+    manager to open Log Management and delete the row, which means the wrong
+    number sits in every dashboard until somebody is found. That is a long
+    time for a figure the whole plant is measured on, and it teaches people
+    that mistakes are expensive to admit.
+
+    Three limits, and each one is doing a job:
+
+      * **Your own row only.** Checked against the operator's name on the log
+        rather than trusting the caller, so this can never become a way to
+        delete somebody else's work from an unprivileged screen.
+      * **Recent only.** Two minutes. Long enough to notice a fat-fingered
+        number and act, short enough that this is a correction rather than a
+        way to quietly rewrite a shift after the fact.
+      * **The latest row only.** Undoing an older entry while newer ones exist
+        would silently change what those newer ones were credited against.
+
+    Anything already reviewed is off limits: a log carrying a lot-verification
+    flag is evidence a manager may be looking at, so it is refused here and
+    stays a manager's decision. Run progress is recomputed from the surviving
+    logs afterwards, so the counter follows the deletion rather than drifting.
+    """
+    session = ScopedSession()
+    try:
+        log = session.query(ProductionLog).filter(ProductionLog.id == int(log_id)).first()
+        if not log:
+            return False, "That log no longer exists."
+
+        if str(log.operator_name or "").strip().lower() != str(operator_name or "").strip().lower():
+            return False, "That log belongs to someone else."
+
+        age = (datetime.utcnow() - (log.timestamp or datetime.utcnow())).total_seconds()
+        if age > window_seconds:
+            return False, ("Too late to undo from here - ask a manager to remove it "
+                           "from Log Management.")
+
+        newer = session.query(ProductionLog).filter(
+            ProductionLog.operator_name == log.operator_name,
+            ProductionLog.pump_station == log.pump_station,
+            ProductionLog.id > log.id,
+        ).count()
+        if newer:
+            return False, "You've logged again since - only the most recent entry can be undone."
+
+        if log.verify_status in ("mismatch", "expired", "rejected"):
+            return False, ("That log is flagged for review, so it needs a manager. "
+                           "The flag is the record of a cartridge problem.")
+
+        units = int(log.bottles_filled or 0)
+        session.query(LotVerification).filter(
+            LotVerification.production_log_id == log.id
+        ).update({"production_log_id": None}, synchronize_session=False)
+        session.delete(log)
+        session.commit()
+    finally:
+        session.close()
+
+    # Recompute from what survives rather than subtracting - the same reason
+    # the run counter is rebuilt anywhere else it can drift.
+    try:
+        sync_all_runs_with_logs()
+    except Exception:
+        logger.exception("undo_own_log: run resync failed after deleting log %s", log_id)
+    return True, f"Removed your last entry of {units:,} units."
+
+
 def delete_downtime_log(log_id: int) -> bool:
     session = ScopedSession()
     try:

@@ -43,24 +43,22 @@ GATEWAY_OPERATOR_NAME = "Automated Gateway"
 
 
 def _current_shift() -> str:
-    """Picks a shift name from PlantSettings' configured start times so
-    gateway-sourced rows land in the right shift bucket the same way a
-    human's would. Falls back to 'Shift 1' if settings can't be read —
-    matches ProductionLog.shift's own column default."""
+    """Which shift a machine-sourced reading belongs to.
+
+    Delegates to shifts.current_shift so a gateway row lands in exactly the
+    same bucket a human's entry would. This used to carry its own list of
+    three shifts and pick by sorting the start times, which had two faults:
+    it offered a shift this plant does not run, and sorting cannot answer
+    01:30 - that is earlier than every start time, so the naive result was
+    the last entry by luck rather than by reasoning about the wrap-around.
+
+    Falls back to "Shift 1" if settings cannot be read, matching
+    ProductionLog.shift's own column default.
+    """
     try:
         from crud import get_plant_settings
-        settings = get_plant_settings()
-        now_str = datetime.now().strftime("%H:%M")
-        starts = [
-            (settings.get("shift_3_start", "23:00"), "Shift 3"),
-            (settings.get("shift_2_start", "14:30"), "Shift 2"),
-            (settings.get("shift_1_start", "06:00"), "Shift 1"),
-        ]
-        starts.sort(reverse=True)
-        for start, label in starts:
-            if now_str >= start:
-                return label
-        return starts[-1][1]
+        from shifts import current_shift
+        return current_shift(get_plant_settings())
     except Exception:
         return "Shift 1"
 

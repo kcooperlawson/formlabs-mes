@@ -45,9 +45,11 @@ from database import (
     add_suggestion,
     do_logout,
     check_authentication,
+    undo_own_log, UNDO_WINDOW_SECONDS,
 )
 from database import esc
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
+from shifts import picker_options as shift_picker_options
 import fill_weight
 import base64
 
@@ -104,6 +106,11 @@ if active_theme not in THEMES:
     active_theme = "Default Dark"
 
 st.markdown(THEMES[active_theme], unsafe_allow_html=True)
+try:
+    from ui_shell import apply_display_preferences
+    apply_display_preferences(locals().get('cookie_manager'))
+except Exception:
+    pass
 # ===================================================================
 
 st.markdown(f"""
@@ -565,7 +572,11 @@ if current_role in ("operator", "packer"):
             new_role = st.selectbox("New Assigned Role", role_opts, index=start_role_idx)
 
         with t_col2:
-            shift_opts = ["Shift 1", "Shift 2", "Shift 3", "Floater"]
+            # Driven by the plant's configured shift count, and always
+            # including whatever this person is currently on - so someone
+            # still carrying a retired shift can be transferred off it
+            # rather than having the dropdown silently pick Shift 1 for them.
+            shift_opts = shift_picker_options(get_plant_settings(), current_shift)
             start_shift_idx = shift_opts.index(current_shift) if current_shift in shift_opts else 0
             new_shift = st.selectbox("New Assigned Shift", shift_opts, index=start_shift_idx)
 
@@ -1115,6 +1126,28 @@ if tab1 is not None:
                                         reason=reason_text or None)
 
         st.markdown("---")
+        # A short window to take back the last entry. Deliberately here, next
+        # to the form that created it, rather than on a manager's screen: the
+        # person who typed 2500 instead of 250 is standing right here and
+        # knows within seconds, and making them find a lead to fix it is how
+        # a wrong number ends up living in the dashboards all shift.
+        _undo = st.session_state.get("undo_log")
+        if _undo:
+            _age = (datetime.now() - _undo["at"]).total_seconds()
+            if _age > UNDO_WINDOW_SECONDS:
+                st.session_state.pop("undo_log", None)
+            else:
+                _u1, _u2 = st.columns([3, 1])
+                _u1.caption(
+                    f"Last entry: **{_undo['units']:,} units** "
+                    f"({int(UNDO_WINDOW_SECONDS - _age)}s left to undo)")
+                if _u2.button("↩️ Undo last", use_container_width=True, key="undo_last_log"):
+                    _ok, _msg = undo_own_log(_undo["id"], current_user)
+                    st.session_state.pop("undo_log", None)
+                    (st.toast if _ok else st.error)(_msg, **({"icon": "↩️"} if _ok else {}))
+                    if _ok:
+                        st.rerun()
+
         st.markdown("#### 📊 3. Production Output")
 
         # Give the Good Units its own massive full-width input
@@ -1217,6 +1250,23 @@ if tab1 is not None:
                     }
                 else:
                     _mem.pop(station, None)
+
+            # Remember this submission so the operator can take it back if
+            # they spot a typo in the next couple of minutes. Only the id and
+            # the moment - everything else is re-read from the database, so a
+            # stale session cannot delete the wrong row.
+            try:
+                _mine = get_production_logs_df()
+                _mine = _mine[(_mine["operator_name"] == current_user)
+                              & (_mine["pump_station"] == station)]
+                if not _mine.empty:
+                    st.session_state["undo_log"] = {
+                        "id": int(_mine.sort_values("id").iloc[-1]["id"]),
+                        "at": datetime.now(),
+                        "units": int(bottles_filled),
+                    }
+            except Exception:
+                st.session_state.pop("undo_log", None)
 
             if verification and verification.get("result") in ("mismatch", "expired"):
                 st.toast("Logged and flagged for the manager — the lot did not check out.", icon="⚠️")

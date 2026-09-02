@@ -266,6 +266,165 @@ def _shade(hex_colour: str, factor: float) -> str:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# A second channel, because colour alone cannot carry this.
+#
+# Measured across the palette, five pairs of resins sit within a CIE76 deltaE
+# of 5 - effectively the same colour to the eye. Clear V4 and Rigid 4000 are
+# 1.9 apart; Black V4 and Tough 1500 are 4.4. Those colours came off the
+# plant's own sheet, where each one sits beside a full row of text; shrunk to
+# a chip, the colour is being asked to do more than it can. A Clear/Rigid
+# mix-up is precisely the class of error the lot gate exists to catch.
+#
+# So every chip also carries a texture derived from the resin's FAMILY, not
+# its individual name. That distinction matters: Clear V4 and Clear V4.1
+# SHOULD look alike - same material, one revision apart - while Clear and
+# Rigid must not, however close their hues landed. Family is already how
+# colours are resolved, so the texture rides on the same decision.
+#
+# It also survives what colour does not: greyscale printing, a sun-washed
+# floor screen, and the ~8% of men with a colour vision deficiency.
+# ---------------------------------------------------------------------------
+_PATTERNS = (
+    ("solid", None),
+    ("hatch", "repeating-linear-gradient(45deg,{ink} 0 2px,transparent 2px 7px)"),
+    ("back-hatch", "repeating-linear-gradient(-45deg,{ink} 0 2px,transparent 2px 7px)"),
+    ("dots", "radial-gradient({ink} 1.3px,transparent 1.4px)"),
+    ("rows", "repeating-linear-gradient(0deg,{ink} 0 2px,transparent 2px 7px)"),
+    ("cols", "repeating-linear-gradient(90deg,{ink} 0 2px,transparent 2px 7px)"),
+    ("grid", "repeating-linear-gradient(0deg,{ink} 0 1.5px,transparent 1.5px 8px),"
+             "repeating-linear-gradient(90deg,{ink} 0 1.5px,transparent 1.5px 8px)"),
+)
+
+
+def resin_family(name) -> str:
+    """A stable key for the material family a resin belongs to.
+
+    Resolved in the same order colour is, so the two can never disagree: an
+    exact sheet name still reports the family its rule matches, which is what
+    keeps every revision of a family sharing one texture.
+    """
+    key = _norm(name)
+    if not key:
+        return "unknown"
+    for needle, _colour in _FAMILY_RULES:
+        if needle in key:
+            return needle
+    for needle, _colour in _COLOUR_WORDS:
+        if needle in key:
+            return needle
+    return "hash:" + hashlib.md5(key.encode("utf-8")).hexdigest()[:8]
+
+
+def _lab(hex_colour):
+    """CIE L*a*b*, so colours can be compared the way an eye compares them."""
+    r, g, b = (v / 255.0 for v in _rgb(hex_colour))
+
+    def lin(c):
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = lin(r), lin(g), lin(b)
+    x = (r * .4124 + g * .3576 + b * .1805) / .95047
+    y = (r * .2126 + g * .7152 + b * .0722)
+    z = (r * .0193 + g * .1192 + b * .9505) / 1.08883
+
+    def f(t):
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def delta_e(a: str, b: str) -> float:
+    """Perceptual distance between two colours (CIE76).
+
+    Under about 10 two colours are hard to tell apart side by side; under 5
+    they are the same colour for practical purposes.
+    """
+    return sum((x - y) ** 2 for x, y in zip(_lab(a), _lab(b))) ** 0.5
+
+
+# Two families whose colours are this close need different textures, or the
+# chip carries no information the name does not already carry.
+CONFUSABLE_DELTA_E = 10.0
+
+
+def _assign_patterns() -> dict:
+    """Give every known family a texture, chosen so that families which look
+    alike never wear the same one.
+
+    Deliberately assigned rather than hashed. Hashing a family name gives a
+    stable texture but an arbitrary one, and it collided exactly where it
+    could least afford to: Rigid 10K and Rigid 4000 are 3.4 apart - the same
+    colour, to the eye - carry target weights 370 g apart, and drew the same
+    texture. Walking the families and picking a texture no confusable
+    neighbour is already using makes that impossible by construction, and it
+    stays true when a family is added later.
+
+    Computed once at import from the static rule tables, so it is identical
+    on every machine and across every restart.
+    """
+    families = []
+    seen = set()
+    for needle, colour in _FAMILY_RULES + _COLOUR_WORDS:
+        if needle not in seen:
+            seen.add(needle)
+            families.append((needle, colour))
+
+    names = [p[0] for p in _PATTERNS]
+    assigned = {}
+    for needle, colour in families:
+        taken = {
+            assigned[other]
+            for other, other_colour in families
+            if other in assigned and delta_e(colour, other_colour) < CONFUSABLE_DELTA_E
+        }
+        free = [n for n in names if n not in taken]
+        if free:
+            assigned[needle] = free[0]
+        else:
+            # More confusable neighbours than textures. Fall back to the
+            # least-used one rather than failing - still better than nothing,
+            # and the test reports it rather than letting it pass silently.
+            counts = {n: 0 for n in names}
+            for v in assigned.values():
+                counts[v] = counts.get(v, 0) + 1
+            assigned[needle] = min(names, key=lambda n: counts[n])
+    return assigned
+
+
+_FAMILY_PATTERN = _assign_patterns()
+
+
+def resin_pattern(name) -> str:
+    """Which texture this resin's family wears. Stable across restarts."""
+    fam = resin_family(name)
+    if fam in _FAMILY_PATTERN:
+        return _FAMILY_PATTERN[fam]
+    if fam == "unknown":
+        return _PATTERNS[0][0]
+    # An unrecognised material: no family to reason about, so hash it. Its
+    # colour comes from the spread-out fallback swatches, which are chosen to
+    # be far apart, so a texture collision here costs little.
+    idx = int(hashlib.md5(fam.encode("utf-8")).hexdigest()[:8], 16) % len(_PATTERNS)
+    return _PATTERNS[idx][0]
+
+
+def _pattern_css(name, background: str) -> str:
+    """The background-image declaration for a chip, or '' for a solid one.
+
+    The texture is drawn in a shade of the chip's OWN colour rather than in
+    black or white, so it reads as a surface rather than as a second colour
+    fighting the first, and never competes with the label sitting on top.
+    """
+    pattern = resin_pattern(name)
+    css = dict(_PATTERNS).get(pattern)
+    if not css:
+        return ""
+    ink = _shade(background, -0.22) if _luminance(background) > 0.45 else _shade(background, 0.30)
+    return f"background-image:{css.format(ink=ink)};background-size:8px 8px;"
+
+
 def resin_color(name, stored=None) -> str:
     """The background colour for a resin, as #RRGGBB. Never returns None."""
     if _is_real_colour(stored):
@@ -308,7 +467,7 @@ def resin_colors(name, stored=None):
 
 
 def resin_chip(name, stored=None, *, bold: bool = True, size: str = "md",
-               title: str = None) -> str:
+               title: str = None, pattern: bool = True) -> str:
     """A coloured pill containing the resin's name, as an HTML string.
 
     Escaped here rather than at the call site, so a resin name containing a
@@ -324,9 +483,10 @@ def resin_chip(name, stored=None, *, bold: bool = True, size: str = "md",
         "md": ("2px 10px", "0.82rem"),
         "lg": ("4px 14px", "0.95rem"),
     }.get(size, ("2px 10px", "0.82rem"))
+    texture = _pattern_css(label, bg) if pattern else ""
     return (
         f'<span title="{html.escape(title or label)}" style="'
-        f"display:inline-block;background:{bg};color:{fg};"
+        f"display:inline-block;background-color:{bg};{texture}color:{fg};"
         f"border:1px solid {border};border-radius:999px;padding:{pad};"
         f"font-size:{font};font-weight:{600 if bold else 500};"
         f"line-height:1.45;white-space:nowrap;vertical-align:middle;"
@@ -345,7 +505,8 @@ def resin_dot(name, stored=None, *, text: bool = True) -> str:
     bg, _fg, border = resin_colors(label, stored)
     dot = (
         f'<span style="display:inline-block;width:10px;height:10px;'
-        f"border-radius:50%;background:{bg};border:1px solid {border};"
+        f"border-radius:50%;background-color:{bg};{_pattern_css(label, bg)}"
+        f"border:1px solid {border};"
         f'margin-right:6px;vertical-align:-1px;"></span>'
     )
     return dot + html.escape(label) if text else dot
