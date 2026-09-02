@@ -30,7 +30,20 @@ BASE_UI_CSS = """
     /* Hide the 3-dot menu (MainMenu) */
     #MainMenu { visibility: hidden !important; }
 
-
+    /* NOTE: an earlier version of this rule also hid the sidebar's
+       collapse/expand toggle (stSidebarCollapseButton /
+       stSidebarCollapsedControl / collapsedControl), its resize handle,
+       and the entire top header (stHeader). The intent was only to
+       remove the native per-page link list above, but this went further
+       and killed the real collapse arrow on desktop, and on mobile that
+       same "collapsed control" button IS the only way to open the
+       sidebar at all. Reverted: those are native Streamlit chrome and
+       need to stay interactive. [data-testid="stSidebarNav"] above
+       already fully covers the original goal (no native page list
+       showing behind the custom sidebar). Each theme below already
+       styles header[data-testid="stHeader"] with a transparent
+       background, so leaving it un-hidden here just lets that existing
+       per-theme styling show through instead of forcing it away. */
 
     /* 1. UNIVERSAL PAGE LINKS (TOP NAV) */
     /* ANTI-SQUISH NAV BUTTONS (For 7-Column God Mode) */
