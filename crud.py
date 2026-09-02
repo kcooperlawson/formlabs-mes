@@ -1727,13 +1727,22 @@ def get_plant_settings() -> dict:
                 "shift_2_break_mins": getattr(settings, 'shift_2_break_mins', 60.0),
                 "shift_3_break_mins": getattr(settings, 'shift_3_break_mins', 60.0),
                 "handover_emails": getattr(settings, 'handover_emails', ""),
-                "enable_packing": bool(getattr(settings, 'enable_packing', 1))
+                "enable_packing": bool(getattr(settings, 'enable_packing', 1)),
+                # shift_count was stored and saved but never read back out of
+                # here, so every caller fell through to shifts.py's default of
+                # two. That is the right answer for this plant today, which is
+                # exactly why it went unnoticed - a plant that set three would
+                # have saved it and watched the app ignore it.
+                "shift_count": int(getattr(settings, 'shift_count', 2) or 2),
+                "pump_form_url": (getattr(settings, 'pump_form_url', "") or ""),
+                "pump_form_label": (getattr(settings, 'pump_form_label', "") or ""),
             }
         return {
             "target_lph": 400.0, "packing_target_uph": 500.0, "shift_1_start": "06:00", "shift_1_hours": 8.5,
             "shift_2_start": "14:30", "shift_2_hours": 8.5, "shift_3_start": "23:00", "shift_3_hours": 7.0,
             "yield_target_pct": 99.0, "packing_yield_target_pct": 99.5, "shift_1_break_mins": 60.0,
-            "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "handover_emails": "", "enable_packing": True
+            "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "handover_emails": "", "enable_packing": True,
+            "shift_count": 2, "pump_form_url": "", "pump_form_label": ""
         }
     finally:
         session.close()

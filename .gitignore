@@ -52,3 +52,6 @@ formlabs_mes_move_*.zip
 tests/visual_baseline/
 tests/visual_current/
 tests/visual_diffs/
+
+# Scratch left by tooling that cannot delete files here
+_to_delete/

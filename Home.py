@@ -212,7 +212,13 @@ st.set_page_config(
     page_title="Formlabs MES Live Dashboard",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="expanded",
+    # "auto", not "expanded". Expanded is a fixed instruction that ignores the
+    # screen it lands on: on a phone the sidebar is an overlay about 320px
+    # wide, so forcing it open on a 390px screen covers four fifths of the
+    # page and the operator's first action every time is to close something
+    # they did not open. "auto" is expanded on a desktop or the wall display
+    # and collapsed on a phone - which is where the operators actually are.
+    initial_sidebar_state="auto",
 )
 
 # Nothing is written to the sidebar until after sign-in, so on the login screen
@@ -622,13 +628,19 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# No hardcoded colours here. This header used to be #FFFFFF on a card, which
+# is fine on the twenty-four dark themes and invisible on the six light ones -
+# white text on a cream card, on the landing screen, in the first thing anyone
+# sees. The point of a palette is that a component takes its colour from the
+# theme instead of assuming one, so this inherits and the caption is dimmed by
+# opacity, which works in both directions.
 st.markdown(
     '<div class="filter-section-card"><div style="display:flex;'
     ' justify-content:space-between; align-items:center;'
-    ' margin-bottom:8px;"><b style="font-size:0.95rem; color:#FFFFFF;">🔍 TIME'
-    ' HORIZON & PRODUCTION FILTERS</b><span style="font-size:0.75rem;'
-    ' color:#94A3B8;">All top statistics and tables calculate based on these'
-    " filters.</span></div></div>",
+    ' margin-bottom:8px;"><b style="font-size:0.95rem; color:inherit;">🔍 TIME'
+    ' HORIZON &amp; PRODUCTION FILTERS</b><span style="font-size:0.75rem;'
+    ' color:inherit; opacity:0.72;">All top statistics and tables calculate'
+    " based on these filters.</span></div></div>",
     unsafe_allow_html=True,
 )
 
@@ -936,9 +948,9 @@ if show_pouring:
                         <span class="telemetry-label" style="color:#10B981;">⏱️ LIVE SHIFT TRAJECTORY</span>
                         <span style="font-size:0.75rem; font-weight:800; color:#10B981;">{status_badge}</span>
                     </div>
-                    <div style="font-size:1.15rem; font-weight:800; color:#FFFFFF; margin-top:4px;">{active_shift_name}</div>
+                    <div style="font-size:1.15rem; font-weight:800; color:inherit; margin-top:4px;">{active_shift_name}</div>
                     <div style="margin:14px 0 6px;">
-                        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#94A3B8; margin-bottom:4px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:inherit; opacity:0.72; margin-bottom:4px;">
                             <span>{elapsed_net:.1f}h elapsed</span><span>{remaining_hours:.1f}h remaining</span>
                         </div>
                         <div style="background:#1E2B45; border-radius:6px; height:8px; overflow:hidden;">
@@ -949,7 +961,7 @@ if show_pouring:
                         <div><span class="telemetry-label" style="color:#00D2FF;">Expected Right Now</span><br><b style="font-size:1.3rem; color:#00D2FF;">{expected_display}</b></div>
                         <div><span class="telemetry-label" style="color:#A855F7;">Projected Shift End</span><br><b style="font-size:1.3rem; color:#A855F7;">{projected_total:,.0f} L</b></div>
                         <div><span class="telemetry-label">Pace Variance</span><br><b style="font-size:1.1rem; color:{variance_color};">{variance_display}</b></div>
-                        <div><span class="telemetry-label">OEE Performance</span><br><b style="font-size:1.1rem; color:#FFFFFF;">{oee_pct:.1f}%</b></div>
+                        <div><span class="telemetry-label">OEE Performance</span><br><b style="font-size:1.1rem; color:inherit;">{oee_pct:.1f}%</b></div>
                     </div>
                 </div>
                 """,
@@ -957,7 +969,7 @@ if show_pouring:
             )
         elif time_horizon == "⚡ Live Today (Active Shift)":
             next_line = (
-                f"Next up: <b style='color:#94A3B8;'>{shift_status['next_shift_label']}</b>"
+                f"Next up: <b style='color:inherit; opacity:0.8;'>{shift_status['next_shift_label']}</b>"
                 if shift_status.get("next_shift_label")
                 else "Check Plant Settings for the shift schedule."
             )
@@ -969,8 +981,8 @@ if show_pouring:
                         <span style="font-size:0.75rem; font-weight:800; color:#64748B;">⏸️ FLOOR IDLE</span>
                     </div>
                     <div style="text-align:center; padding:26px 0 10px;">
-                        <div style="font-size:1rem; color:#94A3B8;">No shift is currently running.</div>
-                        <div style="font-size:0.8rem; color:#64748B; margin-top:6px;">{next_line}</div>
+                        <div style="font-size:1rem; color:inherit; opacity:0.72;">No shift is currently running.</div>
+                        <div style="font-size:0.8rem; color:inherit; opacity:0.55; margin-top:6px;">{next_line}</div>
                     </div>
                 </div>
                 """,
@@ -981,8 +993,8 @@ if show_pouring:
                 f"""
                 <div class="telemetry-grid-card" style="border-color:#1E2B45;">
                     <div class="telemetry-label">📊 VIEWING HISTORICAL DATA</div>
-                    <div style="font-size:0.95rem; color:#94A3B8; margin-top:10px;">Live shift trajectory only applies in <b style="color:#FFFFFF;">⚡ Live Today (Active Shift)</b> mode.</div>
-                    <div style="font-size:0.8rem; color:#64748B; margin-top:8px;">Switch the Time Horizon filter above to see real-time shift pace.</div>
+                    <div style="font-size:0.95rem; color:inherit; opacity:0.72; margin-top:10px;">Live shift trajectory only applies in <b style="color:inherit;">⚡ Live Today (Active Shift)</b> mode.</div>
+                    <div style="font-size:0.8rem; color:inherit; opacity:0.55; margin-top:8px;">Switch the Time Horizon filter above to see real-time shift pace.</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1040,17 +1052,17 @@ if show_packing:
     p1, p2, p3, p4 = st.columns(4)
     p1.markdown(
         f"""<div class="telemetry-grid-card" style="border-color:#A855F7;"><div class="telemetry-label">TOTAL UNITS PACKED</div>
-            <div class="telemetry-val-large" style="color:#A855F7;">{total_packed:,} <span style="font-size:0.9rem; color:#94A3B8;">units</span></div></div>""",
+            <div class="telemetry-val-large" style="color:#A855F7;">{total_packed:,} <span style="font-size:0.9rem; color:inherit; opacity:0.72;">units</span></div></div>""",
         unsafe_allow_html=True,
     )
     p2.markdown(
         f"""<div class="telemetry-grid-card" style="border-color:#A855F7;"><div class="telemetry-label">ESTIMATED SKIDS BUILT</div>
-            <div class="telemetry-val-large" style="color:#FFFFFF;">{total_skids_est:,.1f} <span style="font-size:0.9rem; color:#94A3B8;">skids</span></div></div>""",
+            <div class="telemetry-val-large" style="color:inherit;">{total_skids_est:,.1f} <span style="font-size:0.9rem; color:inherit; opacity:0.72;">skids</span></div></div>""",
         unsafe_allow_html=True,
     )
     p3.markdown(
         f"""<div class="telemetry-grid-card" style="border-color:#A855F7;"><div class="telemetry-label">PACKING VELOCITY</div>
-            <div class="telemetry-val-large" style="color:#A855F7;">{pack_velocity_uh:,.0f} <span style="font-size:0.9rem; color:#94A3B8;">Units/h</span></div></div>""",
+            <div class="telemetry-val-large" style="color:#A855F7;">{pack_velocity_uh:,.0f} <span style="font-size:0.9rem; color:inherit; opacity:0.72;">Units/h</span></div></div>""",
         unsafe_allow_html=True,
     )
     p4.markdown(

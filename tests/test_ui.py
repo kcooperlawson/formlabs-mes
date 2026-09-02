@@ -149,6 +149,58 @@ check("RPS submit is enabled",
       getattr([b for b in at4.button if "SUBMIT POURING LOG" in b.label][0], "disabled", None), False)
 print("  RPS bypass OK")
 
+# --- G. the pump form link, on the real page -----------------------------
+# Asserted against the rendered page rather than against normalise() alone,
+# because the thing that matters is whether an operator gets a button - and a
+# correct URL that never reaches st.link_button is the same to them as no
+# button at all. Both directions: configured shows it, cleared removes it.
+def _links(at):
+    """(label, url) for every link_button on the page.
+
+    AppTest has no typed accessor for link_button - it arrives as an
+    UnknownElement whose .value raises - so read the protobuf, which carries
+    both the wording the operator sees and the address they would be sent to.
+    """
+    out = []
+    for e in at.get("link_button"):
+        out.append((getattr(e.proto, "label", ""), getattr(e.proto, "url", "")))
+    return out
+
+# Written through database.py rather than crud.py on purpose: the page reads
+# settings through a cached wrapper, and only the database-module writer drops
+# that cache. Going straight to crud here would leave the page reading a stale
+# copy and the test would be asserting against the wrong thing.
+import database as _db
+_saved = crud.get_plant_settings()
+try:
+    _db.update_plant_settings({"pump_form_url": "https://forms.example.com/pump-check",
+                                "pump_form_label": "Pump check"})
+    at5 = run_as(OP, h_pump=STATION)
+    links = _links(at5)
+    check("a configured pump form renders a button",
+          any("Pump check" in lbl for lbl, _ in links), True)
+    check("pointing at the address that was configured",
+          any(url == "https://forms.example.com/pump-check" for _, url in links), True)
+
+    # An address typed without a scheme is the most common real paste. It must
+    # not reach the page scheme-relative, or the browser resolves it against
+    # the MES and the button lands on a 404 that looks like the MES is broken.
+    _db.update_plant_settings({"pump_form_url": "forms.example.com/pump-check"})
+    at6 = run_as(OP, h_pump=STATION)
+    check("a scheme-less address still renders a button", bool(_links(at6)), True)
+    check("and is sent out as https, not resolved against the MES",
+          all(url.startswith("https://") for _, url in _links(at6)), True)
+
+    _db.update_plant_settings({"pump_form_url": "", "pump_form_label": ""})
+    at7 = run_as(OP, h_pump=STATION)
+    check("no configured form means no button at all", _links(at7), [])
+    check("and no warning aimed at an operator who could not act on it",
+          "pump form address" in texts(at7), False)
+    print("  pump form link OK (shown when set, absent when not)")
+finally:
+    _db.update_plant_settings({"pump_form_url": _saved.get("pump_form_url", ""),
+                                "pump_form_label": _saved.get("pump_form_label", "")})
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} UI checks FAILED:\n" + "\n".join(FAILS))

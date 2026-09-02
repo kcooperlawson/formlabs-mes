@@ -252,5 +252,22 @@ check("In band" in body2, "an in-band reading is confirmed on screen")
 check(getattr(submit_of(at2), "disabled", None) is False, "and submit stays enabled")
 print(f"  live feedback appears as the number is typed ({RESIN} target {ON_TARGET:g} g)")
 
+section("THE IN-BAND HEADLINE NEVER ROUNDS AWAY THE EXCEPTION")
+# 349 of 350 is 99.71%, which a ".0f" prints as "100%" - directly above a
+# scatter plot in which the one out-of-band point is plainly visible. The
+# exception is the reason the panel exists.
+check(fw.band_percent(349, 350) == "99.7%", "349 of 350 reads as what it is, not as 100%")
+# The clamp matters only once the true value rounds to 100 at one decimal:
+# 9999/10000 is 99.99%, which "%.1f" would print as "100.0%".
+check(fw.band_percent(9999, 10000) == "99.9%", "a share that rounds to 100 is held below it")
+check(fw.band_percent(350, 350) == "100%", "an actual clean sweep does read 100%")
+check(fw.band_percent(1, 1000) == "0.1%", "and a lone success never reads as 0%")
+check(fw.band_percent(0, 350) == "0%", "while none in band does read 0%")
+check(fw.band_percent(0, 0) == "\u2014", "nothing judged yet is a dash, not a division by zero")
+check(fw.band_percent(175, 350) == "50.0%", "an ordinary share prints with a decimal")
+check(fw.band_percent(None, 350) == "\u2014", "junk in gives a dash, not an exception")
+check(fw.band_percent(400, 350) == "100%", "more in-band than judged is clamped rather than over 100%")
+print("  the headline agrees with the plot")
+
 section("RESULT")
 print(f"ALL {CHECKS} FILL WEIGHT ASSERTIONS PASSED")

@@ -38,7 +38,10 @@ st.set_page_config(
     page_title="Analytics Engine | Formlabs MES",
     page_icon="🌌",
     layout="wide",
-    initial_sidebar_state="expanded"
+    # "auto" like the entry point - see Home.py. Every other page already
+    # leaves this at the default; this one and Home were the two forcing the
+    # sidebar open on a phone.
+    initial_sidebar_state="auto"
 )
 
 st.logo("assets/formlabs_logo.png")
@@ -349,11 +352,11 @@ st.markdown(f"""
 <div style="background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 12px; padding: 12px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
     <div>
         <div style="font-size: 0.7rem; font-weight: 800; color: #00D2FF; letter-spacing: 0.15em;">LIVE DAILY EXPECTATION (TICKING)</div>
-        <div style="font-size: 1.5rem; font-weight: 900; color: #FFFFFF;">{expected_right_now:,.0f} L</div>
+        <div style="font-size: 1.5rem; font-weight: 900; color: inherit;">{expected_right_now:,.0f} L</div>
     </div>
     <div style="text-align: right;">
         <div style="font-size: 0.7rem; font-weight: 800; color: #A855F7; letter-spacing: 0.15em;">SELF-ADJUSTING DAILY PROJECTION</div>
-        <div style="font-size: 1.5rem; font-weight: 900; color: #FFFFFF;">{projected_daily:,.0f} L</div>
+        <div style="font-size: 1.5rem; font-weight: 900; color: inherit;">{projected_daily:,.0f} L</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -547,8 +550,12 @@ else:
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Readings taken", f"{_summary['samples']:,}")
-    m2.metric("In band", f"{(_in_band / _judged * 100):.0f}%" if _judged else "—",
-              help="Share of readings inside the resin's own tolerance window.")
+    # fill_weight.band_percent, not a format string: 349 of 350 rounds to
+    # "100%" beside a scatter that visibly contains an out-of-band point, and
+    # the reader who spots that stops trusting the rest of the panel.
+    m2.metric("In band", fill_weight.band_percent(_in_band, _judged),
+              help="Share of readings inside the resin's own tolerance window. "
+                   "Only a clean sweep reads 100%.")
     m3.metric("Mean deviation", f"{_summary['mean_deviation']:+.1f} g",
               help="Average distance from target. Positive means running heavy.")
     m4.metric("Resin above target", f"{_summary['kg']:+,.1f} kg",
@@ -610,8 +617,16 @@ else:
                        color_discrete_map={"over": "#EA580C", "under": "#38BDF8"})
         # 'auto' rather than 'outside': a negative bar puts an outside label
         # on the left, straight through the station names.
+        #
+        # But 'auto' means a short bar's label lands OUTSIDE it, on the chart
+        # background - and a single white text colour then makes that one label
+        # invisible on every light theme. It was: the pump averaging +0.35 g
+        # had no readable number at all. Inside and outside get their own
+        # colours: white on the saturated bar, and the same slate the rest of
+        # the chart chrome uses out on the background, which reads either way.
         fig_p.update_traces(textposition="auto", cliponaxis=False,
-                            textfont=dict(color="#FFFFFF", size=12))
+                            insidetextfont=dict(color="#FFFFFF", size=12),
+                            outsidetextfont=dict(color="#94A3B8", size=12))
         fig_p.add_vline(x=0, line_color="#64748B")
         fig_p.update_layout(**chart_layout, showlegend=False)
         st.plotly_chart(fig_p, use_container_width=True)

@@ -21,6 +21,7 @@ from database import (
 )
 from database import esc
 from shifts import picker_options as shift_picker_options
+import external_links
 
 st.set_page_config(page_title="IT Admin Console | Formlabs MES", page_icon="🛡️", layout="wide")
 
@@ -396,17 +397,55 @@ with tab_settings:
         emails = st.text_input("Shift Handover Email Recipients (comma separated)",
                                value=current_settings.get("handover_emails", ""), key="emails_input")
 
+        # The form behind the QR sticker on the pump. A setting rather than a
+        # constant because this application does not own that form - whoever
+        # does can move it, and moving it should cost one field here.
+        st.markdown("##### 🔗 Pump Form Link")
+        st.caption(
+            "Puts a button on the operator terminal that opens this address in a new tab. "
+            "The MES stays open behind it, so an operator can fill the form in and come back "
+            "mid-log without signing in again. Leave it empty and no button appears."
+        )
+        pf_c1, pf_c2 = st.columns((3, 2))
+        with pf_c1:
+            pump_url = st.text_input("Address", value=current_settings.get("pump_form_url", ""),
+                                     placeholder="https://forms.example.com/pump-check",
+                                     key="pump_form_url_input")
+        with pf_c2:
+            pump_label = st.text_input("Button wording",
+                                       value=current_settings.get("pump_form_label", ""),
+                                       placeholder="Open the pump form",
+                                       key="pump_form_label_input")
+
         if st.form_submit_button("💾 Save Operational Parameters", type="primary", use_container_width=True):
+            # Checked here, on the screen of the person who can fix it, rather
+            # than on the operator terminal where a bad address becomes a
+            # button that goes nowhere. Stored normalised, so the operator page
+            # never has to cope with a missing scheme or a trailing full stop.
+            pump_clean, pump_problem = external_links.normalise(pump_url)
             update_dict = {
                 "shift_1_start": s1_start, "shift_1_hours": s1_hrs, "shift_1_break_mins": s1_brk,
                 "shift_2_start": s2_start, "shift_2_hours": s2_hrs, "shift_2_break_mins": s2_brk,
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
-                "handover_emails": emails
+                "handover_emails": emails,
+                "pump_form_url": pump_clean,
+                "pump_form_label": (pump_label or "").strip()[:60],
             }
             update_plant_settings(update_dict)
+            if pump_problem:
+                # Everything else saved; say plainly which part did not, rather
+                # than a success toast over a setting that quietly did nothing.
+                st.session_state["_pump_form_warning"] = (
+                    f"{pump_problem} That address was not saved, so no button will "
+                    "appear on the operator terminal.")
+            else:
+                st.session_state.pop("_pump_form_warning", None)
             st.toast("✅ Plant settings updated globally!")
             st.rerun()
+
+    if st.session_state.get("_pump_form_warning"):
+        st.warning("⚠️ " + st.session_state["_pump_form_warning"])
 
     st.markdown("---")
     st.subheader("⚙️ Master Plant Equipment & Configuration")

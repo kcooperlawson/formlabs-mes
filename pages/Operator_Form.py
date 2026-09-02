@@ -51,6 +51,7 @@ from database import esc
 from components import empty_state, save_state
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
 from shifts import picker_options as shift_picker_options
+import external_links
 import fill_weight
 import base64
 
@@ -817,8 +818,8 @@ if not df_runs.empty:
 <div style="background-color: #1E2B45; border-radius: 8px; width: 100%; height: 16px; margin-top: 14px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
 <div class="animated-progress-bar" style="width: {prog_pct * 100}%; height: 100%; background-color: {status_color}; transition: width 0.4s ease;"></div>
 </div>
-<div style="font-size: 0.8rem; color: #94A3B8; margin-top: 4px; text-align: right;">
-Progress: <b style="color:#FFFFFF;">{run['current_units']:,} / {run['target_units']:,}</b> Units ({prog_pct*100:.1f}%) | Lot: {_display_lot(run.get('lot_number'), run.get('cartridge_type'))}
+<div style="font-size: 0.8rem; color: inherit; opacity: 0.72; margin-top: 4px; text-align: right;">
+Progress: <b style="color:inherit;">{run['current_units']:,} / {run['target_units']:,}</b> Units ({prog_pct*100:.1f}%) | Lot: {_display_lot(run.get('lot_number'), run.get('cartridge_type'))}
 </div>
 </div>
 """, unsafe_allow_html=True)
@@ -909,6 +910,34 @@ if not st.session_state.get("auto_scrolled_to_logs", False):
 
 plant_config = get_plant_settings()
 packing_enabled = plant_config.get("enable_packing", True)
+
+# --- The pump form, reachable without leaving this page ---------------------
+# There is a QR sticker on the pump that opens a form somebody outside this
+# application owns. Scanning it is a one-way trip: the phone navigates away
+# from the MES and the way back is the browser's back button, which on a
+# Streamlit app means a fresh session and a sign-in.
+#
+# This opens the same form in a new tab instead. The MES tab is never
+# navigated away from, so closing the form puts the operator back exactly
+# where they were, mid-log, with nothing retyped. It also beats the sticker
+# on distance - they are already holding the phone.
+#
+# Above the tab strip on purpose, so it is reachable whichever tab they are
+# standing in, and absent entirely when no address is configured.
+_pump_url, _pump_problem = external_links.normalise(plant_config.get("pump_form_url", ""))
+if _pump_url:
+    st.link_button(
+        "🔗 " + external_links.label_or_default(plant_config.get("pump_form_label", "")),
+        _pump_url,
+        use_container_width=True,
+        help="Opens in a new tab. This page stays open behind it, so nothing "
+             "you have already typed is lost.",
+    )
+elif _pump_problem and current_role in ("manager", "admin"):
+    # Shown to the people who can fix it, and to nobody else - an operator
+    # cannot act on a malformed setting and a warning they cannot clear is
+    # just noise on the screen they work from.
+    st.caption(f"⚠️ The pump form address in plant settings is not usable: {_pump_problem}")
 
 if current_role == "packer":
     if packing_enabled:

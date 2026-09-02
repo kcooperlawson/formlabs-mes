@@ -206,6 +206,12 @@ class PlantSettings(Base):
     shift_3_break_mins = Column(Float, default=60.0)
     handover_emails = Column(Text, default="")
     enable_packing = Column(Integer, default=1)  # 1 = True, 0 = False
+    # An external form the plant links out to - today the pump form behind the
+    # QR sticker on the pump. Held here rather than in source because this
+    # application does not own that form and whoever does can move it. Empty
+    # means no button, which is right for an install that has no such form.
+    pump_form_url = Column(Text, nullable=True)
+    pump_form_label = Column(String(60), nullable=True)
 
 class Suggestion(Base):
     __tablename__ = "suggestions"

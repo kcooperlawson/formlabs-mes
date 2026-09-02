@@ -168,3 +168,35 @@ def giveaway(rows) -> dict:
         "kg": round(total_dev / 1000.0, 2),
         "mean_deviation": round(total_dev / total_units, 2) if total_units else 0.0,
     }
+
+
+def band_percent(in_band, judged) -> str:
+    """The "share of readings inside their window" figure, as it should print.
+
+    Exists because `f"{349/350*100:.0f}%"` is "100%", displayed beside a
+    scatter plot that visibly contains an out-of-band point. The one exception
+    is the entire reason anyone opens this panel, and a headline that rounds it
+    away is worse than no headline: the reader who spots the contradiction
+    stops trusting every other number on the page.
+
+    So a clean sweep is the only thing that reads 100%, and a single good
+    reading among failures is the only thing that reads 0%. Everything between
+    keeps a decimal and is clamped away from both ends.
+    """
+    try:
+        good, total = int(in_band), int(judged)
+    except (TypeError, ValueError):
+        return "—"
+    if total <= 0:
+        return "—"
+    good = max(0, min(good, total))
+    if good == total:
+        return "100%"
+    if good == 0:
+        return "0%"
+    pct = good / total * 100.0
+    if pct > 99.9:
+        return "99.9%"
+    if pct < 0.1:
+        return "0.1%"
+    return f"{pct:.1f}%"
