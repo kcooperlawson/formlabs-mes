@@ -50,6 +50,14 @@ class ProductionLog(Base):
     # lot_verifications; that table remains the system of record.
     #   verified | mismatch | expired | recorded | fast_path | skipped
     verify_status = Column(String(20), nullable=True, index=True)
+    # Fill-weight check for this log. Optional by design: a reading is a
+    # measurement, not a control, so nothing here can stop an operator
+    # submitting. Status is judged against the resin's window at the moment
+    # of capture (see fill_weight.judge) and stored, so editing a spec later
+    # cannot re-judge readings that were already taken.
+    check_weight_g = Column(Float, nullable=True)
+    weight_deviation_g = Column(Float, nullable=True)   # measured - target, + is give-away
+    weight_status = Column(String(10), nullable=True, index=True)   # in | under | over
 
 class DowntimeLog(Base):
     __tablename__ = "downtime_logs"

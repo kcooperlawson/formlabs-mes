@@ -210,12 +210,16 @@ with mig_engine.connect() as conn:
             {"f": fmt, "n": name, "c": colour})
     conn.commit()
 
-subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
+# Upgrade to 0005 specifically, not to head. This section tests what 0005
+# does to a table shaped like production; pinning it to head made the test
+# fail the moment 0006 was added, which is a false alarm about an unrelated
+# migration rather than a real regression in this one.
+subprocess.run([sys.executable, "-m", "alembic", "upgrade", "0005_resin_colors"],
                check=True, capture_output=True, cwd=str(ROOT))
 
 with mig_engine.connect() as conn:
     check(conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
-          == "0005_resin_colors", "schema reached 0005")
+          == "0005_resin_colors", "schema is at 0005, the revision under test")
     after = {}
     for name, fmt, colour in conn.execute(sa.text(
             "SELECT resin_name, cartridge_type, color_tag FROM resin_specs")):

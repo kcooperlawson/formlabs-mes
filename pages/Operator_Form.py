@@ -48,6 +48,7 @@ from database import (
 )
 from database import esc
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
+import fill_weight
 import base64
 
 import extra_streamlit_components as stx
@@ -899,13 +900,20 @@ if tab1 is not None:
 
         cart_matched = get_all_resin_specs_df(cart_code)
         cart_matched = cart_matched[cart_matched["resin_name"] == resin] if not cart_matched.empty else cart_matched
+        # weight_spec is whichever spec row we ended up showing, or None when
+        # this resin has no numbers on file. The check-weight field further
+        # down judges against exactly what the operator was shown here, so
+        # the two can never disagree.
+        weight_spec = None
         if not cart_matched.empty:
             spec_info = cart_matched.iloc[0]
+            weight_spec = fill_weight.spec_from_row(spec_info)
             st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g**")
         else:
             matched = all_specs_df[all_specs_df["resin_name"] == resin]
             if not matched.empty:
                 spec_info = matched.iloc[0]
+                weight_spec = fill_weight.spec_from_row(spec_info)
                 st.caption(f"⚖️ Target: **{spec_info['actual_spec_g']}g** | Range: **{spec_info['acceptable_range']}g** "
                            f"_(no spec on file for {cartridge} — showing this resin's spec from another Container Format)_")
             else:
@@ -1120,6 +1128,44 @@ if tab1 is not None:
         with p_col2:
             scrap_filled = st.number_input("🗑️ Scrap Filled", min_value=0, value=0, step=1, key="h_s_filled")
 
+        # ---------------------------------------------------------------
+        # Check weight. Optional, never blocking, never pre-filled.
+        #
+        # Optional because a reading is a measurement, not a control: the lot
+        # check stops the line because a wrong lot is a defect, but a heavy
+        # cartridge is information. Make this mandatory and within a week it
+        # is the target weight typed from memory on every log, and a column
+        # full of 1110 is worse than an empty one because it looks like data.
+        #
+        # Never pre-filled for the same reason the run card had to stop
+        # printing the lot it was hiding: a box that already contains the
+        # right-looking answer gets accepted, not measured.
+        #
+        # One reading an hour is a sample of that hour, not an inspection of
+        # one cartridge - which is why the analytics weight it by the units
+        # logged alongside it.
+        w_col1, w_col2 = st.columns([1, 2])
+        with w_col1:
+            check_weight = st.number_input(
+                "⚖️ Check weight (g) — optional",
+                min_value=0.0, max_value=99999.0, value=None, step=1.0,
+                placeholder="leave blank if not weighed", key="h_weight",
+                help="One cartridge off the scale. Skip it if you didn't weigh one — "
+                     "the log submits either way.",
+            )
+        weight_reading = fill_weight.judge(check_weight, weight_spec)
+        with w_col2:
+            if check_weight is not None and weight_reading is None and weight_spec is None:
+                st.caption("⚖️ Recorded, but there's no weight spec on file for this "
+                           "resin yet, so there's nothing to compare it against.")
+            elif weight_reading:
+                _icon, _msg = fill_weight.describe(weight_reading)
+                _tone = {"in": "#4ADE80", "over": "#FBBF24", "under": "#FBBF24"}.get(
+                    weight_reading["status"], "#94A3B8")
+                st.markdown(
+                    f"<div style='margin-top:26px;color:{_tone};font-weight:600;'>"
+                    f"{_icon} {esc(_msg)}</div>", unsafe_allow_html=True)
+
         notes = st.text_area("Process Observations / Notes", placeholder="e.g. Target fill weight nominal...",
                              key="h_notes")
 
@@ -1148,7 +1194,8 @@ if tab1 is not None:
                 scrap_filled=int(scrap_filled),
                 notes=log_notes,
                 log_type="Hourly Bottle Count",
-                verification=verification
+                verification=verification,
+                weight=weight_reading,
             )
 
             # Arm the fast path only after a clean check. A mismatch or an
@@ -1173,6 +1220,11 @@ if tab1 is not None:
 
             if verification and verification.get("result") in ("mismatch", "expired"):
                 st.toast("Logged and flagged for the manager — the lot did not check out.", icon="⚠️")
+            if weight_reading and weight_reading.get("status") in ("over", "under"):
+                st.toast(
+                    f"Weight {weight_reading['measured']:.0f} g is outside the band for "
+                    f"{resin} — recorded, and it shows on the manager's fill-weight view.",
+                    icon="⚖️")
             if matched_run:
                 st.toast(f"Recorded {bottles_filled} units of {resin}! Credited to your active run.", icon="🧪")
             else:

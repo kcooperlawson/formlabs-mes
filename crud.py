@@ -1028,7 +1028,7 @@ def add_hourly_log(
         operator_name: str, pump_station: str, shift: str, cartridge_type: str,
         resin_type: str, lot_number: str, bottles: int, scrap_empty: int,
         scrap_filled: int, notes: str = "", log_type: str = "Hourly Bottle Count",
-        verification: dict = None
+        verification: dict = None, weight: dict = None
 ) -> bool:
     """Returns True if this log was matched to (and credited toward) an
     active AssignedRun's live progress tracker, False otherwise — the
@@ -1051,6 +1051,14 @@ def add_hourly_log(
     for the shape and the meaning of each result). It is optional so that
     every existing caller - the Admin Panel, reconciliation, and the
     Device Gateway writer - keeps working untouched.
+
+    `weight` is the fill-weight reading for this log, as returned by
+    fill_weight.judge(), or None when the operator did not take one - which
+    is the common case and is fine. Unlike the lot check it is purely a
+    measurement: nothing about it can prevent the log being written. Its
+    status was judged against the resin's window at the moment of capture
+    and is stored as given, so editing a spec later cannot retrospectively
+    re-judge a reading somebody already took.
     """
     session = ScopedSession()
     matched_run = False
@@ -1063,6 +1071,9 @@ def add_hourly_log(
             pump_station_id=_resolve_pump_id(session, pump_station),
             resin_spec_id=_resolve_resin_id(session, resin_type),
             verify_status=(verification or {}).get("result"),
+            check_weight_g=(weight or {}).get("measured"),
+            weight_deviation_g=(weight or {}).get("deviation"),
+            weight_status=(weight or {}).get("status"),
         )
         session.add(log_row)
 

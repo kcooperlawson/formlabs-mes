@@ -24,6 +24,7 @@ from database import (
     get_all_users_df, get_all_resin_specs_df,
 )
 from resin_palette import resin_color_map, stored_color_map
+import fill_weight
 
 
 cookie_manager = stx.CookieManager(key="analytics_cookies")
@@ -503,3 +504,119 @@ with d2:
         st.info("Insufficient data for matrix.")
 
 
+
+
+# ==================== FILL WEIGHT ====================
+# The tolerance window is lopsided - a typical spec allows 10 g under target
+# and only 5 g over - so a pump set to stay safely clear of the low limit
+# sits high in the window on every cartridge and gives resin away on every
+# cartridge, entirely inside spec and entirely invisible. This section exists
+# to make that number sayable.
+st.markdown("---")
+st.markdown("<h4 style='color:#E2E8F0;'>⚖️ Fill weight</h4>", unsafe_allow_html=True)
+
+_w = pour_df[pour_df["check_weight_g"].notna()].copy() if "check_weight_g" in pour_df.columns else pd.DataFrame()
+
+if _w.empty:
+    # An honest empty state rather than a broken chart. Readings are optional,
+    # so "nobody has weighed anything yet" is a normal condition, not a fault -
+    # and saying what to do about it is more use than an empty axis.
+    st.info(
+        "No check weights recorded yet. The pouring form has an optional "
+        "**Check weight (g)** box — one reading an hour from any pump is enough "
+        "to show where that pump is sitting in its tolerance window, and how "
+        "much resin is being given away above target."
+    )
+else:
+    _w["weight_deviation_g"] = pd.to_numeric(_w["weight_deviation_g"], errors="coerce")
+    _w = _w[_w["weight_deviation_g"].notna()]
+
+    # Each reading stands for the units logged alongside it: one weight an
+    # hour is a sample of that hour's output, not a single cartridge on its
+    # own. Weighting by units is what turns "4 g heavy" into kilograms.
+    _summary = fill_weight.giveaway(
+        zip(_w["weight_deviation_g"], _w["bottles_filled"].fillna(0))
+    )
+    _in_band = int((_w["weight_status"] == "in").sum())
+    _judged = int(_w["weight_status"].isin(["in", "over", "under"]).sum())
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Readings taken", f"{_summary['samples']:,}")
+    m2.metric("In band", f"{(_in_band / _judged * 100):.0f}%" if _judged else "—",
+              help="Share of readings inside the resin's own tolerance window.")
+    m3.metric("Mean deviation", f"{_summary['mean_deviation']:+.1f} g",
+              help="Average distance from target. Positive means running heavy.")
+    m4.metric("Resin above target", f"{_summary['kg']:+,.1f} kg",
+              help="Mean deviation applied to the units those readings represent. "
+                   "Positive is resin given away.")
+
+    g1, g2 = st.columns((2, 1))
+    with g1:
+        # Deviation rather than absolute grams, because each resin has its own
+        # target - plotting raw weight would stack unrelated products on one
+        # axis and show nothing. Zero is target. Points are coloured by the
+        # status judged at capture against that resin's own window, which is
+        # why no band lines are drawn: the limits differ per resin and a
+        # single pair of lines would be wrong for most of the points.
+        _plot = _w.sort_values("timestamp")
+        fig_w = px.scatter(
+            _plot, x="timestamp", y="weight_deviation_g", color="pump_station",
+            labels={"weight_deviation_g": "Grams from target", "timestamp": "",
+                    "pump_station": ""},
+            hover_data=["resin_type", "check_weight_g", "operator_name", "weight_status"],
+        )
+        fig_w.update_traces(marker=dict(size=8, line=dict(width=0)), opacity=0.75)
+
+        # Out-of-band readings ride on top as their own trace rather than as a
+        # third colour in the main series. At this density a status colour is
+        # lost among hundreds of in-band points, and the exceptions are the
+        # entire reason a manager opens this chart.
+        _out = _plot[_plot["weight_status"].isin(["over", "under"])]
+        if not _out.empty:
+            fig_w.add_scatter(
+                x=_out["timestamp"], y=_out["weight_deviation_g"], mode="markers",
+                name="outside band",
+                marker=dict(size=15, symbol="diamond-open", color="#F87171",
+                            line=dict(width=2.5)),
+                hovertext=_out["pump_station"], hoverinfo="text+y",
+            )
+
+        fig_w.add_hline(y=0, line_dash="dash", line_color="#64748B",
+                        annotation_text="target", annotation_font_color="#94A3B8")
+        fig_w.update_layout(**chart_layout, legend_title_text="",
+                            legend=dict(orientation="h", yanchor="bottom",
+                                        y=1.02, xanchor="left", x=0))
+        st.plotly_chart(fig_w, use_container_width=True)
+
+    with g2:
+        # The actionable cut: which pump runs heavy. A station consistently
+        # above zero is a setting, not noise, and it is fixable in minutes.
+        _by_pump = (_w.groupby("pump_station")["weight_deviation_g"]
+                    .agg(["mean", "count"]).reset_index()
+                    .sort_values("mean", ascending=False))
+        _by_pump["mean"] = _by_pump["mean"].round(2)
+        # Above target costs money, below target does not - so the two
+        # directions get different colours rather than one bar colour that
+        # makes "runs light" look like the same problem as "runs heavy".
+        _by_pump["tone"] = _by_pump["mean"].apply(lambda m: "over" if m > 0 else "under")
+        fig_p = px.bar(_by_pump, x="mean", y="pump_station", orientation="h",
+                       labels={"mean": "Mean grams from target", "pump_station": ""},
+                       text="mean", color="tone",
+                       color_discrete_map={"over": "#EA580C", "under": "#38BDF8"})
+        # 'auto' rather than 'outside': a negative bar puts an outside label
+        # on the left, straight through the station names.
+        fig_p.update_traces(textposition="auto", cliponaxis=False,
+                            textfont=dict(color="#FFFFFF", size=12))
+        fig_p.add_vline(x=0, line_color="#64748B")
+        fig_p.update_layout(**chart_layout, showlegend=False)
+        st.plotly_chart(fig_p, use_container_width=True)
+
+        if len(_by_pump):
+            _worst = _by_pump.iloc[0]
+            if _worst["mean"] > 0.5:
+                st.caption(
+                    f"**{_worst['pump_station']}** is averaging "
+                    f"{_worst['mean']:+.1f} g against target across "
+                    f"{int(_worst['count'])} readings. Every gram above target is "
+                    f"resin out of the door on every cartridge that pump fills."
+                )

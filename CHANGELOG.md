@@ -6,6 +6,22 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 4.0 — Wednesday, September 2, 2026
+**Fill weight: recording what actually went into the cartridge**
+
+- **The app has always known the target fill weight and never once recorded a measurement against it.** `resin_specs` carries the target and the tolerance window — 1110 g, accept 1100 to 1115 — so it could say how many units were poured but not how much resin went into them. Added an optional check-weight box to the hourly pouring form, three columns on `production_logs` (Alembic `0006`), and a fill-weight section in Analytics.
+- **The window is lopsided, and that's the point.** A typical spec allows 10 g under target and only 5 g over. So a pump set to run safely clear of the low limit sits high in the window on every single cartridge — inside spec, passing every check, and giving away resin on every unit. Every gram above target is about 0.09% of the fill. Nothing in the app could see that before; the seeded rehearsal put it at 81 kg over a fortnight on one pump running 3.7 g heavy.
+- **The field is optional and can never block a submission.** The lot gate stops the line because a wrong lot is a defect; a heavy cartridge is information. Make a weight mandatory and within a week it's the target typed from memory on every log — and a column full of `1110` is worse than an empty one, because it looks like data. Sparse and honest beats dense and fabricated.
+- **And it is never pre-filled**, for the same reason the run card had to stop printing the lot the gate was hiding: a box that already contains the right-looking answer gets accepted, not measured. Both rules are asserted against the real rendered page rather than left as comments — the tests drive the actual form and check that submit stays enabled with the box empty, and stays enabled when the reading is out of band.
+- Deliberately one field, not the three the paper form asks for. Three cartridges weighed in the same minute mostly measure the scale's noise; the variation worth catching is between hours, not within a minute. One reading an hour is a sample of that hour, which is why the analytics weight each reading by the units logged alongside it — that's what turns "+3 g" into kilograms.
+- The reading is judged against the resin's own window at the moment of capture and the verdict stored alongside it, the same way `verify_status` already works. Editing a resin's tolerances later can't retrospectively re-judge readings somebody already took, and "show me every out-of-band log" stays a single indexed scan.
+- Live feedback as the number is typed — in band, or how far outside and that it's worth telling a lead. An optional field that swallows the number teaches people to skip it; one that answers tells them something about the pump they're standing at.
+- The scatter plots deviation rather than absolute grams, because each resin has its own target and raw weights would stack unrelated products on one axis. Out-of-band readings ride on top as their own trace instead of a third colour — at a few hundred points a status colour disappears into the crowd, and the exceptions are the entire reason a manager opens the chart. Alongside it, mean deviation per pump, coloured by sign: running heavy costs money and running light doesn't, so they shouldn't look like the same problem.
+- **Found while testing: `test_resin_colors` pinned the schema to `head`,** so adding `0006` broke it — a false alarm about an unrelated migration rather than a real regression. It now upgrades to `0005` specifically, since that's the revision it's actually testing.
+- Worth noting the endgame this is a bridge to: the `serial_ascii` adapter in the Device Gateway was written for exactly these bench scales. If they have a serial output, the weight arrives with no operator effort at all — and these manual readings are how that automated capture would be validated, since you need known-good numbers to check it against.
+
+---
+
 ## 3.9 — Tuesday, September 1, 2026
 **Resin colour identity everywhere a resin is named**
 
