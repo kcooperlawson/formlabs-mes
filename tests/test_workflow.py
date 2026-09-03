@@ -117,7 +117,7 @@ def pour(op, station, cart, resin, expected_lot, typed, units,
 
 section("3b. STAMP NORMALISATION")
 # The cartridge base is stamped L-<lot>. Operators type it verbatim, with or
-# without the prefix, in whatever case and spacing they manage on a tablet.
+# without the prefix, in whatever case and spacing they manage on a phone.
 for _typed in ("L-2411A0742", "l- 2411a0742", "L:2411A0742", "2411-A-0742", "2411a0742"):
     check(f"{_typed!r} reads as the run lot", lots_match(GREY_LOT, _typed), True)
 check("a different lot never matches", lots_match(GREY_LOT, "L-2408B0119"), False)

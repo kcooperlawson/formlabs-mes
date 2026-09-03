@@ -350,7 +350,7 @@ if not st.session_state["authenticated"]:
                     # --- NEW CHECKBOX ---
                     st.markdown("<br>", unsafe_allow_html=True)
                     remember_device = st.checkbox("💾 Remember this device", value=False,
-                                                  help="Checking this keeps you logged in for 30 days. Do not use on shared tablets.")
+                                                  help="Keeps you signed in on this phone for 30 days. Do not tick it on a shared device.")
                     st.markdown("<br>", unsafe_allow_html=True)
 
                     if st.form_submit_button("INITIALIZE SESSION", type="primary", use_container_width=True):

@@ -1220,7 +1220,7 @@ if tab1 is not None:
                     # action must never be slower than the risky one.
                     st.markdown(f"**Photograph the {words['noun']} bottom** "
                                 "— required to log a pour against a flag.")
-                    photo_mode = st.radio("Stamp photo", ("Take photo", "Upload image"),
+                    photo_mode = st.radio(f"Photo of the {words['noun']} bottom", ("Take photo", "Upload image"),
                                           horizontal=True, key="h_lot_photo_mode")
                     if photo_mode == "Take photo":
                         pending_photo = st.camera_input(f"Photograph the {words['noun']} bottom",
@@ -1541,7 +1541,7 @@ if tab3 is not None:
         if photo_input_method == "Upload Image File":
             uploaded_photo = st.file_uploader("Upload station photo", type=["png", "jpg", "jpeg", "webp", "heic", "heif"], key="mobile_photo_upload")
         else:
-            uploaded_photo = st.camera_input("Capture live photo from tablet / workstation webcam")
+            uploaded_photo = st.camera_input("Take a photo with this phone's camera")
 
         if uploaded_photo is not None:
             st.image(uploaded_photo, caption="Inspection Photo Preview", width=300)

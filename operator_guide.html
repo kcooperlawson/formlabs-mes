@@ -1,0 +1,204 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Formlabs MES — Operator Guide</title><style>
+@page { size: Letter; margin: 0; }
+:root{
+  /* Light print palette. This document is printed and read on paper, so the
+     page is white: a dark ground looks right on screen and comes out of a
+     printer as a solid block of toner that bleeds through the sheet. */
+  --ground:#FFFFFF; --surface:#F1F5F9; --surface-2:#F8FAFC; --raised:#E2E8F0;
+  --line:#CBD5E1; --line-soft:#E2E8F0;
+  --ink:#0F172A; --body:#334155; --muted:#475569; --faint:#64748B;
+  --accent:#C2410C; --accent-2:#EA580C; --accent-dim:#FED7AA;
+  --good:#15803D; --warn:#B45309; --bad:#B91C1C;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --disp:"Inter Display","Inter",Arial,sans-serif;
+  --mono:"DejaVu Sans Mono",monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:var(--sans); color:var(--body); font-size:10pt; line-height:1.55;
+     background:var(--ground); -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+.page{width:8.5in; height:11in; padding:0.7in 0.78in 0.55in; position:relative;
+      page-break-after:always; overflow:hidden; background:var(--ground);}
+.page:last-child{page-break-after:auto;}
+
+h1,h2,h3,h4{font-family:var(--disp); color:var(--ink); margin:0; font-weight:700; letter-spacing:-.018em;}
+h2{font-size:19pt; line-height:1.12; letter-spacing:-.025em;}
+h3{font-size:11.5pt; margin-bottom:4pt;}
+h4{font-size:9.4pt;}
+p{margin:0 0 7pt;}
+strong{color:var(--ink); font-weight:600;}
+code,.mono{font-family:var(--mono); font-size:8.2pt; background:var(--surface);
+           padding:.5pt 3pt; border-radius:2pt; color:#9A3412;
+           border:.4pt solid var(--line-soft);}
+
+.eyebrow{font-family:var(--mono); font-size:7pt; letter-spacing:.15em;
+         text-transform:uppercase; color:var(--accent);}
+.sec-head{border-bottom:1pt solid var(--line); padding-bottom:7pt; margin-bottom:14pt;}
+.sec-head .eyebrow{display:block; margin-bottom:5pt;}
+.lead{font-size:10.6pt; color:var(--body);}
+.lead strong{color:var(--ink);}
+
+.folio{position:absolute; left:0.78in; right:0.78in; bottom:0.32in; display:flex;
+       justify-content:space-between; font-family:var(--mono); font-size:6.8pt;
+       color:var(--faint); letter-spacing:.08em; text-transform:uppercase;
+       border-top:.5pt solid var(--line-soft); padding-top:6pt;}
+
+/* cover */
+.cover{padding:0.85in 0.8in; background:var(--ground);}
+.cover::before{content:""; position:absolute; left:0; top:0; bottom:0; width:.16in; background:var(--accent);}
+.cover .logo{height:.4in; margin-bottom:.8in;}
+.cover h1{color:var(--ink); font-size:39pt; line-height:1.0; letter-spacing:-.03em; max-width:6in;}
+.cover .sub{font-size:11.5pt; color:var(--accent-2); margin-top:15pt;}
+.cover .rule{height:1pt; background:var(--line); margin:30pt 0 20pt; width:2.2in;}
+.cover .blurb{font-size:10.8pt; line-height:1.55; color:var(--muted); max-width:4.8in;}
+.cover .meta{position:absolute; left:0.8in; right:0.8in; bottom:0.7in; display:flex; gap:0.42in;
+             font-family:var(--mono); font-size:7pt; color:var(--faint); text-transform:uppercase; letter-spacing:.08em;}
+.cover .meta b{display:block; font-family:var(--sans); color:var(--ink); font-size:9pt;
+               font-weight:600; letter-spacing:-.01em; margin-top:3pt; text-transform:none;}
+
+/* figures */
+figure{margin:0 0 10pt;}
+figure img{width:100%; display:block; border:.6pt solid var(--line); border-radius:3pt;
+           max-height:2.85in; object-fit:cover; object-position:top center;}
+figure img.med{max-height:3.35in;} figure img.big{max-height:4.15in;} figure img.sml{max-height:1.95in;}
+figcaption{font-size:7.6pt; color:var(--muted); margin-top:5pt; line-height:1.42;}
+figcaption b{color:var(--ink); font-weight:600;}
+
+/* blocks */
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12pt 16pt;}
+.grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10pt 13pt;}
+.card{border:.6pt solid var(--line); border-radius:3pt; padding:10pt 11pt; background:var(--surface);}
+.card h4{margin-bottom:3pt;}
+.card p{font-size:8.8pt; line-height:1.45; color:var(--muted); margin:0;}
+.card .tag{font-family:var(--mono); font-size:6.6pt; letter-spacing:.1em; text-transform:uppercase;
+           color:var(--accent); display:block; margin-bottom:5pt;}
+.stat{border-left:2pt solid var(--accent); padding-left:9pt;}
+.stat .n{font-family:var(--disp); font-size:22pt; font-weight:800; color:var(--ink);
+         letter-spacing:-.03em; line-height:1; display:block;}
+.stat .l{font-size:7.6pt; color:var(--muted); line-height:1.35; display:block; margin-top:4pt;}
+.note{background:var(--surface-2); border-left:2pt solid var(--line); padding:10pt 12pt; margin:0 0 11pt;}
+.note p{margin:0; font-size:9.2pt;}
+.note .eyebrow{display:block; margin-bottom:4pt; color:var(--muted);}
+.note.warn{border-left-color:var(--warn);} .note.warn .eyebrow{color:var(--warn);}
+
+ul.tight{margin:0 0 8pt; padding-left:13pt;}
+ul.tight li{margin-bottom:4pt; font-size:9.3pt; line-height:1.45; color:var(--muted);}
+ul.tight li::marker{color:var(--accent);}
+ul.tight li strong{color:var(--ink);}
+
+table{width:100%; border-collapse:collapse; font-size:8pt;}
+th{text-align:left; font-weight:600; color:var(--ink); border-bottom:1pt solid var(--line);
+   padding:5pt 6pt; font-size:7.2pt; letter-spacing:.07em; text-transform:uppercase;}
+td{padding:5pt 6pt; border-bottom:.5pt solid var(--line-soft); vertical-align:top; line-height:1.4; color:var(--muted);}
+td.k{font-weight:600; color:var(--ink);}
+.yes{color:var(--good); font-weight:600;} .no{color:var(--faint);} .part{color:var(--warn); font-weight:600;}
+
+.step{display:grid; grid-template-columns:20pt 1fr; gap:0 9pt; margin-bottom:9pt;}
+.step .n{font-family:var(--disp); font-size:8.5pt; font-weight:800; color:var(--ground);
+         background:var(--accent); width:16pt; height:16pt; border-radius:50%;
+         display:flex; align-items:center; justify-content:center; margin-top:1pt;}
+.step h4{margin-bottom:2pt;}
+.step p{font-size:9pt; margin:0; color:var(--muted); line-height:1.45;}
+
+.toc{font-size:9.2pt;}
+.toc .row{display:flex; align-items:baseline; gap:7pt; padding:5.5pt 0; border-bottom:.5pt solid var(--line-soft);}
+.toc .row .num{font-family:var(--mono); font-size:7.6pt; color:var(--accent); width:18pt; flex:none;}
+.toc .row .t{color:var(--ink); font-weight:600;}
+.toc .row .d{color:var(--muted); flex:1; font-size:8.6pt;}
+.toc .row .pg{font-family:var(--mono); font-size:7.6pt; color:var(--faint);}
+
+.role-band{display:flex; margin-bottom:12pt; border:.6pt solid var(--line); border-radius:3pt; overflow:hidden;}
+.role-band div{flex:1; padding:7pt 9pt; font-size:7.8pt; color:var(--muted); border-right:.6pt solid var(--line);}
+.role-band div:last-child{border-right:none;}
+.role-band b{display:block; color:var(--ink); font-size:8.8pt; font-weight:600; margin-bottom:2pt;}
+.role-band div.me{background:var(--surface); border-top:2pt solid var(--accent);}
+.role-band div.me b{color:var(--accent-2);}
+
+/* theme gallery */
+.themes{display:grid; grid-template-columns:1fr 1fr; gap:11pt 13pt;}
+/* Three across for the light set: two rows of thumbnails would push the rest
+   of that page over the fold, and these three are being compared with each
+   other rather than read in detail. */
+.themes.three{grid-template-columns:1fr 1fr 1fr; gap:9pt 10pt;}
+.themes.three .nm{font-size:7.6pt;} .themes.three .sw{font-size:6pt;}
+.theme img{width:100%; display:block; border:.5pt solid var(--line); border-radius:3pt;}
+.theme .cap{display:flex; justify-content:space-between; align-items:baseline; margin-top:4pt;}
+.theme .nm{font-size:8.4pt; font-weight:600; color:var(--ink);}
+.theme .sw{font-family:var(--mono); font-size:6.8pt; color:var(--faint);}
+.chip{display:inline-block; width:7pt; height:7pt; border-radius:1.5pt; margin-left:3pt; vertical-align:-.5pt;}
+</style>
+<style>
+  body{font-size:11pt; line-height:1.6;}
+  .page{padding:0.62in 0.72in 0.5in;}
+  h1,h2,h3,h4{color:var(--ink);}
+  .cover-op{display:flex; flex-direction:column; justify-content:center; height:11in;
+            padding:0 1.05in; text-align:left;}
+  /* align-self, not width. The cover is a column flexbox, whose align-items
+     defaults to `stretch` - which pulls the logo out to the full column
+     width and flattens the mark. Nothing was setting a width at all. */
+  .cover-op .logo{height:34pt; width:auto; align-self:flex-start;
+                  margin-bottom:30pt;}
+  .cover-op h1{font-family:var(--disp); font-size:34pt; font-weight:800; line-height:1.06;
+               letter-spacing:-0.02em; margin:0;}
+  .cover-op .sub{font-size:13.5pt; color:var(--muted); margin-top:12pt; max-width:5.1in;
+                 line-height:1.5;}
+  .cover-op .rule{height:2.5pt; width:1.5in; background:var(--accent); margin:22pt 0 20pt;}
+  .cover-op .who{font-family:var(--mono); font-size:8.4pt; letter-spacing:.13em;
+                 text-transform:uppercase; color:var(--faint); line-height:2;}
+
+  .sec{border-bottom:1.4pt solid var(--ink); padding-bottom:7pt; margin-bottom:15pt;}
+  .sec .num{font-family:var(--mono); font-size:8pt; letter-spacing:.16em; color:var(--accent);
+            text-transform:uppercase; display:block; margin-bottom:3pt;}
+  .sec h2{font-family:var(--disp); font-size:20pt; font-weight:800; margin:0;
+          letter-spacing:-0.015em;}
+
+  .row{display:grid; grid-template-columns:1fr 1.72in; gap:20pt; align-items:start;
+       margin-bottom:15pt;}
+  .row.wide{grid-template-columns:1fr 2.05in;}
+  .row .shot img{width:100%; border:.7pt solid var(--line); border-radius:6pt;}
+  .row .shot .cap{font-size:8pt; color:var(--faint); text-align:center; margin-top:4pt;
+                  line-height:1.35;}
+
+  .stepbig{display:flex; gap:11pt; margin-bottom:12pt; align-items:flex-start;}
+  .stepbig .n{flex:0 0 auto; width:23pt; height:23pt; border-radius:50%;
+              background:var(--accent); color:#fff; font-family:var(--disp);
+              font-weight:800; font-size:12pt; display:flex; align-items:center;
+              justify-content:center; margin-top:1pt;}
+  .stepbig h4{font-size:12pt; font-weight:800; margin:1pt 0 3pt;}
+  .stepbig p{margin:0; font-size:10.6pt; line-height:1.55; color:var(--body);}
+  .stepbig p + p{margin-top:5pt;}
+
+  .callout{border-left:3.5pt solid var(--accent); background:var(--surface-2);
+           padding:11pt 14pt; margin:0 0 13pt;}
+  .callout .lab{font-family:var(--mono); font-size:7.6pt; letter-spacing:.13em;
+                text-transform:uppercase; color:var(--accent); display:block; margin-bottom:4pt;}
+  .callout p{margin:0; font-size:10.4pt; line-height:1.55;}
+  .callout.stop{border-left-color:var(--bad);} .callout.stop .lab{color:var(--bad);}
+  .callout.ok{border-left-color:var(--good);} .callout.ok .lab{color:var(--good);}
+
+  .fix{border-top:.7pt solid var(--line-soft); padding:9pt 0 0; margin-bottom:9pt;}
+  .fix h4{font-size:11pt; font-weight:800; margin:0 0 3pt;}
+  .fix p{margin:0; font-size:10.2pt; line-height:1.55; color:var(--body);}
+
+  .rule-list{margin:0; padding-left:0; list-style:none;}
+  .rule-list li{font-size:11pt; line-height:1.5; margin-bottom:9pt; padding-left:18pt;
+                position:relative; color:var(--ink);}
+  .rule-list li::before{content:"—"; position:absolute; left:0; color:var(--accent);
+                        font-weight:700;}
+  .rule-list li span{color:var(--muted); font-size:10.2pt;}
+
+  .later{display:grid; grid-template-columns:1fr 1fr; gap:9pt 16pt; margin-top:4pt;}
+  .later div{font-size:10pt; line-height:1.5; color:var(--muted);}
+  .later b{color:var(--ink); display:block; font-size:10.4pt;}
+</style>
+</head><body><section class="page cover-op"><img class="logo" src="assets/formlabs_logo.png" alt="Formlabs"><h1>Logging your<br>pouring shift</h1><div class="rule"></div><div class="sub">Everything you need to use the pouring log on your phone &mdash; signing in, clearing your station, logging the hour, and what to do when something is not right.</div><div class="who" style="margin-top:34pt;">For &mdash; pouring operators<br>Read once &middot; keep for reference<br>September 2026</div></section>
+<section class="page"><div class="sec"><span class="num">Before you start</span><h2>What this is, in one page</h2></div><p style="font-size:11.6pt; line-height:1.6;">Once an hour, at your pump, you write down what you poured. That is the whole job. It takes under a minute and it happens on <b>your own phone</b> &mdash; there is nothing to install and no extra device to carry.</p><p style="margin-top:9pt;">Until now none of this was written down anywhere. That means nobody could answer simple questions later: how many we poured on a given day, how much was scrapped, how long a pump was down, or which resin lot went into which containers. What you log is where those answers come from.</p><div class="callout"><span class="lab">The one rule</span><p><b>Log it when it happens.</b> An hour written up at the end of a shift is a guess, and every number that comes out of this later is built on what you typed.</p></div><h3 style="font-size:13pt; margin:16pt 0 8pt;">Your shift, start to finish</h3><ul class="rule-list"><li>Sign in on your phone. <span>Once a day, or once ever if it is your own phone.</span></li><li>Clear the startup checklist for your pump. <span>The rest of the app stays locked until you do.</span></li><li>Every hour: set your station and resin, check the lot, enter your counts, submit.</li><li>Log downtime when the line stops, and photos at changeovers and spills.</li><li>That is it. Nothing to close out at the end of the shift.</li></ul><div class="callout"><span class="lab">If you are not sure</span><p>Nothing here can break anything. The worst you can do is enter a wrong number, and there is a button to take that back. Ask your lead rather than guessing at a lot code.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>2</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 1</span><h2>Signing in</h2></div><div class="row"><div><div class="stepbig"><div class="n">1</div><div><h4>Open the plant address in your phone's browser</h4><p>Your lead will give you the address. Add it to your home screen the first time and it becomes one tap after that &mdash; there is no app to download.</p></div></div><div class="stepbig"><div class="n">2</div><div><h4>Enter your operator ID and PIN</h4><p>Both come from your lead. If you have never signed in, ask them to set you up.</p></div></div><div class="stepbig"><div class="n">3</div><div><h4>Tick <em>Remember this device</em></h4><p>On a phone only you carry, this is the right thing to do &mdash; it keeps you signed in for 30 days so you are not typing a PIN every hour. Do not tick it on a phone somebody else uses.</p></div></div></div><div class="shot"><img src="figs_op/01_signin.png" alt=""><div class="cap">The sign-in screen.</div></div></div><div class="callout stop"><span class="lab">Five wrong PINs locks you out for fifteen minutes</span><p>It unlocks on its own, but you do not have to wait &mdash; any manager can reset your PIN straight away. Ask rather than guessing at it.</p></div><div class="callout"><span class="lab">Everything you log is attached to your name</span><p>That is the point of signing in: your hours are yours, and nobody can quietly change them. It also means you should not hand your phone to someone else to log their hour on your account.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>3</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 2</span><h2>Clearing your station</h2></div><p class="lead">The first time you open the app each shift it is locked, and it stays locked until you have certified the pump you are standing at. This is deliberate: the checklist is about <em>this station</em>, not about you.</p><div class="stepbig"><div class="n">1</div><div><h4>Pick the pump you are starting at</h4><p>Choose it at the top of the lock screen. Whatever you pick here carries through to your logging screen, so you only answer this once.</p></div></div><div class="stepbig"><div class="n">2</div><div><h4>Submit the start-of-shift cleanliness photo</h4><p>Take it on the phone. Add a note if there is anything worth saying about the state of the station; otherwise the default note is fine.</p></div></div><div class="stepbig"><div class="n">3</div><div><h4>Confirm the two checks</h4><p>That you have scanned the daily station QR code and submitted that checksheet, and that your bins of empty cartridges and your receiving carts are staged for the run.</p></div></div><div class="stepbig"><div class="n">4</div><div><h4>Press <em>Submit Validation &amp; Unlock Terminal</em></h4><p>The logging screens open up. You will not see this again today unless you move stations.</p></div></div><div class="callout"><span class="lab">Moved to a different pump later?</span><p>The checklist comes back for the new station. That is not a mistake &mdash; it certifies the pump you are standing at, and you are now standing at a different one.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>4</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 3</span><h2>Logging the hour &mdash; set up</h2></div><div class="row wide"><div><div class="stepbig"><div class="n">1</div><div><h4>Pump station</h4><p>Already set from your checklist. Change it only if you have actually moved.</p></div></div><div class="stepbig"><div class="n">2</div><div><h4>Container format</h4><p>V2 or V1 cartridge, RPS bulk jug, or Pigment. Pick what you are physically filling.</p></div></div><div class="stepbig"><div class="n">3</div><div><h4>Resin formulation</h4><p>The resin you are running. Its colour tag appears underneath so you can check it against the master sheet at a glance.</p></div></div><p style="margin-top:11pt; font-size:10.6pt;">Under the resin you will see its <b>target fill weight and the acceptable range</b>. Worth a glance against your scale.</p></div><div class="shot"><img src="figs_op/02_material.png" alt=""><div class="cap">Station and material, with the target weight underneath.</div></div></div><div class="callout"><span class="lab">If nothing is assigned to your station</span><p>You will see a note saying no run matched. Keep going &mdash; your log still records and still counts. Tell your lead, because it means the work order side has not been set up, not that you did anything wrong.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>5</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 4</span><h2>Logging the hour &mdash; check the lot</h2></div><div class="row wide"><div><p class="lead" style="font-size:11.4pt;">This is the one part of the log that is a check rather than a record, and it is the reason the whole thing is worth doing.</p><div class="stepbig"><div class="n">1</div><div><h4>Turn the container over</h4><p>Cartridge or bulk jug &mdash; both carry the same lot label on the bottom.</p></div></div><div class="stepbig"><div class="n">2</div><div><h4>Type the code you can see</h4><p>Exactly as printed. Spacing, capitals and the <span class="mono">L-</span> prefix do not matter &mdash; type it however it comes out.</p></div></div></div><div class="shot"><img src="figs_op/03_lot_blank.png" alt=""><div class="cap">The lot check, before you type.</div></div></div><div class="callout"><span class="lab">The lot the run expects is hidden on purpose</span><p>You will see dots instead of a number. That is not a fault. If the screen showed you the answer, the check would be checking nothing &mdash; <b>read the container, not the screen.</b></p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>6</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 4</span><h2>What the lot check tells you</h2></div><div class="row wide"><div><h3 style="font-size:12.6pt; margin:0 0 6pt;">Green &mdash; it matches</h3><p style="font-size:10.6pt;">Carry on and enter your counts. Nothing else to do.</p><p style="font-size:10.6pt; margin-top:7pt;">On your next log at the same station, with the same resin and lot, this becomes a single tap to confirm the container in your hand still reads the same code. The full check comes back whenever anything changes, after four hours, and on every tenth log.</p></div><div class="shot"><img src="figs_op/05_lot_ok.png" alt=""><div class="cap">A clean check.</div></div></div><div class="row wide"><div><h3 style="font-size:12.6pt; margin:0 0 6pt; color:var(--bad);">Red &mdash; STOP, do not pour</h3><p style="font-size:10.6pt;">This container is not from the lot your run expects. <b>Set it aside and get your lead.</b></p><p style="font-size:10.6pt; margin-top:7pt;">If you pull it, press <em>Wrong cartridge &mdash; pulled it, nothing poured</em>. That records the catch, which is worth having: it is the system working.</p><p style="font-size:10.6pt; margin-top:7pt;">If your lead decides the pour goes ahead anyway, choose a reason, add the detail, and photograph the label. The log then saves with a flag on it so it can be reviewed later.</p></div><div class="shot"><img src="figs_op/04_lot_stop.png" alt=""><div class="cap">A mismatch.</div></div></div><div class="callout stop"><span class="lab">A mismatch never stops you working</span><p>It asks for an explanation, and it never blocks you from pulling the container &mdash; the safe thing to do is always the quickest thing to do.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>7</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 5</span><h2>Logging the hour &mdash; your counts</h2></div><div class="row wide"><div><div class="stepbig"><div class="n">1</div><div><h4>Good units filled</h4><p>The containers you actually filled this hour.</p></div></div><div class="stepbig"><div class="n">2</div><div><h4>Scrap empty and scrap filled, kept separate</h4><p>They mean different things: an empty scrapped is a handling problem, a filled one is lost resin as well. Keeping them apart is what makes the difference visible.</p></div></div><div class="stepbig"><div class="n">3</div><div><h4>Check weight &mdash; optional, every time</h4><p>If you have the scale to hand, weigh one and type the number. It tells you straight away whether that container is inside its window and how far off target it is. <b>Leaving it blank never blocks anything</b> &mdash; a blank is honest, a guess is worse than nothing.</p></div></div><div class="stepbig"><div class="n">4</div><div><h4>Anything worth noting, then submit</h4><p>The screen tells you plainly whether it saved. If it says it did not, nothing was recorded &mdash; submit again.</p></div></div></div><div class="shot"><img src="figs_op/06_counts.png" alt=""><div class="cap">Counts and submit.</div></div></div><div class="callout ok"><span class="lab">Typed the wrong number? Take it back.</span><p>For two minutes after you submit, an <em>Undo last</em> button sits just above the counts. Use it &mdash; a 2500 that should have been 250 is much easier to fix now than to explain later.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>8</span></div></section>
+<section class="page"><div class="sec"><span class="num">Step 6</span><h2>Downtime, photos and messages</h2></div><div class="row wide"><div><h3 style="font-size:12.6pt; margin:0 0 5pt;">When the line stops</h3><p style="font-size:10.6pt;">Use the <em>Log Station Downtime</em> tab: the reason, how many minutes, and what was done about it.</p><p style="font-size:10.6pt; margin-top:7pt;">Log it as it happens rather than reconstructing it later. Downtime nobody records does not disappear &mdash; it turns up as bad yield instead, which makes it look like the pouring was the problem.</p></div><div class="shot"><img src="figs_op/07_downtime.png" alt=""><div class="cap">The downtime tab.</div></div></div><h3 style="font-size:12.6pt; margin:14pt 0 5pt;">Photo audits</h3><p style="font-size:10.6pt;">The <em>Cleanliness &amp; Photo Audit</em> tab covers start of shift, end of shift, moving a line onto a different resin, and spills. There is a tick box to mark a photo as an active spill or leak, which flags it for attention rather than filing it as routine.</p><h3 style="font-size:12.6pt; margin:14pt 0 5pt;">Talking to your lead</h3><p style="font-size:10.6pt;">The <em>Manager Comms</em> tab is a direct thread with the plant lead, inside the app. Use it for anything that should stay attached to the record rather than living in a text message.</p><h3 style="font-size:12.6pt; margin:14pt 0 5pt;">Your own numbers</h3><p style="font-size:10.6pt;">Units poured, scrap and quality yield sit at the top of your screen and update as you log. It is the same figure management sees &mdash; there is no separate scoring going on behind it.</p><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>9</span></div></section>
+<section class="page"><div class="sec"><span class="num">Reference</span><h2>When something is not right</h2></div><div class="fix"><h4>The app is locked and will not let me log</h4><p>You have not cleared the startup checklist for the pump you picked. Do that and the logging tabs open. If you have moved stations, it will ask again for the new one.</p></div><div class="fix"><h4>I am locked out after mistyping my PIN</h4><p>Five wrong attempts locks the account for fifteen minutes. It clears on its own, but any manager can reset it immediately &mdash; that is faster than waiting.</p></div><div class="fix"><h4>The lot does not match and my lead is not around</h4><p>Do not pour. Set the container aside and press <em>Wrong cartridge &mdash; pulled it, nothing poured</em>. That is a complete, correct outcome on its own; nothing is left hanging by choosing it.</p></div><div class="fix"><h4>It says no active run matched my station</h4><p>Log the hour anyway &mdash; it records and it counts. Read the code off the container as normal; it gets stored against your log. Tell your lead so the work order can be set up.</p></div><div class="fix"><h4>I typed the wrong number and already submitted</h4><p>Press <em>Undo last</em> within two minutes. After that, ask your lead &mdash; they can correct it from their side, and it is better fixed than left.</p></div><div class="fix"><h4>The screen says my log was not saved</h4><p>Then it was not, and nothing was recorded. Submit again. This is the app being honest rather than pretending &mdash; the network drops in parts of the building.</p></div><div class="fix"><h4>I cannot read the screen properly</h4><p>Under <em>Account &amp; Preferences</em> there is a <b>Display</b> section: <em>Glove mode</em> makes every button and box bigger for gloved hands, and there are light themes for working under bright shop lighting. Both are remembered.</p></div><div class="fix"><h4>I keep losing my place while pouring</h4><p>Turn on <em>Focus mode</em> at the top of the logging tab. It strips the screen down to the four things you need mid-run &mdash; resin, lot, count so far, how many left &mdash; big enough to read from across the station.</p></div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>10</span></div></section>
+<section class="page"><div class="sec"><span class="num">Last page</span><h2>What else it does</h2></div><p class="lead" style="font-size:11.4pt;">None of this is your job, and none of it needs anything from you beyond the hourly log. It is here so you know what happens to what you type, and who is looking at it.</p><div class="later" style="margin-top:14pt;"><div><b>Work orders</b>Managers dispatch runs to a pump. That is where the expected lot in your check comes from, and how your units count towards a target.</div><div><b>The floor display</b>A screen showing the shift&rsquo;s pace, built from the same logs. No extra entry &mdash; it is your hourly figures, shown large.</div><div><b>Trends and reports</b>Yield, scrap and downtime over weeks, and a shift handover that emails itself. All of it is the same rows you entered.</div><div><b>Fill weights</b>The optional check weights add up into how much resin is going out above target &mdash; which is money, and invisible without them.</div><div><b>Lot traceability</b>Which lot went into which containers, at which pump, by whom and when. That is the question a customer complaint asks.</div><div><b>Reactors and stock</b>Vessel levels reconciled against what has actually been poured, rather than against what was assumed.</div></div><div class="callout"><span class="lab">If something about the app is wrong or annoying, say so</span><p>There is a feedback box under <em>Account &amp; Preferences</em>, and it goes straight to whoever maintains this. Small annoyances at a pump are the ones worth reporting &mdash; they are the ones nobody else can see.</p></div><div style="margin-top:20pt; padding-top:11pt; border-top:.7pt solid var(--line);font-size:9.6pt; color:var(--faint);">A fuller description of the system, for managers and IT, is in the <em>Capability &amp; Operations Handbook</em>.</div><div class="folio"><span>Formlabs MES &middot; Operator Guide</span><span>11</span></div></section></body></html>
