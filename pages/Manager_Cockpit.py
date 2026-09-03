@@ -214,3 +214,8 @@ with col3:
     st.page_link("pages/Mgr_Google_Sync.py", label="☁️ Google Cloud Sheets Sync", use_container_width=True)
     st.page_link("pages/Mgr_Shift_Handover.py", label="📤 PDF Shift Handover", use_container_width=True)
     st.page_link("pages/Mgr_Log_Management.py", label="🗑️ Log Management & Cleanup", use_container_width=True)
+    # Added because it was built and then left with no way in: nothing in the
+    # app linked to it, so the contrast audit and the component gallery could
+    # only be reached by typing the URL.
+    st.page_link("pages/Mgr_Theme_Gallery.py", label="🎨 Theme Gallery & Contrast Audit",
+                 use_container_width=True)

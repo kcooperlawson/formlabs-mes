@@ -128,6 +128,17 @@ def _light_mode_fixes(p: Palette) -> str:
             background-color: {_rgba(p.accent, 0.14)} !important;
             border-color: {p.accent} !important;
         }}
+        /* The popover trigger gets the same translucent pill as the nav links
+           in the base stylesheet, so it needs the same correction here - a
+           white-on-white wash otherwise. */
+        [data-testid="stPopover"] button {{
+            background-color: {_rgba(p.ink, 0.05)} !important;
+            border: 1px solid {_rgba(p.ink, 0.12)} !important;
+        }}
+        [data-testid="stPopover"] button,
+        [data-testid="stPopover"] button * {{
+            color: {p.body} !important;
+        }}
         div[data-testid="stTabs"] [data-baseweb="tab"] {{
             background-color: {_rgba(p.ink, 0.04)} !important;
             border: 1px solid {_rgba(p.ink, 0.10)} !important;

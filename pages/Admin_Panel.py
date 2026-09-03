@@ -89,7 +89,13 @@ with st.sidebar:
     # Only show IT Admin to actual admins
     if st.session_state.get("user_role") == "admin":
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-    st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+    # There was a link to pages/Device_Registry.py here. That page has never
+    # existed - the Device Gateway is a backend package with no screen - and
+    # st.page_link raises on a target it cannot find, so this single line took
+    # the whole IT Admin console down for every admin who opened it. The page
+    # sweep did not catch it because that harness stubs st.page_link out; it
+    # was found by opening the page in a browser. If the registry screen is
+    # ever written, link it back here.
 
     st.markdown("---")
     # ---------------------------

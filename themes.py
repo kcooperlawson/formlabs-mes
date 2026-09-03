@@ -45,6 +45,50 @@ BASE_UI_CSS = """
        background, so leaving it un-hidden here just lets that existing
        per-theme styling show through instead of forcing it away. */
 
+    /* Streamlit sets its own text colour on the sidebar container, which is
+       chosen for its light base theme and cuts the inheritance chain from
+       .stApp. Anything in the sidebar that does not name a colour of its own
+       therefore came out as near-black on the dark sidebar these themes
+       paint - which is what happened to the navigation links: 1.35:1 against
+       their own pill, the six controls an operator taps to get anywhere, and
+       the entire navigation on a phone. `inherit` reconnects the chain, so
+       the sidebar follows whatever the active theme set on .stApp, and is
+       correct for the light themes and the dark ones alike. Everything in
+       there that does name a colour is unaffected. */
+    section[data-testid="stSidebar"],
+    [data-testid="stSidebarContent"],
+    [data-testid="stSidebarUserContent"] {
+        color: inherit !important;
+    }
+
+    /* Widget labels - the words above every control: "Pump Station", "Resin
+       Formulation", "Check weight (g)". Same cause as the navigation, and a
+       wider blast radius, because these sit over the page background on every
+       form in the app. Measured at 1.14-1.68:1 across the dark themes: the
+       label an operator reads to know what they are typing into was the
+       least legible text on the screen. */
+    [data-testid="stWidgetLabel"],
+    [data-testid="stWidgetLabel"] *,
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary * {
+        color: inherit !important;
+    }
+
+    /* The popover trigger ("Account & Preferences") keeps Streamlit's own
+       near-white button surface, which no theme paints over. Reconnecting the
+       sidebar's inherited colour above would have put light text on that white
+       pill, so it gets the same translucent treatment as the nav links
+       instead - one surface, one rule, legible either way. The light themes
+       override both together; see theme_engine._light_mode_fixes. */
+    [data-testid="stPopover"] button {
+        background-color: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
+    [data-testid="stPopover"] button,
+    [data-testid="stPopover"] button * {
+        color: inherit !important;
+    }
+
     /* 1. UNIVERSAL PAGE LINKS (TOP NAV) */
     /* ANTI-SQUISH NAV BUTTONS (For 7-Column God Mode) */
     [data-testid="stPageLink-NavLink"] {
@@ -63,6 +107,16 @@ BASE_UI_CSS = """
         padding: 10px 15px !important;
         text-decoration: none !important;
         transition: all 0.2s ease !important;
+        /* This rule styled the pill and never named a text colour, so the
+           label fell through to Streamlit's own muted grey - a colour chosen
+           for a light background. On the dark themes, which is what nearly
+           everyone runs, the top navigation came out at 1.35:1 against its
+           own pill: the six buttons an operator taps to get anywhere were the
+           least readable text on the screen, and worst on a phone where they
+           are the entire navigation. `inherit` takes the colour from .stApp,
+           so it is correct in both directions, and the light themes' own
+           override still wins because it is emitted after this. */
+        color: inherit !important;
     }
     .stPageLink a:hover {
         background-color: rgba(255, 255, 255, 0.15) !important;
@@ -72,6 +126,23 @@ BASE_UI_CSS = """
     .stPageLink p {
         font-size: 1.05rem !important;
         font-weight: 800 !important;
+    }
+    /* Colouring the <a> alone is not enough: Streamlit wraps the label in its
+       own markdown container and colours THAT, so the text carried on
+       rendering in the default near-black while the link around it was
+       correct. Every descendant inherits instead, which walks the right
+       colour down from the <a> whatever the theme, and leaves any element
+       that names its own colour alone. */
+    .stPageLink a,
+    .stPageLink a *,
+    [data-testid="stPageLink-NavLink"],
+    [data-testid="stPageLink-NavLink"] * {
+        color: inherit !important;
+    }
+    /* Streamlit marks the link to the page you are already on and styles it
+       down. Kept distinguishable without making it unreadable. */
+    [data-testid="stPageLink-NavLink"][aria-current] {
+        opacity: 0.95 !important;
     }
 
     /* 2. UNIVERSAL SLIDABLE IN-PAGE TABS (MODERN PILL BUTTONS) */

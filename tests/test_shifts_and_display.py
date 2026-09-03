@@ -198,6 +198,47 @@ for name, p in PALETTES.items():
               f"{name} carries the base-CSS corrections a light ground needs")
 print("  light themes correct the dark assumptions baked into BASE_UI_CSS")
 
+# Navigation labels must take a colour from the theme rather than falling
+# through to Streamlit's own. This is asserted on the CSS every theme carries,
+# because it was measured at 1.35:1 in a browser: the shared base stylesheet
+# painted the nav pill and never named a text colour, so the label kept
+# Streamlit's near-black default on a dark pill - the six controls that get an
+# operator anywhere, and the whole navigation on a phone.
+from themes import BASE_UI_CSS
+_nav_rules = [r for r in BASE_UI_CSS.split("}") if "stPageLink" in r or "PageLink-NavLink" in r]
+check(any("color: inherit" in r for r in _nav_rules),
+      "the base stylesheet gives navigation links a colour from the theme")
+# The <a> alone is not enough - Streamlit colours its own markdown wrapper
+# inside the link, so the descendants have to inherit too.
+check(any("*" in r.split("{")[0] and "color: inherit" in r for r in _nav_rules),
+      "and the label inside the link inherits it as well")
+# And the sidebar, whose own container colour cuts the chain from .stApp.
+check(any("stSidebar" in r and "color: inherit" in r
+          for r in BASE_UI_CSS.split("}")),
+      "the sidebar inherits the theme's text colour instead of Streamlit's")
+print("  navigation labels take their colour from the active theme")
+
+# The same root cause reached further than the navigation. Streamlit colours
+# any element the themes do not, using a value picked for its own light base
+# theme, so on a dark ground these measured 1.14-1.68:1 in a browser: the
+# widget label above every control on every form, and the popover trigger,
+# which additionally keeps Streamlit's near-white button surface and so needed
+# a background as well as a colour.
+_rules = BASE_UI_CSS.split("}")
+check(any("stWidgetLabel" in r and "color: inherit" in r for r in _rules),
+      "widget labels take their colour from the theme, not Streamlit's default")
+check(any("stPopover" in r and "background-color" in r for r in _rules),
+      "the popover trigger is given a surface rather than keeping the white one")
+check(any("stPopover" in r and "color: inherit" in r for r in _rules),
+      "and a colour to go on it")
+# A light theme must correct the popover pill too, or it is a pale wash on a
+# pale ground - the same trap the nav links were in.
+for name, pal in PALETTES.items():
+    if pal.light:
+        check("stPopover" in THEMES[name],
+              f"{name} corrects the popover surface for a light ground")
+print("  widget labels and the popover trigger are legible on every theme")
+
 section("7. DISPLAY MODES COMPOSE WITH EVERY THEME")
 check(dm.display_css() == "", "neither mode on produces no CSS at all")
 g = dm.display_css(glove=True)

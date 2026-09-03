@@ -65,6 +65,21 @@ def init_db():
       - Already stamped (normal case after the first boot on this version):
         just applies any migrations added since.
 
+    Every one of those three paths ends at head. That was not true until it
+    was tested: stamping used to be an `else` branch, so a pre-Alembic
+    database got marked as being at the baseline and then ran the rest of that
+    boot against a schema seven revisions behind the models. It died on the
+    first settings query with "column plant_settings.shift_count does not
+    exist" - and the way to reach it is to restore an older backup onto a new
+    machine and start the app, which is exactly what somebody setting up a
+    second PC does. Stamping says where the database already is; it is not a
+    substitute for bringing it up to date.
+
+    The stamp is written as a plain INSERT rather than through
+    `command.stamp`, because Alembic's environment is not re-entrant within
+    one process (see below) and this path has to run a real upgrade
+    immediately afterwards.
+
     Idempotent within a process: unlike the old raw-SQL version, Alembic's
     command.upgrade()/command.stamp() aren't designed to be re-entered
     multiple times in one running process (its internal EnvironmentContext
@@ -90,9 +105,23 @@ def init_db():
     existing_tables = set(inspector.get_table_names())
 
     if "alembic_version" not in existing_tables and "users" in existing_tables:
-        command.stamp(alembic_cfg, "0001_baseline")
-    else:
-        command.upgrade(alembic_cfg, "head")
+        # A database the old pre-Alembic init_db() built: the tables are there
+        # and are caught up with that era's ALTER TABLE list, so record where
+        # it stands rather than re-running CREATE TABLE against tables that
+        # already exist.
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS alembic_version "
+                "(version_num VARCHAR(32) NOT NULL, "
+                "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"))
+            conn.execute(text("INSERT INTO alembic_version (version_num) "
+                              "VALUES ('0001_baseline')"))
+
+    # Always, from whichever of the three starting points. An empty database
+    # runs all of them; a just-stamped one runs everything after the baseline;
+    # an up-to-date one does nothing.
+    command.upgrade(alembic_cfg, "head")
 
     _schema_ready = True
 
