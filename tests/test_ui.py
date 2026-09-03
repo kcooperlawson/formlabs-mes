@@ -109,8 +109,10 @@ check("stop screen asks for a reason",
       any((sb.label or "").startswith("Logging it anyway") for sb in at.selectbox), True)
 check("stop screen offers the pull-the-cartridge button",
       any("pulled it" in b.label for b in at.button), True)
-check("stop screen asks for the stamp photo", "Photograph the stamp" in body, True)
-check("photo is listed as outstanding", "photograph the stamp" in body, True)
+check("stop screen asks for the photo", "Photograph the cartridge bottom" in body, True)
+check("the cartridge instruction points at the same label",
+      "lot label on the bottom" in body, True)
+check("photo is listed as outstanding", "photograph the cartridge bottom" in body, True)
 check("submit still disabled on a mismatch",
       getattr([b for b in at.button if "SUBMIT POURING LOG" in b.label][0], "disabled", None), True)
 check("expected lot stays masked even on the stop screen", GOOD_LOT not in body, True)
@@ -124,7 +126,7 @@ at2.text_input(key="h_lot_entered").set_value(f"L-{GOOD_LOT}").run()
 b2 = texts(at2)
 check("matching lot goes green", "Lot matches this run" in b2, True)
 check("nothing left blocking submit", "Before you can submit" not in b2, True)
-check("a clean check never asks for a photo", "Photograph the stamp" not in b2, True)
+check("a clean check never asks for a photo", "Photograph the" not in b2, True)
 check("no stop screen on a match", "DO NOT POUR" not in b2, True)
 check("a clean check unlocks submit",
       getattr([b for b in at2.button if "SUBMIT POURING LOG" in b.label][0], "disabled", None), False)
@@ -150,10 +152,13 @@ check("RPS gets the free-entry field taken away",
       any(i.label == "Batch Lot Number" for i in at4.text_input), False)
 check("RPS gets a lot field to read into",
       any(i.label.startswith("L-") for i in at4.text_input), True)
-# A jug is not turned over to read a stamp on its base. Telling somebody
-# holding a 5-litre jug to do that is how an instruction stops being read.
-check("the instruction names the jug's tag, not a cartridge bottom",
-      "tag on the jug" in b3, True)
+# The words follow the container, and only the noun differs: both carry the
+# same kind of lot label in the same place, on the bottom of the empty. An
+# operator at the pump is the only person who would notice the screen getting
+# that wrong, which is why it is asserted here rather than trusted.
+check("the instruction says to turn the JUG over", "Turn the jug over" in b3, True)
+check("and points at the lot label on its bottom",
+      "lot label on the bottom" in b3, True)
 check("and does not tell them to turn a cartridge over",
       "Turn the cartridge over" in b3, False)
 check("the section heading names the jug too", "Jug Lot Verification" in b3, True)
@@ -188,6 +193,27 @@ if not _rps_row.empty:
     print(f"  RPS gate OK ({RPS_STATION} / {RPS_RESIN}, lot {RPS_LOT})")
 else:
     check(False, "no RPS run on file to exercise the jug gate against")
+
+# --- F2. the wording tracks the picker, within one session ---------------
+# It would be easy for this to be right on a page that opens as RPS and wrong
+# the moment somebody switches format without reloading, because the strings
+# are chosen once per render. Switch it back and forth on the same instance
+# and read what the page says each time.
+at_sw = run_as(OP, h_pump=STATION)
+at_sw.selectbox(key="h_cart").set_value("RPS (5L Bulk Jug)").run()
+sw_rps = texts(at_sw)
+at_sw.selectbox(key="h_cart").set_value("V1 (1L Cartridge)").run()
+sw_v1 = texts(at_sw)
+at_sw.selectbox(key="h_cart").set_value("RPS (5L Bulk Jug)").run()
+sw_back = texts(at_sw)
+
+check("picking RPS says jug", "Turn the jug over" in sw_rps, True)
+check("switching to V1 says cartridge again", "Turn the cartridge over" in sw_v1, True)
+check("and stops saying jug", "Turn the jug over" in sw_v1, False)
+check("switching back to RPS says jug again", "Turn the jug over" in sw_back, True)
+check("the heading follows too (V1)", "Cartridge Lot Verification" in sw_v1, True)
+check("the heading follows too (RPS)", "Jug Lot Verification" in sw_back, True)
+print("  wording follows the Container Format picker, not the page")
 
 # --- G. the pump form link, on the real page -----------------------------
 # Asserted against the rendered page rather than against normalise() alone,

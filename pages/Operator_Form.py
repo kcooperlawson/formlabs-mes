@@ -1064,8 +1064,8 @@ if tab1 is not None:
         # The run's lot used to auto-fill an editable box right here, which
         # meant the form answered its own question: an operator could log a
         # full hour without ever turning a cartridge over. Now the expected
-        # lot is masked and the operator types what is actually stamped on
-        # the bottom of the cartridge in their hand, so nothing about this
+        # lot is masked and the operator types what is actually on the bottom
+        # of the container in their hand, so nothing about this
         # gate can be satisfied from what is on screen.
         #
         # A mismatch never dead-ends anyone - it demands a reason, flags the
@@ -1075,8 +1075,9 @@ if tab1 is not None:
         # understanding that bulk jugs carried no lot label; they always have,
         # and the plant now requires the tag to be on the jug before pouring
         # starts, which is what made the check possible there. A 5-litre jug
-        # is not turned over to read a stamp on its base, so the wording
-        # follows the container - see crud.container_words.
+        # is read exactly the way a cartridge is - turned over, the lot label
+        # on its bottom - so only the noun differs on screen. See
+        # crud.container_words.
         # ==================================================================
         gate_applies = cart_code in GATED_FORMATS
         words = container_words(cart_code)
@@ -1217,13 +1218,15 @@ if tab1 is not None:
                     # 20-30 seconds costs nothing the situation wasn't costing anyway.
                     # Note it is NOT required to pull the cartridge above: the safe
                     # action must never be slower than the risky one.
-                    st.markdown("**Photograph the stamp** — required to log a pour against a flag.")
+                    st.markdown(f"**Photograph the {words['noun']} bottom** "
+                                "— required to log a pour against a flag.")
                     photo_mode = st.radio("Stamp photo", ("Take photo", "Upload image"),
                                           horizontal=True, key="h_lot_photo_mode")
                     if photo_mode == "Take photo":
-                        pending_photo = st.camera_input("Photograph the stamp", key="h_lot_cam")
+                        pending_photo = st.camera_input(f"Photograph the {words['noun']} bottom",
+                                                        key="h_lot_cam")
                     else:
-                        pending_photo = st.file_uploader("Upload a photo of the stamp",
+                        pending_photo = st.file_uploader(f"Upload a photo of the {words['noun']} bottom",
                                                          type=["png", "jpg", "jpeg", "webp", "heic", "heif"],
                                                          key="h_lot_upload")
 
@@ -1232,7 +1235,7 @@ if tab1 is not None:
                 if result == "mismatch" and not (reason_kind and reason_detail.strip()):
                     gate_blockers.append("pick a reason and add details before logging a flagged pour")
                 if result == "mismatch" and pending_photo is None:
-                    gate_blockers.append("photograph the stamp")
+                    gate_blockers.append(f"photograph the {words['noun']} bottom")
 
                 gate_ok = not gate_blockers
                 if gate_ok:
@@ -1243,7 +1246,7 @@ if tab1 is not None:
                     # instead of burying it under a correct-looking count.
                     lot_num = typed if (result == "mismatch" or not expected_is_real) else expected_lot
                     if result == "mismatch":
-                        extra_note = (f"⚠️ LOT MISMATCH — cartridge stamped L-{typed}, "
+                        extra_note = (f"⚠️ LOT MISMATCH — {words['noun']} labelled L-{typed}, "
                                       f"run expects {expected_lot}. {reason_text}")
                     verification = dict(base_v, entered_lot=typed, result=result,
                                         check_level="record" if result == "recorded" else "full",

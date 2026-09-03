@@ -351,14 +351,14 @@ td.k{font-weight:600; color:var(--ink);}
   of this form auto-filled the run's lot and printed it on screen, which meant an hour could be logged
   without a cartridge ever being turned over &mdash; the check was answering its own question.</p>
   <figure><img src="figs_print/13_gate.png" alt="Lot verification section" style="max-height:1.5in;">
-    <figcaption><b>The check.</b> The lot the run expects is masked. The operator reads the
-    <span class="mono">L-</span> code off the container &mdash; stamped on a cartridge base, printed on an
-    RPS jug's tag &mdash; and types it. Spacing, case and the prefix are normalised, so a code typed
-    verbatim matches a run lot entered bare.</figcaption></figure>
+    <figcaption><b>The check.</b> The lot the run expects is masked. The operator turns the container
+    over and types the <span class="mono">L-</span> code from the lot label on its bottom. Spacing, case
+    and the prefix are normalised, so a code typed verbatim matches a run lot entered
+    bare.</figcaption></figure>
   <figure style="margin-top:9pt;"><img class="sml" src="figs_print/14_gate_stop.png" alt="Mismatch screen" style="max-height:1.35in;">
     <figcaption><b>When it doesn't match.</b> Submission is refused until the cartridge is pulled &mdash;
     recorded as a catch, with no production logged &mdash; or a cause, details and a photograph of the
-    stamp are supplied. The log then saves flagged, carrying the lot physically in the cartridge.</figcaption></figure>
+    label are supplied. The log then saves flagged, carrying the lot physically in the container.</figcaption></figure>
   <div class="grid2" style="margin-top:11pt;">
     <div class="card"><span class="tag">Frequency</span><h4>Full check, then a confirm</h4>
       <p>The full check runs on the first log of a shift, on any change of run, lot, resin or station,
@@ -371,8 +371,8 @@ td.k{font-weight:600; color:var(--ink);}
   <figure style="margin-top:11pt;"><img src="figs_print/13b_gate_rps.png" alt="The same check on an RPS jug"
        style="max-height:1.15in;">
     <figcaption><b>The same check on a bulk jug.</b> RPS was the one exempt format, on the understanding
-    that jugs carried nothing to read. They do, and the tag goes on before pouring &mdash; so the check
-    applies there, with the wording following the container.</figcaption></figure>
+    that jugs carried nothing to read. They carry the same lot label a cartridge does, in the same place
+    &mdash; so it is the same check, and only the noun changes with the format picked above.</figcaption></figure>
   <div class="note" style="margin-top:10pt;"><span class="eyebrow">Design note</span>
     <p>A mismatch does not stop the line; it requires an explanation, because a control that halts
     production is one people learn to work around. Every flag and every pulled container reaches the
@@ -656,10 +656,10 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Pump station, container format (V2, V1, RPS bulk jug or Pigment) and resin formulation. The target
     fill weight and tolerance for that resin appear underneath &mdash; check it against your scale.</p></div></div>
   <div class="step"><span class="n">5</span><div><h4>Verify the lot</h4>
-    <p>On a cartridge, turn it over and read the <span class="mono">L-</span> code stamped on its base;
-    on an RPS jug, read it off the lot tag, which goes on before pouring starts. The lot the run expects
-    is hidden on purpose &mdash; <strong>read the container, not the screen.</strong> Spacing, case and
-    the prefix do not matter.</p></div></div>
+    <p>Turn the container over and read the <span class="mono">L-</span> code from the lot label on its
+    bottom &mdash; the same label on a cartridge and on a jug. The lot the run expects is hidden on
+    purpose &mdash; <strong>read the container, not the screen.</strong> Spacing, case and the prefix do
+    not matter.</p></div></div>
   <figure style="margin:10pt 0;"><img class="med" src="figs_print/21_gate_pass.png" alt="Lot verification passing">
     <figcaption><b>A clean check.</b> Green means the cartridge belongs to this run. On the next log at the
     same station with nothing changed, this becomes a single confirmation tap &mdash; returning to the full
@@ -668,7 +668,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>A red <strong>STOP &mdash; DO NOT POUR</strong> means the cartridge is not from your run's lot. Set it
     aside, tell your lead, and press <em>Wrong cartridge &mdash; pulled it, nothing poured</em>. That records
     the catch. If your lead decides the pour goes ahead, choose the reason, add the detail and photograph the
-    stamp &mdash; the log saves with the flag attached.</p></div></div>
+    lot label &mdash; the log saves with the flag attached.</p></div></div>
   <div class="step"><span class="n">7</span><div><h4>Enter your counts and submit</h4>
     <p>Good units filled, plus scrap empty and scrap filled kept separate &mdash; they mean different things
     to quality. Add anything worth noting, then submit. Your totals and the run's progress both move
@@ -707,9 +707,9 @@ td.k{font-weight:600; color:var(--ink);}
   </div>
   <div class="note" style="margin-top:13pt;"><span class="eyebrow">Worth knowing</span>
     <p><strong>Your logs are attached to you</strong>, and nobody can quietly overwrite one.<br>
-    <strong>Every container format is checked, RPS jugs included.</strong> The lot tag goes on the jug
-    before pouring, so the check applies there exactly as it does to a cartridge &mdash; only the wording
-    changes, because you read a tag rather than turning a jug over.<br>
+    <strong>Every container format is checked, RPS jugs included.</strong> Jugs carry the same lot label
+    in the same place, so it is the same job &mdash; turn it over, read the code. The screen says jug or
+    cartridge to match the container format you picked.<br>
     <strong>Nothing you submit is silently discarded.</strong> If a log cannot be matched to an active run you
     are told on screen, rather than finding out later that a progress bar never moved.</p></div>
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">The one rule</span>
@@ -729,7 +729,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Reactor and size, resin, container format, target units, pump station and lot number. Assign an
     operator for accountability, but note progress follows the <em>station</em> &mdash; anyone working that
     pump contributes to the same run.</p></div></div>
-  <div class="step"><span class="n">2</span><div><h4>Enter the lot exactly as stamped</h4>
+  <div class="step"><span class="n">2</span><div><h4>Enter the lot exactly as printed</h4>
     <p>The most important field on the form: it is what the operator's cartridge check is compared against.
     Enter the number as printed after <span class="mono">L-</span> on the base. Spacing, case and the prefix
     are normalised, but a wrong number cannot be.</p></div></div>
@@ -873,7 +873,7 @@ td.k{font-weight:600; color:var(--ink);}
       <p>Derived from the plant's own configured shift times rather than a fixed hour, because
       &ldquo;night&rdquo; here means &ldquo;not the day shift&rdquo;. A gentle brightness and warmth
       reduction rather than a different set of colours, so it works with all thirty-four themes.
-      Photographs are exempt, so a cartridge stamp under review keeps its true colour.</p></div>
+      Photographs are exempt, so a lot label under review keeps its true colour.</p></div>
     <div class="card"><span class="tag">Mid-pour</span><h4>Focus mode</h4>
       <p>During a pour the operator is at the pump, not at the screen. One toggle strips the page to the
       four things that matter mid-run &mdash; resin, lot, count so far, how many left &mdash; at a size

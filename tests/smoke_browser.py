@@ -183,8 +183,12 @@ async def desktop_pass(browser):
         check(ok, "the form can be set to that run's station, format and resin")
         await pg.wait_for_timeout(4000)
 
+        # Match the part of the label that does not change with the container:
+        # it reads "L- - lot on the cartridge bottom label" or "...jug bottom
+        # label". Pinning to the old "lot stamped" wording is what made this
+        # report a missing field after the label was corrected.
         lot_field = pg.locator(
-            'div[data-testid="stTextInput"]:has-text("lot stamped")').locator("input").first
+            'div[data-testid="stTextInput"]:has-text("bottom label")').locator("input").first
         if not await lot_field.count():
             check(False, "no lot field appeared for a station that has an active run")
         else:

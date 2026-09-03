@@ -108,14 +108,14 @@ with tab_flag:
                 if pd.notna(row["production_log_id"]):
                     st.caption(f"Production log #{int(row['production_log_id'])} carries this flag.")
                 else:
-                    st.caption("No production logged against this check \u2014 the cartridge was "
+                    st.caption("No production logged against this check \u2014 the container was "
                                "pulled before pouring, which is the outcome this control is for.")
-                # Historic checks may still carry a stamp photo from before capture
-                # was removed; show it when one exists rather than losing the evidence.
+                # Historic checks may still carry a photo from before capture was
+                # removed; show it when one exists rather than losing the evidence.
                 if row["photo_filename"]:
                     img_path = os.path.join(LOT_PHOTO_DIR, str(row["photo_filename"]))
                     if os.path.exists(img_path):
-                        st.image(img_path, width=340, caption="Stamp as photographed")
+                        st.image(img_path, width=340, caption="Lot label as photographed")
                 st.markdown("---")
 
 # --------------------------------------------------------------- COVERAGE --

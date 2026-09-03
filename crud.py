@@ -929,25 +929,24 @@ GATED_FORMATS = ("V1", "V2", "Pigment", "RPS")
 
 
 def container_words(cart_code) -> dict:
-    """What to call the thing in the operator's hands, and where the lot is.
+    """What to call the container in the operator's hands. Only the noun.
 
-    A 5-litre jug is not turned over to read a stamp on its base, and telling
-    somebody holding one to do that is how an instruction stops being read at
-    all. The check is identical on every format; only these words differ, so
-    they live in one place rather than as branches through the form.
+    Cartridges and jugs carry the same kind of lot label in the same place -
+    on the bottom of the empty, applied before it is filled - so the check, the
+    instruction and the action are identical and only the word for the thing
+    changes. Two earlier versions of this got that wrong in opposite
+    directions: one sent operators hunting for a tag on the side of a jug, the
+    other invented a distinction between a stamped cartridge and a labelled jug
+    that does not exist. Both would have been noticed at the pump and nowhere
+    else, which is the argument for keeping the difference down to one word.
     """
-    if str(cart_code or "").strip().upper() == "RPS":
-        return {
-            "noun": "jug",
-            "where": "Find the lot tag on the jug and read the lot from it.",
-            "field": "L- — lot on the jug's tag",
-            "still_reads": "Jug in front of me still reads",
-        }
+    noun = "jug" if str(cart_code or "").strip().upper() == "RPS" else "cartridge"
     return {
-        "noun": "cartridge",
-        "where": "Turn the cartridge over. The bottom is stamped `L-` followed by the lot.",
-        "field": "L- — lot stamped on the cartridge bottom",
-        "still_reads": "Cartridge in my hand still reads",
+        "noun": noun,
+        "where": f"Turn the {noun} over. The lot label on the bottom reads `L-` "
+                 "followed by the lot.",
+        "field": f"L- — lot on the {noun} bottom label",
+        "still_reads": f"{noun.capitalize()} in my hand still reads",
     }
 
 
