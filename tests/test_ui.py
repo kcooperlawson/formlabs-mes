@@ -137,17 +137,57 @@ at3.text_input(key="h_lot_entered").set_value(f"  l- {GOOD_LOT.lower()}  ").run(
 check("messy transcription still matches", "Lot matches this run" in texts(at3), True)
 print(f"  match path OK (lot {GOOD_LOT}, incl. messy transcription)")
 
-# --- F. RPS bypasses the gate entirely -----------------------------------
+# --- F. RPS is gated too, and the wording follows the container ----------
+# The jugs were excluded on the understanding that they carried no label. They
+# always have, and the plant now requires the tag to be on before pouring, so
+# the check applies. Asserted on the rendered form rather than on a constant,
+# because the thing that changed is what an operator is shown.
 at4 = run_as(OP, h_pump=STATION)
 at4.selectbox(key="h_cart").set_value("RPS (5L Bulk Jug)").run()
 b3 = texts(at4)
-check("RPS says no label to check", "carry no lot label" in b3, True)
-check("RPS restores the free-entry lot field",
-      any(i.label == "Batch Lot Number" for i in at4.text_input), True)
-check("RPS has no L- field", any(i.label.startswith("L-") for i in at4.text_input), False)
-check("RPS submit is enabled",
-      getattr([b for b in at4.button if "SUBMIT POURING LOG" in b.label][0], "disabled", None), False)
-print("  RPS bypass OK")
+check("RPS no longer claims there is nothing to check", "carry no lot label" in b3, False)
+check("RPS gets the free-entry field taken away",
+      any(i.label == "Batch Lot Number" for i in at4.text_input), False)
+check("RPS gets a lot field to read into",
+      any(i.label.startswith("L-") for i in at4.text_input), True)
+# A jug is not turned over to read a stamp on its base. Telling somebody
+# holding a 5-litre jug to do that is how an instruction stops being read.
+check("the instruction names the jug's tag, not a cartridge bottom",
+      "tag on the jug" in b3, True)
+check("and does not tell them to turn a cartridge over",
+      "Turn the cartridge over" in b3, False)
+check("the section heading names the jug too", "Jug Lot Verification" in b3, True)
+check("RPS submit is blocked until the tag is read",
+      getattr([b for b in at4.button if "SUBMIT POURING LOG" in b.label][0], "disabled", None), True)
+
+# The same gate, both directions, on a jug.
+_rps_runs = crud.get_assigned_runs_df()
+_rps_row = _rps_runs[_rps_runs["cartridge_type"].astype(str).str.upper().str.startswith("RPS")]
+if not _rps_row.empty:
+    RPS_STATION = str(_rps_row["pump_station"].iloc[0])
+    RPS_RESIN = str(_rps_row["resin_type"].iloc[0])
+    RPS_LOT = str(_rps_row["lot_number"].iloc[0])
+    submit_daily_checklist(OP, "Shift 1", RPS_STATION)
+
+    at5 = run_as(OP, h_pump=RPS_STATION)
+    at5.selectbox(key="h_cart").set_value("RPS (5L Bulk Jug)").run()
+    at5.selectbox(key="h_resin").set_value(RPS_RESIN).run()
+    at5.text_input(key="h_lot_entered").set_value("L-0000WRONG").run()
+    b4 = texts(at5)
+    check("a wrong tag on a jug stops the pour", "DO NOT POUR" in b4, True)
+    check("and the stop screen says jug, not cartridge", "This jug is not from the lot" in b4, True)
+    check("the expected lot is masked on a jug too", RPS_LOT not in b4, True)
+    check("and the masking hint names the jug", "read the jug, not the screen" in b4, True)
+
+    at6 = run_as(OP, h_pump=RPS_STATION)
+    at6.selectbox(key="h_cart").set_value("RPS (5L Bulk Jug)").run()
+    at6.selectbox(key="h_resin").set_value(RPS_RESIN).run()
+    at6.text_input(key="h_lot_entered").set_value(f"L-{RPS_LOT}").run()
+    check("the right tag clears the gate on a jug",
+          "Lot matches this run" in texts(at6), True)
+    print(f"  RPS gate OK ({RPS_STATION} / {RPS_RESIN}, lot {RPS_LOT})")
+else:
+    check(False, "no RPS run on file to exercise the jug gate against")
 
 # --- G. the pump form link, on the real page -----------------------------
 # Asserted against the rendered page rather than against normalise() alone,

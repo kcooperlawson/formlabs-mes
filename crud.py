@@ -878,8 +878,10 @@ def reconcile_reactor_level(reactor_name: str, visual_fill_pct: float, operator_
 # normalized form so an operator can type the stamp verbatim (prefix and
 # all) and still match a run whose lot was entered bare.
 #
-# RPS is poured without lot labels, so nothing here applies to it - the
-# caller is responsible for skipping the gate on that container format.
+# This applies to every container format. RPS jugs used to be excluded, on the
+# understanding that they carried no label - they always have carried one, and
+# the plant now requires the tag to be on the jug before pouring starts, which
+# is what let the check be turned on for that format too.
 # ============================================================================
 
 # Lots the app invented for itself because no active run matched the
@@ -913,9 +915,40 @@ def is_placeholder_lot(value) -> bool:
 
 
 def lots_match(expected, entered) -> bool:
-    """Compare a run's lot to what the operator read off the cartridge."""
+    """Compare a run's lot to what the operator read off the container."""
     e, t = normalize_lot(expected), normalize_lot(entered)
     return bool(e) and bool(t) and e == t
+
+
+# Every container format the plant pours now carries a lot the operator can
+# read, so the gate applies to all of them. RPS jugs were previously excluded
+# because the jug itself was not being labelled at the station; the plant now
+# requires the tag to be on before pouring, which is what made the check
+# possible on that format.
+GATED_FORMATS = ("V1", "V2", "Pigment", "RPS")
+
+
+def container_words(cart_code) -> dict:
+    """What to call the thing in the operator's hands, and where the lot is.
+
+    A 5-litre jug is not turned over to read a stamp on its base, and telling
+    somebody holding one to do that is how an instruction stops being read at
+    all. The check is identical on every format; only these words differ, so
+    they live in one place rather than as branches through the form.
+    """
+    if str(cart_code or "").strip().upper() == "RPS":
+        return {
+            "noun": "jug",
+            "where": "Find the lot tag on the jug and read the lot from it.",
+            "field": "L- — lot on the jug's tag",
+            "still_reads": "Jug in front of me still reads",
+        }
+    return {
+        "noun": "cartridge",
+        "where": "Turn the cartridge over. The bottom is stamped `L-` followed by the lot.",
+        "field": "L- — lot stamped on the cartridge bottom",
+        "still_reads": "Cartridge in my hand still reads",
+    }
 
 
 def parse_expiry(value):

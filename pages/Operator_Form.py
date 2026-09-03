@@ -23,6 +23,8 @@ from database import (
     save_lot_photo,
     is_placeholder_lot,
     lots_match,
+    GATED_FORMATS,
+    container_words,
     add_downtime_log,
     add_cleanliness_audit,
     get_assigned_runs_df,
@@ -325,11 +327,19 @@ else:
 # Managers and admins still see the real value - they're the ones who have
 # to compare it against what an operator typed.
 def _display_lot(lot_value, cartridge_type=None):
+    """Blind the run's lot for the people who have to read it off the container.
+
+    `cartridge_type` used to buy an exemption for RPS, on the understanding
+    that bulk jugs carried no label. They always have, and the plant now
+    requires the tag to be on the jug before pouring, so the jug is read the
+    same way a cartridge is - which means showing its lot on screen would
+    defeat the check on that format exactly as it would on any other. The
+    parameter is kept because callers pass it and a future format really might
+    have nothing to read.
+    """
     lot = str(lot_value or "N/A")
     if str(st.session_state.get("user_role", "operator")) in ("manager", "admin"):
         return lot
-    if str(cartridge_type or "").strip().upper() == "RPS":
-        return lot          # RPS carries no label, so there is nothing to blind
     return "•" * 9 if lot not in ("", "N/A", "None") else lot
 
 
@@ -1059,16 +1069,22 @@ if tab1 is not None:
         # gate can be satisfied from what is on screen.
         #
         # A mismatch never dead-ends anyone - it demands a reason, flags the
-        # log, and alerts the manager. RPS is poured without lot labels, so
-        # the gate never applies to it.
+        # log, and alerts the manager.
+        #
+        # The gate now covers RPS as well. It used to skip that format on the
+        # understanding that bulk jugs carried no lot label; they always have,
+        # and the plant now requires the tag to be on the jug before pouring
+        # starts, which is what made the check possible there. A 5-litre jug
+        # is not turned over to read a stamp on its base, so the wording
+        # follows the container - see crud.container_words.
         # ==================================================================
-        GATED_FORMATS = ("V1", "V2", "Pigment")
         gate_applies = cart_code in GATED_FORMATS
+        words = container_words(cart_code)
         expected_lot = auto_lot
         expected_is_real = not is_placeholder_lot(expected_lot)
 
         st.markdown("---")
-        st.markdown("#### 🔒 2. Cartridge Lot Verification")
+        st.markdown(f"#### 🔒 2. {words['noun'].capitalize()} Lot Verification")
 
         lot_num = expected_lot
         verification = None
@@ -1078,7 +1094,10 @@ if tab1 is not None:
         extra_note = ""
 
         if not gate_applies:
-            st.info("**RPS bulk jugs carry no lot label** — nothing to verify on this format.")
+            # No format reaches this now. Kept rather than deleted because a
+            # format added later with nothing to read on it should degrade to
+            # a plain field, not to a gate that can never be satisfied.
+            st.info(f"**No lot label on this format** — nothing to verify.")
             lot_num = st.text_input("Batch Lot Number", value=auto_lot,
                                     help="Auto-fills from the active run.", key="h_lot")
             gate_ok = True
@@ -1113,7 +1132,7 @@ if tab1 is not None:
                     f"✅ Verified at **{mem['ts'].strftime('%I:%M %p').lstrip('0')}** "
                     f"by {mem.get('by', 'this station')} — same run, same lot, same station.")
                 still_reads = st.checkbox(
-                    f"Cartridge in my hand still reads **L-{mem['entered']}**",
+                    f"{words['still_reads']} **L-{mem['entered']}**",
                     key="h_lot_fast_confirm")
                 st.caption("A full check comes back on any change of run, lot, resin or station, "
                            "after 4 hours, and on every 10th log.")
@@ -1129,18 +1148,18 @@ if tab1 is not None:
                 if expected_is_real:
                     st.markdown(
                         "Expected lot for this run: &nbsp; `• • • • • • • • •` &nbsp; "
-                        "<span style='color:#94A3B8; font-size:0.85rem;'>"
-                        "hidden on purpose — read the cartridge, not the screen</span>",
+                        "<span style='color:inherit; opacity:0.72; font-size:0.85rem;'>"
+                        f"hidden on purpose — read the {words['noun']}, not the screen</span>",
                         unsafe_allow_html=True)
                 else:
                     st.warning(
                         "No active run matched this station / resin / format, so there is no lot "
-                        "to check against. Read the stamp anyway — it gets recorded against this log "
-                        "instead of the placeholder the app would otherwise invent.")
-                st.caption("Turn the cartridge over. The bottom is stamped `L-` followed by the lot. "
+                        f"to check against. Read the {words['noun']} anyway — it gets recorded against "
+                        "this log instead of the placeholder the app would otherwise invent.")
+                st.caption(f"{words['where']} "
                            "Type it exactly as printed — spacing, case and the prefix don't matter.")
 
-                entered_lot = st.text_input("L- — lot stamped on the cartridge bottom",
+                entered_lot = st.text_input(words["field"],
                                             key="h_lot_entered", placeholder="2411A0742")
 
                 typed = entered_lot.strip()
@@ -1166,16 +1185,18 @@ if tab1 is not None:
                 elif result == "recorded":
                     st.info(f"📝 Stamp recorded: **L-{typed}**. Nothing to compare it against.")
                 elif result == "mismatch":
-                    st.error("⛔ **STOP — DO NOT POUR.** This cartridge is not from the lot assigned "
-                             "to your run. Set it aside and get your lead.")
+                    st.error(f"⛔ **STOP — DO NOT POUR.** This {words['noun']} is not from the lot "
+                             "assigned to your run. Set it aside and get your lead.")
 
                 if result == "mismatch":
-                    st.markdown("**Pulled the cartridge instead? Log the catch — it belongs in the record.**")
-                    if st.button("❌ Wrong cartridge — pulled it, nothing poured",
+                    st.markdown(f"**Pulled the {words['noun']} instead? Log the catch — "
+                                "it belongs in the record.**")
+                    if st.button(f"❌ Wrong {words['noun']} — pulled it, nothing poured",
                                  use_container_width=True, key="h_lot_reject"):
                         add_lot_verification(dict(
                             base_v, entered_lot=typed, result="rejected", check_level="full",
-                            reason="Cartridge pulled at the station before pouring",
+                            reason=f"{words['noun'].capitalize()} pulled at the station "
+                                   "before pouring",
                             photo_filename=save_lot_photo(pending_photo)))
                         gate_mem.pop(station, None)
                         st.toast("Catch recorded. Nothing was logged as poured.", icon="🛑")

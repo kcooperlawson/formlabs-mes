@@ -161,7 +161,9 @@ async def desktop_pass(browser):
     for _, r in runs.iterrows():
         lot = str(r.get("lot_number") or "").strip()
         fmt = str(r.get("cartridge_type") or "").strip()
-        if lot and fmt.upper() != "RPS":          # RPS jugs carry no lot label
+        # No format is exempt any more - the jugs carry a lot tag and the
+        # plant requires it on before pouring - so any run with a lot will do.
+        if lot:
             target = (str(r["pump_station"]), fmt, str(r["resin_type"]), lot)
             break
 

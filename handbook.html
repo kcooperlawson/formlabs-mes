@@ -182,14 +182,15 @@ td.k{font-weight:600; color:var(--ink);}
 
 <section class="page">
   <div class="sec-head"><span class="eyebrow">01 &nbsp;/&nbsp; Overview</span><h2>What the system is</h2></div>
-  <p class="lead">The resin pouring station previously ran on a multi-sheet Excel tracker. It held
-  OEE metrics, shift handover summaries and a live pace tracker, and it worked &mdash; but it had
-  hardcoded row ranges, operator names spelled differently between sheets, downtime that was counted
-  twice, and it could only be read by whoever had the file open.</p>
-  <p style="margin-top:9pt;">What replaced it is a web application, opened in a browser at each
-  station, in the office and on the floor display, backed by a PostgreSQL database. Managers dispatch
-  work orders; operators log against them from the pump. The figures on the wall display, in the
-  analytics charts and in the emailed shift handover come from the same rows.</p>
+  <p class="lead">Resin pouring has never had a production tracking system. Counts, downtime,
+  changeovers and cartridge lots lived on paper and in people's heads, which means the plant has been
+  running without a record it could query, an hourly pace it could see, or any way to answer a
+  quality question after the fact.</p>
+  <p style="margin-top:9pt;">This is that record. A web application opened in a browser &mdash; on an
+  operator's phone at the pump, on a desk in the office, and on the floor display &mdash; backed by a
+  PostgreSQL database. Managers dispatch work orders; operators log against them as the hour
+  happens. The figures on the wall display, in the analytics charts and in the emailed shift handover
+  are not separate reports: they are the same rows, read different ways.</p>
 
   <div class="grid3" style="margin:16pt 0 14pt;">
     <div class="stat"><span class="n">18</span><span class="l">screens, from the operator terminal to the IT console</span></div>
@@ -197,15 +198,15 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
   </div>
   <div class="grid3" style="margin-bottom:16pt;">
-    <div class="stat"><span class="n">3</span><span class="l">shifts modelled, each with its own targets and pace</span></div>
-    <div class="stat"><span class="n">24</span><span class="l">interface themes, for readability in different light</span></div>
-    <div class="stat"><span class="n">75</span><span class="l">automated checks run before a release</span></div>
+    <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
+    <div class="stat"><span class="n">34</span><span class="l">interface themes, six of them light, for readability in different conditions</span></div>
+    <div class="stat"><span class="n">880</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
   <ul class="tight">
     <li>Every unit poured, attached to an operator, a station, a resin, a lot number and a timestamp.</li>
-    <li>A cartridge lot check against each pouring log, including the ones that failed.</li>
+    <li>A lot check against each pouring log &mdash; every container format &mdash; including the ones that failed.</li>
     <li>Downtime by reason and duration, and scrap split between empty and filled containers.</li>
     <li>Start-of-shift, changeover and spill photo audits, filed against the station.</li>
     <li>Pre-shift validation per operator, per shift, per pump station.</li>
@@ -280,8 +281,8 @@ td.k{font-weight:600; color:var(--ink);}
   </div>
   <h3 style="margin-top:16pt;">What happens when an operator submits a log</h3>
   <div class="grid2" style="margin-top:8pt;">
-    <div class="step"><span class="n">1</span><div><h4>Checked at the station</h4><p>The cartridge lot is
-      compared against the run before the form accepts the entry.</p></div></div>
+    <div class="step"><span class="n">1</span><div><h4>Checked at the station</h4><p>The lot on the
+      container is compared against the run before the form accepts the entry.</p></div></div>
     <div class="step"><span class="n">2</span><div><h4>One transaction</h4><p>The log and its verification
       record are written together; neither can exist without the other.</p></div></div>
     <div class="step"><span class="n">3</span><div><h4>The run re-counts</h4><p>Progress is recomputed from
@@ -344,16 +345,17 @@ td.k{font-weight:600; color:var(--ink);}
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">04 &nbsp;/&nbsp; Quality &amp; traceability</span><h2>Cartridge lot verification</h2></div>
+  <div class="sec-head"><span class="eyebrow">04 &nbsp;/&nbsp; Quality &amp; traceability</span><h2>Lot verification</h2></div>
   <p class="lead" style="margin-bottom:11pt;">Lot labels get mixed up at the pumps: a pallet of
-  pre-labelled empties is staged that belongs to a different lot, and resin goes into it. Previously the
-  logging form auto-filled the run's lot and displayed it, so an hour could be logged without a cartridge
-  ever being turned over.</p>
-  <figure><img src="figs_print/13_gate.png" alt="Lot verification section">
+  pre-labelled empties is staged that belongs to a different lot, and resin goes into it. An earlier build
+  of this form auto-filled the run's lot and printed it on screen, which meant an hour could be logged
+  without a cartridge ever being turned over &mdash; the check was answering its own question.</p>
+  <figure><img src="figs_print/13_gate.png" alt="Lot verification section" style="max-height:1.5in;">
     <figcaption><b>The check.</b> The lot the run expects is masked. The operator reads the
-    <span class="mono">L-</span> code stamped on the cartridge base and types it. Spacing, case and the
-    prefix are normalised, so the stamp typed verbatim matches a run lot entered bare.</figcaption></figure>
-  <figure style="margin-top:10pt;"><img class="sml" src="figs_print/14_gate_stop.png" alt="Mismatch screen">
+    <span class="mono">L-</span> code off the container &mdash; stamped on a cartridge base, printed on an
+    RPS jug's tag &mdash; and types it. Spacing, case and the prefix are normalised, so a code typed
+    verbatim matches a run lot entered bare.</figcaption></figure>
+  <figure style="margin-top:9pt;"><img class="sml" src="figs_print/14_gate_stop.png" alt="Mismatch screen" style="max-height:1.35in;">
     <figcaption><b>When it doesn't match.</b> Submission is refused until the cartridge is pulled &mdash;
     recorded as a catch, with no production logged &mdash; or a cause, details and a photograph of the
     stamp are supplied. The log then saves flagged, carrying the lot physically in the cartridge.</figcaption></figure>
@@ -366,10 +368,15 @@ td.k{font-weight:600; color:var(--ink);}
       flag &mdash; and deliberately not required to pull a cartridge, so the safe action is never the
       slower one.</p></div>
   </div>
-  <div class="note" style="margin-top:11pt;"><span class="eyebrow">Design note</span>
-    <p>A mismatch does not stop the line. It requires an explanation, because a control that halts
-    production is one people learn to work around. Every flagged pour and every pulled cartridge reaches
-    the manager's review page.</p></div>
+  <figure style="margin-top:11pt;"><img src="figs_print/13b_gate_rps.png" alt="The same check on an RPS jug"
+       style="max-height:1.15in;">
+    <figcaption><b>The same check on a bulk jug.</b> RPS was the one exempt format, on the understanding
+    that jugs carried nothing to read. They do, and the tag goes on before pouring &mdash; so the check
+    applies there, with the wording following the container.</figcaption></figure>
+  <div class="note" style="margin-top:10pt;"><span class="eyebrow">Design note</span>
+    <p>A mismatch does not stop the line; it requires an explanation, because a control that halts
+    production is one people learn to work around. Every flag and every pulled container reaches the
+    manager's review page.</p></div>
   <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>7</span></div>
 </section>
 
@@ -566,7 +573,7 @@ td.k{font-weight:600; color:var(--ink);}
       <li><strong>Deletions re-sync.</strong> Removing a log recalculates whatever work order it counted toward.</li>
       <li><strong>Bulk deletion is deliberately hard.</strong> Disabled until the word DELETE is typed into a confirmation box.</li>
       <li><strong>Corrections are visible.</strong> A plant-level correction is written as a labelled system adjustment, not by editing an operator's entries.</li>
-      <li><strong>Secrets are out of the repository.</strong> Connection strings and credentials live in environment config, not in source.</li>
+      <li><strong>Credentials are kept out of the application itself.</strong> Connection strings and passwords live in a configuration file on the machine, not written into the program.</li>
     </ul></div>
   </div>
   <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management">
@@ -648,10 +655,11 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step"><span class="n">4</span><div><h4>Set your station and material</h4>
     <p>Pump station, container format (V2, V1, RPS bulk jug or Pigment) and resin formulation. The target
     fill weight and tolerance for that resin appear underneath &mdash; check it against your scale.</p></div></div>
-  <div class="step"><span class="n">5</span><div><h4>Verify the cartridge lot</h4>
-    <p>Turn a cartridge over and type the <span class="mono">L-</span> code stamped on its base. The lot the
-    run expects is hidden on purpose &mdash; <strong>read the cartridge, not the screen.</strong> Type it as
-    you see it; spacing, case and the prefix do not matter.</p></div></div>
+  <div class="step"><span class="n">5</span><div><h4>Verify the lot</h4>
+    <p>On a cartridge, turn it over and read the <span class="mono">L-</span> code stamped on its base;
+    on an RPS jug, read it off the lot tag, which goes on before pouring starts. The lot the run expects
+    is hidden on purpose &mdash; <strong>read the container, not the screen.</strong> Spacing, case and
+    the prefix do not matter.</p></div></div>
   <figure style="margin:10pt 0;"><img class="med" src="figs_print/21_gate_pass.png" alt="Lot verification passing">
     <figcaption><b>A clean check.</b> Green means the cartridge belongs to this run. On the next log at the
     same station with nothing changed, this becomes a single confirmation tap &mdash; returning to the full
@@ -698,9 +706,10 @@ td.k{font-weight:600; color:var(--ink);}
       MES.</p></div>
   </div>
   <div class="note" style="margin-top:13pt;"><span class="eyebrow">Worth knowing</span>
-    <p><strong>Your logs are attached to you</strong>, not to a spreadsheet cell someone can overwrite.<br>
-    <strong>RPS bulk jugs skip the lot check</strong> &mdash; they carry no lot label, so the section does not
-    appear.<br>
+    <p><strong>Your logs are attached to you</strong>, and nobody can quietly overwrite one.<br>
+    <strong>Every container format is checked, RPS jugs included.</strong> The lot tag goes on the jug
+    before pouring, so the check applies there exactly as it does to a cartridge &mdash; only the wording
+    changes, because you read a tag rather than turning a jug over.<br>
     <strong>Nothing you submit is silently discarded.</strong> If a log cannot be matched to an active run you
     are told on screen, rather than finding out later that a progress bar never moved.</p></div>
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">The one rule</span>
@@ -887,15 +896,15 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">600+</span><span class="l">assertions across six suites &mdash; workflow, interface, colour, fill weight, shifts and display, external links</span></div>
-    <div class="stat"><span class="n">37</span><span class="l">interface assertions driving the real operator screen headlessly, forms included</span></div>
+    <div class="stat"><span class="n">839</span><span class="l">assertions across eight suites &mdash; workflow, interface, colour, fill weight, shifts and display, links, boot paths</span></div>
+    <div class="stat"><span class="n">23</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
   <h3>What the simulation covers</h3>
   <p>All eight migrations are applied to an empty database and the result compared table by table against
   the application's own model definitions. A manager then creates three work orders; operators clear per-station
   checklists and pour &mdash; clean logs, a fast-path log, a mismatched cartridge, a cartridge pulled before
-  pouring, a log with no run behind it, and an RPS pour that skips the check &mdash; alongside downtime. Every
+  pouring, a log with no run behind it, and a gated RPS jug &mdash; alongside downtime. Every
   figure the interface displays is then recomputed from the raw rows and compared against hand-figured
   expectations: poured, scrap, yield, per-operator totals, run progress, flag rate and variance.</p>
   <h3 style="margin-top:12pt;">What that has caught</h3>

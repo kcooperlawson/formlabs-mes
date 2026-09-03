@@ -47,9 +47,12 @@ print(f"  {len(_pumps)} stations, {len(_resins)} resins")
 # ============================================================ MANAGER: RUNS
 section("2. MANAGER CREATES WORK ORDERS")
 GREY_LOT, CLEAR_LOT = "2411A0742", "2503C0088"
+# The bulk jugs carry a lot tag too, now that the plant requires it on before
+# pouring - so the RPS run gets a real lot like the others.
+BLACK_LOT = "2505B0193"
 create_assigned_run("Reactor 1", 5000, "Draft Grey V5",     "V1",  1000, "Ana Ruiz", "Pump 1", GREY_LOT,  "")
 create_assigned_run("Reactor 1", 5000, "Standard Clear V5", "V2",   800, "Bo Chen",  "Pump 2", CLEAR_LOT, "")
-create_assigned_run("Reactor 1", 5000, "Standard Black V5", "RPS",  400, "Bo Chen",  "Pump 3", "",        "")
+create_assigned_run("Reactor 1", 5000, "Standard Black V5", "RPS",  400, "Bo Chen",  "Pump 3", BLACK_LOT, "")
 runs = get_assigned_runs_df()
 # create_assigned_run returns the auto-detected unit count, not the row id
 r1 = int(runs[runs["pump_station"] == "Pump 1"]["id"].iloc[0])
@@ -59,7 +62,7 @@ check("three runs created", len(runs), 3)
 check("all start at zero units", list(runs["current_units"].unique()), [0])
 print(f"  Pump 1 / V1 Grey  lot {GREY_LOT}  target 1000")
 print(f"  Pump 2 / V2 Clear lot {CLEAR_LOT}  target 800")
-print(f"  Pump 3 / RPS Black  no lot         target 400")
+print(f"  Pump 3 / RPS Black lot {BLACK_LOT}  target 400")
 
 # ====================================================== STARTUP CHECKLISTS
 section("3. STARTUP CHECKLIST  (per operator, per shift, per station)")
@@ -90,12 +93,13 @@ def decide(expected_lot, typed):
 
 def pour(op, station, cart, resin, expected_lot, typed, units,
          scrap_e=0, scrap_f=0, level="full", note=""):
-    """One operator log, gated exactly the way the form gates it."""
-    if cart == "RPS":                       # gate never renders for RPS
-        return add_hourly_log(operator_name=op, pump_station=station, shift="Shift 1",
-                              cartridge_type=cart, resin_type=resin, lot_number=expected_lot,
-                              bottles=units, scrap_empty=scrap_e, scrap_filled=scrap_f,
-                              notes=note, verification=None), None
+    """One operator log, gated exactly the way the form gates it.
+
+    Every container format goes through the gate now. RPS used to be handed a
+    bypass here because the form skipped it; the jugs have always carried a
+    lot tag and the plant now requires it to be on before pouring, so the
+    check applies to them like anything else.
+    """
     result = decide(expected_lot, typed)
     lot_on_log = typed if (result == "mismatch" or is_placeholder_lot(expected_lot)) else expected_lot
     reason = "Wrong pallet staged at the station — lead approved finishing the tote" if result == "mismatch" else None
@@ -151,10 +155,19 @@ placeholder = f"LOT-{date.today().strftime('%Y%m%d')}-01"
 m, r = pour("Ana Ruiz", "Pump 2", "V2", "Standard Clear V5", placeholder, "L-2503C0088", 120)
 check("no run lot -> recorded, not mismatch", r, "recorded")
 
-# --- Bo, Pump 3, RPS: gate never applies ---------------------------------
-m, r = pour("Bo Chen", "Pump 3", "RPS", "Standard Black V5", "", "", 150)
-check("RPS pours with no gate", r, None)
+# --- Bo, Pump 3, RPS: gated like every other format ----------------------
+# The jug carries a lot tag, so it is read and checked. Nothing about the gate
+# is special-cased for it any more; only the wording on screen differs.
+m, r = pour("Bo Chen", "Pump 3", "RPS", "Standard Black V5", BLACK_LOT, f"L-{BLACK_LOT}", 150)
+check("RPS goes through the gate and verifies", r, "verified")
 check("RPS log still credits its run", m, True)
+
+# A wrong tag on a jug is deliberately NOT re-tested here. This file's `decide`
+# is the harness's own copy of the rule, so a mismatch it produces proves
+# nothing about which formats the form gates - and adding one here would
+# displace the mismatch the assertions below are inspecting. The claim that
+# matters, that the real form now renders the gate for RPS, is asserted
+# against the rendered page in test_ui.
 
 # --- downtime + packing ---------------------------------------------------
 add_downtime_reason("Nozzle Clog")
@@ -219,20 +232,20 @@ check("downtime minutes", int(dt["duration_min"].sum()), 25)
 section("6. LOT VERIFICATION REPORTING  (what the manager page renders)")
 lv = get_lot_verifications_df(days=30)
 counts = lv["result"].value_counts().to_dict()
-check("verified checks", counts.get("verified"), 4)
+check("verified checks", counts.get("verified"), 5)   # +1: the RPS jug verifies now
 check("mismatch checks", counts.get("mismatch"), 1)
 check("recorded checks", counts.get("recorded"), 1)
 check("rejected checks", counts.get("rejected"), 1)
-check("total checks", len(lv), 7)
+check("total checks", len(lv), 8)
 lvl = lv["check_level"].value_counts().to_dict()
-check("full checks", lvl.get("full"), 4)
+check("full checks", lvl.get("full"), 5)   # +1: the RPS jug is a full check now
 check("fast checks", lvl.get("fast"), 2)
 check("record-only checks", lvl.get("record"), 1)
 flagged = lv[lv["result"].isin(["mismatch", "expired", "rejected"])]
-check("flag rate", round(len(flagged) / len(lv) * 100, 1), round(2 / 7 * 100, 1))
+check("flag rate", round(len(flagged) / len(lv) * 100, 1), round(2 / 8 * 100, 1))
 check("rejection has no production log", bool(lv[lv["result"] == "rejected"]["production_log_id"].isna().all()), True)
 check("every pour check links to its log",
-      int(lv[lv["result"] != "rejected"]["production_log_id"].notna().sum()), 6)
+      int(lv[lv["result"] != "rejected"]["production_log_id"].notna().sum()), 7)
 
 mm = lv[lv["result"] == "mismatch"].iloc[0]
 check("mismatch stores what was expected", mm["expected_lot"], GREY_LOT)
@@ -242,8 +255,12 @@ mlog = df[df["id"] == int(mm["production_log_id"])].iloc[0]
 check("mismatched log carries verify_status", mlog["verify_status"], "mismatch")
 check("mismatched log carries the CARTRIDGE lot", mlog["lot_number"], "L-2408B0119")
 check("mismatched log explains itself in notes", "LOT MISMATCH" in str(mlog["notes"]), True)
-check("clean logs are marked verified", int((df["verify_status"] == "verified").sum()), 4)
-check("RPS log has no verify_status", bool(df[df["cartridge_type"] == "RPS"]["verify_status"].isna().all()), True)
+check("clean logs are marked verified", int((df["verify_status"] == "verified").sum()), 5)
+# RPS logs now carry a verification like every other format - the opposite of
+# what this asserted before the jugs were labelled at the station.
+_rps = df[df["cartridge_type"] == "RPS"]
+check("RPS logs now carry a verify_status", bool(_rps["verify_status"].notna().any()), True)
+check("and at least one of them verified", bool((_rps["verify_status"] == "verified").any()), True)
 print("  " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
 section("7. RECONCILIATION")
