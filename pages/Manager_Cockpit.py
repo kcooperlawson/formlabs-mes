@@ -34,7 +34,8 @@ st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 st.logo("assets/formlabs_logo.png")
 
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-from database import do_logout, check_authentication, get_plant_settings
+from database import (do_logout, check_authentication, get_plant_settings,
+                      role_can_administer)
 
 cookie_manager = stx.CookieManager(key="mgr_cookies")
 try:
@@ -84,8 +85,10 @@ with st.sidebar:
     st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
     st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
 
-    # Only show IT Admin to actual admins
-    if st.session_state.get("user_role") == "admin":
+    # In execution mode this is administrators only. In logging mode there is
+    # no separate IT role and a manager reaches it too - see
+    # crud.can_administer.
+    if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
 
     st.markdown("---")
@@ -168,7 +171,7 @@ with st.sidebar:
 current_role = st.session_state.get("user_role", "operator")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
+if role_can_administer(current_role):
     nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
     with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
     with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
@@ -237,7 +240,16 @@ with col7:
                  use_container_width=True,
                  disabled=not _orders_on)
     if not _orders_on:
-        st.caption("Off. IT Admin → Work Orders turns it on.")
+        st.caption("Off while this plant runs as a logging system.")
+    # In logging mode the manager is the administrator, and the console is
+    # where the mode itself is set - so it belongs in this group rather than
+    # only in the sidebar, where somebody looking for "where do I add a pump"
+    # would not think to look.
+    if role_can_administer(current_role):
+        st.page_link("pages/Admin_Panel.py", label="🛡️ Accounts, Equipment & Settings",
+                     use_container_width=True)
+        if not _orders_on:
+            st.caption("Yours to run: PINs, pumps, resins, backups, and the mode above.")
 with col8:
     st.page_link("pages/Mgr_Resin_Canvas.py", label="⚖️ Master Resin Specifications", use_container_width=True)
     st.caption("Target fill weights, so an out-of-band pour flags itself.")

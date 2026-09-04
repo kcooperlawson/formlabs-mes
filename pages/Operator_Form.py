@@ -45,6 +45,7 @@ from database import (
     get_chat_history_df,
     send_floor_message,
     get_plant_settings,
+    role_can_administer,
     add_suggestion,
     do_logout,
     check_authentication,
@@ -143,7 +144,7 @@ current_shift = st.session_state.get("user_shift") or "Shift 1"
 current_role = st.session_state.get("user_role", "operator")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
+if role_can_administer(current_role):
     # God Mode (Now 6 Columns)
     nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
     with nav_1:
@@ -211,8 +212,10 @@ with st.sidebar:
         st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
         st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
 
-    # Only show IT Admin to Admins
-    if st.session_state.get("user_role") == "admin":
+    # In execution mode this is administrators only. In logging mode there is
+    # no separate IT role and a manager reaches it too - see
+    # crud.can_administer.
+    if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
 
     st.markdown("---")

@@ -17,7 +17,7 @@ from database import (
     unlock_user_account,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
     get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
-    check_authentication, get_assigned_runs_df
+    check_authentication, get_assigned_runs_df, role_can_administer
 )
 from database import esc
 from shifts import picker_options as shift_picker_options
@@ -48,9 +48,17 @@ check_authentication(cookie_manager)
 if not st.session_state.get("authenticated", False):
     st.switch_page("Home.py")
 
-if st.session_state.get("user_role") != "admin":
+_role = st.session_state.get("user_role")
+if not role_can_administer(_role):
     st.error("🔒 Access Denied: Restricted to IT Administrators.")
     st.stop()
+
+# A manager standing here is here because the plant runs as a log, and that is
+# a decision made in this very panel. Worth saying out loud: the alternative
+# is a manager who finds the restore-a-backup button without ever being told
+# they had it, and the sentence also explains the one thing that takes the
+# access away again.
+_here_by_mode = str(_role or "").strip().lower() != "admin"
 
 
 def get_base64_image(image_path):
@@ -86,8 +94,10 @@ with st.sidebar:
     st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
     st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
 
-    # Only show IT Admin to actual admins
-    if st.session_state.get("user_role") == "admin":
+    # In execution mode this is administrators only. In logging mode there is
+    # no separate IT role and a manager reaches it too - see
+    # crud.can_administer.
+    if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
     # There was a link to pages/Device_Registry.py here, and it is gone on
     # purpose rather than because that page is missing - it exists, it works,
@@ -210,6 +220,14 @@ st.markdown(f'''
     <h1 style="margin:0; padding:0; font-size: 2.2rem;">🛡️ IT Administrator Console</h1>
 </div>
 ''', unsafe_allow_html=True)
+
+if _here_by_mode:
+    st.info(
+        "This plant runs as a **logging system**, so there is no separate IT role and "
+        "you have the whole console: accounts and PIN resets, pumps and resins, plant "
+        "settings, backups and cleanup. Switching to an execution system, under "
+        "**How this plant runs this system** below, hands administration back to "
+        "administrator accounts only.")
 
 # TAB PILL STYLING
 st.markdown(
@@ -408,23 +426,33 @@ with tab_settings:
                                   value=current_settings.get("enable_packing", True), key="en_pack_input")
 
         # ------------------ HOW MUCH OF THE APP THIS PLANT USES ------------------
-        # The application grew work orders first, so every screen assumed a
-        # manager had dispatched a run and the operator was logging against it.
-        # A plant that just wants the log had no way to say so, and got told it
-        # was misconfigured on every screen instead.
-        st.markdown("##### 🗂️ Work Orders")
-        st.caption(
-            "Off by default. Leave it off and the operator terminal is a log: station, "
-            "material, lot, counts — nothing for a manager to enter first. Turn it on "
-            "when somebody wants to dispatch runs to stations and track them against a "
-            "target, and the work-order screens come back."
-        )
+        # The application grew work orders and a separate IT role first, so
+        # every screen assumed a manager had dispatched a run and somebody else
+        # administered the thing. A plant that wants the log and one person in
+        # charge of it had no way to say so, and got told it was misconfigured
+        # on every screen instead.
+        #
+        # One picker rather than two switches, because the two go together in
+        # practice: a plant small enough not to dispatch work is a plant small
+        # enough not to have an IT person, and one sentence is easier to
+        # explain to the person deciding than two.
+        st.markdown("##### 🏭 How this plant runs this system")
         simple_now = bool(current_settings.get("simple_mode", True))
-        use_orders = st.checkbox(
-            "📋 This plant dispatches work orders",
-            value=not simple_now, key="use_work_orders_input",
+        MODE_LOG = "Logging system"
+        MODE_MES = "Execution system"
+        mode = st.radio(
+            "Mode", (MODE_LOG, MODE_MES),
+            index=0 if simple_now else 1,
+            key="plant_mode_input", label_visibility="collapsed",
+            captions=(
+                "Operators log; managers read the record and run the system. No work "
+                "orders, and no separate IT role — a manager reaches this console.",
+                "Work orders dispatched to stations and tracked against a target, and "
+                "administration separated from the manager role again.",
+            ),
             help="Nothing is deleted either way. Runs already entered stay in the "
-                 "database and reappear the moment this is ticked again.")
+                 "database and reappear the moment this is set back.")
+        use_orders = (mode == MODE_MES)
 
         st.markdown("##### 📧 Automated Reporting")
         emails = st.text_input("Shift Handover Email Recipients (comma separated)",
@@ -456,16 +484,41 @@ with tab_settings:
             # button that goes nowhere. Stored normalised, so the operator page
             # never has to cope with a missing scheme or a trailing full stop.
             pump_clean, pump_problem = external_links.normalise(pump_url)
+
+            # Switching to an execution system takes administration away from
+            # managers. In a plant that has been running as a log there may be
+            # no administrator account at all - the mode was what granted the
+            # access - and saving that would leave nobody able to reach this
+            # console, including to switch it back. Refuse the mode change,
+            # save everything else, and say what has to exist first.
+            st.session_state.pop("_no_admin_warning", None)
+            mode_blocked = False
+            if simple_now and use_orders:
+                try:
+                    _users = get_all_users_df()
+                    _admins = 0 if _users.empty else int(
+                        (_users["role"].astype(str).str.strip().str.lower() == "admin").sum())
+                except Exception:
+                    _admins = 1          # cannot tell: do not block on a bad read
+                if _admins == 0:
+                    mode_blocked = True
+                    st.session_state["_no_admin_warning"] = (
+                        "This plant has no administrator account, and an execution "
+                        "system restricts this console to administrators — saving that "
+                        "would lock everyone out of it, including you. Give somebody "
+                        "the Administrator role under Personnel below, then set the "
+                        "mode again. Every other setting on this form was saved.")
+
             update_dict = {
                 "shift_1_start": s1_start, "shift_1_hours": s1_hrs, "shift_1_break_mins": s1_brk,
                 "shift_2_start": s2_start, "shift_2_hours": s2_hrs, "shift_2_break_mins": s2_brk,
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
                 "handover_emails": emails,
-                # Stored as the negative of the checkbox: the setting is named
-                # for the smaller configuration, so the default value of a
-                # column nobody has touched is the smaller one.
-                "simple_mode": (not use_orders),
+                # Stored as the negative of the picker: the column is named for
+                # the smaller configuration, so the default value of a row
+                # nobody has touched is the smaller one.
+                "simple_mode": simple_now if mode_blocked else (not use_orders),
                 "pump_form_url": pump_clean,
                 "pump_form_label": (pump_label or "").strip()[:60],
             }
@@ -491,7 +544,7 @@ with tab_settings:
                         f"{_live} run{'s are' if _live != 1 else ' is'} still open. "
                         "They are hidden from the operator terminal now, and the lot "
                         "check records what was poured instead of comparing it against "
-                        "an expected lot. Nothing was deleted — tick the box again to "
+                        "an expected lot. Nothing was deleted — set the mode back to "
                         "bring them back.")
 
             if pump_problem:
@@ -510,6 +563,9 @@ with tab_settings:
 
     if st.session_state.get("_orders_off_warning"):
         st.warning("⚠️ " + st.session_state["_orders_off_warning"])
+
+    if st.session_state.get("_no_admin_warning"):
+        st.error("🔒 " + st.session_state["_no_admin_warning"])
 
     st.markdown("---")
     st.subheader("⚙️ Master Plant Equipment & Configuration")

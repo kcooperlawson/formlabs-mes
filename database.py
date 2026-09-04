@@ -81,6 +81,17 @@ def get_plant_settings():
     return dict(_crud.get_plant_settings())
 
 
+def role_can_administer(role) -> bool:
+    """crud.can_administer for this plant, reading the mode from settings.
+
+    Pages call this rather than testing a role against "admin", so the one
+    place that decides who administers is crud.can_administer and the one
+    place that decides which plant this is, is here. Reads through the cached
+    settings, so a page asking twice in one render costs one query at most.
+    """
+    return _crud.can_administer(role, get_plant_settings().get("simple_mode", True))
+
+
 def _clear_reference_caches():
     """Drop every cached reference read. Called after any config write."""
     for _fn in (get_all_resin_specs_df, get_active_pumps, get_all_pumps_df,

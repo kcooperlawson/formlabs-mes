@@ -16,7 +16,7 @@ import streamlit as st
 import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 
-from database import do_logout, get_avatar_path
+from database import do_logout, get_avatar_path, role_can_administer
 
 try:
     from themes import THEMES
@@ -87,7 +87,7 @@ def render_shell(show_settings: bool = True):
 
     # --- TOP NAVIGATION BAR ---
     st.markdown("<br>", unsafe_allow_html=True)
-    if current_role == "admin":
+    if role_can_administer(current_role):
         nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
         with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
         with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
@@ -133,8 +133,10 @@ def render_shell(show_settings: bool = True):
         st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
         st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
 
-        # Only show IT Admin to actual admins
-        if st.session_state.get("user_role") == "admin":
+        # In execution mode this is administrators only. In logging mode
+        # there is no separate IT role and a manager reaches it too - see
+        # crud.can_administer.
+        if role_can_administer(st.session_state.get("user_role")):
             st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
 
         st.markdown("---")

@@ -93,6 +93,11 @@ table{width:100%; border-collapse:collapse; font-size:8pt;}
 th{text-align:left; font-weight:600; color:var(--ink); border-bottom:1pt solid var(--line);
    padding:5pt 6pt; font-size:7.2pt; letter-spacing:.07em; text-transform:uppercase;}
 td{padding:5pt 6pt; border-bottom:.5pt solid var(--line-soft); vertical-align:top; line-height:1.4; color:var(--muted);}
+/* The capability table grew four rows when the manager column stopped being
+   fixed. Rows give up a point of padding rather than the page giving up a
+   capability, because the whole value of that table is that it is complete. */
+table.tight-rows td{padding:3.6pt 6pt;}
+table.tight-rows th{padding:4pt 6pt;}
 td.k{font-weight:600; color:var(--ink);}
 .yes{color:var(--good); font-weight:600;} .no{color:var(--faint);} .part{color:var(--warn); font-weight:600;}
 
@@ -211,22 +216,23 @@ td.k{font-weight:600; color:var(--ink);}
   PostgreSQL database. Operators log the hour as it happens, at the pump. That log is the whole
   input: the figures on the wall display, in the analytics charts and in the emailed shift handover
   are not separate reports, they are the same rows read different ways.</p>
-  <p style="margin-top:9pt;">Nothing here asks a manager to enter anything. The system installs
-  with work orders switched off &mdash; a plant that wants to dispatch runs to stations and track
+  <p style="margin-top:9pt;">Nothing here asks a manager to enter anything, and nothing asks the plant
+  to find somebody to administer it: as a logging system a manager holds the console too, so a PIN reset
+  or a new pump does not wait on a second person. The system installs with work orders switched off &mdash; a plant that wants to dispatch runs to stations and track
   them against a target turns that on, and the screens for it appear; a plant that does not is a
   log, and the operator terminal never mentions runs at all. Everything in Part Two of this
   handbook works the same way: a setting, answering a question somebody asked
   first, not a step in getting the record.</p>
 
-  <div class="grid3" style="margin:16pt 0 14pt;">
-    <div class="stat"><span class="n">18</span><span class="l">screens, from the operator terminal to the IT console</span></div>
+  <div class="grid3" style="margin:13pt 0 10pt;">
+    <div class="stat"><span class="n">1</span><span class="l">screen an operator uses, on the phone already in their pocket</span></div>
+    <div class="stat"><span class="n">0</span><span class="l">entries required from a manager for the record to be kept</span></div>
     <div class="stat"><span class="n">3</span><span class="l">roles, each seeing only what its job needs</span></div>
-    <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
   </div>
-  <div class="grid3" style="margin-bottom:16pt;">
+  <div class="grid3" style="margin-bottom:12pt;">
     <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
-    <div class="stat"><span class="n">34</span><span class="l">interface themes, six of them light, for readability in different conditions</span></div>
-    <div class="stat"><span class="n">880</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
+    <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
+    <div class="stat"><span class="n">959</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
@@ -450,9 +456,14 @@ td.k{font-weight:600; color:var(--ink);}
 
 <section class="page">
   <div class="sec-head"><div class="hrow"><span class="eyebrow">07 &nbsp;/&nbsp; Who can do what</span><span class="status in">In service</span></div><h2>Roles</h2></div>
-  <p class="lead" style="margin-bottom:12pt;">Everyone signs into the same application and sees a
+  <p class="lead" style="margin-bottom:10pt;">Everyone signs into the same application and sees a
   different one. Access is checked on every page, so the difference is enforced rather than cosmetic.</p>
-  <table>
+  <p style="margin-bottom:11pt;">The column that moves is <b>Manager</b>. A plant running this as a
+  logging system has no separate IT role &mdash; there is nobody to be it &mdash; so a manager is the
+  administrator: accounts and PIN resets, equipment, plant settings, backups and cleanup. Switch to an
+  execution system and those hand back to administrator accounts, which is what the shaded rows below
+  mean.</p>
+  <table class="tight-rows">
     <thead><tr><th style="width:40%">Capability</th><th>Operator</th><th>Manager</th><th>Admin</th></tr></thead>
     <tbody>
       <tr><td class="k">Live SCADA dashboard</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
@@ -469,15 +480,22 @@ td.k{font-weight:600; color:var(--ink);}
       <tr><td class="k">Floor roster &amp; PIN resets</td><td class="no">&mdash;</td><td class="yes">Floor staff</td><td class="yes">All users</td></tr>
       <tr><td class="k">Master resin specifications</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Log management &amp; bulk cleanup</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Plant configuration, shift count &amp; parameters</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Plant configuration, shift count &amp; parameters</td><td class="no">&mdash;</td><td class="part">Logging mode</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Record a check weight against an hourly log</td><td class="yes">Optional</td><td class="yes">Optional</td><td class="yes">Optional</td></tr>
       <tr><td class="k">Undo your own last log, within two minutes</td><td class="yes">Own only</td><td class="yes">Own only</td><td class="yes">Own only</td></tr>
-      <tr><td class="k">Database backup &amp; restore</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Database backup &amp; restore</td><td class="no">&mdash;</td><td class="part">Logging mode</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Provision accounts &amp; reset any PIN</td><td class="no">&mdash;</td><td class="part">Logging mode</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Choose how the plant runs this system</td><td class="no">&mdash;</td><td class="part">Logging mode</td><td class="yes">Yes</td></tr>
     </tbody>
   </table>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:9pt;"><em>Test mode</em> lets a manager or
-  administrator log on behalf of an operator for training and troubleshooting. The entry is attributed to
-  the operator selected and is visible in the log.</p>
+  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;"><em>Logging mode</em> marks the rows a
+  manager holds only while the plant runs as a log. <em>Test mode</em> lets a manager or administrator
+  log on behalf of an operator for training and troubleshooting; the entry is attributed to the operator
+  selected and is visible in the log.</p>
+  <p style="font-size:8.4pt;color:var(--faint);margin-top:6pt;">One thing the mode cannot do is strand a
+  plant: an execution system restricts this console to administrator accounts, so the switch is refused
+  while no such account exists, rather than locking everybody out of the screen that would switch it
+  back.</p>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>11</span></div>
 </section>
 
@@ -810,6 +828,9 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Administrator</span></div><h2>Keeping it running</h2></div>
   <div class="role-band"><div><b>Operator</b>Pours resin at a pump station</div>
     <div><b>Manager</b>Dispatches and reviews</div><div class="me"><b>Admin</b>Runs the system</div></div>
+  <p style="margin-bottom:11pt;">In a plant running this as a logging system this page is the
+  <b>manager's</b> job, not a separate person's &mdash; there is no separate IT role to hold it. The work
+  is the same either way; only who does it changes.</p>
   <div class="grid2">
     <div class="card"><span class="tag">On joining</span><h4>Provision the account</h4>
       <p>Create the user with the correct role and shift before their first shift. Role decides which screens
@@ -890,8 +911,8 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">869</span><span class="l">assertions across eight suites &mdash; workflow, interface, colour, fill weight, shifts and display, links, boot paths</span></div>
-    <div class="stat"><span class="n">35</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
+    <div class="stat"><span class="n">895</span><span class="l">assertions across nine suites &mdash; workflow, interface, roles, colour, fill weight, shifts, links, boot paths</span></div>
+    <div class="stat"><span class="n">45</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">19</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
   <h3>What the simulation covers</h3>

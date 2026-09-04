@@ -20,7 +20,7 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 from database import (
     get_production_logs_df,
     get_downtime_logs_df,
-    get_plant_settings, do_logout, check_authentication,
+    get_plant_settings, do_logout, check_authentication, role_can_administer,
     get_all_users_df, get_all_resin_specs_df,
 )
 from resin_palette import resin_color_map, stored_color_map
@@ -99,8 +99,10 @@ with st.sidebar:
     st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
     st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
 
-    # Only show IT Admin to actual admins
-    if st.session_state.get("user_role") == "admin":
+    # In execution mode this is administrators only. In logging mode there is
+    # no separate IT role and a manager reaches it too - see
+    # crud.can_administer.
+    if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
 
     st.markdown("---")
@@ -248,7 +250,7 @@ st.markdown("""
 current_role = st.session_state.get("user_role", "operator")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
+if role_can_administer(current_role):
     # God Mode (Now 6 Columns)
     nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
     with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)

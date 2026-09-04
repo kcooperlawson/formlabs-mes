@@ -928,6 +928,28 @@ def lots_match(expected, entered) -> bool:
 GATED_FORMATS = ("V1", "V2", "Pigment", "RPS")
 
 
+def can_administer(role, simple_mode) -> bool:
+    """Whether this role reaches the administration console.
+
+    In logging mode there is no separate IT role. A plant that runs this as a
+    record has one person in charge of it, and that person is the manager:
+    resetting a PIN, adding a pump or taking a backup should not require a
+    second account that a plant of this size does not have. Switching to
+    execution mode restores the separation and the console goes back to
+    administrators only.
+
+    Both arguments are required rather than the mode being read in here, so
+    that every caller is explicit about which plant's mode it is applying and
+    the rule itself can be tested without a database. database.py carries the
+    one-argument form for pages, which reads the mode from the cached
+    settings.
+    """
+    r = str(role or "").strip().lower()
+    if r == "admin":
+        return True
+    return bool(simple_mode) and r == "manager"
+
+
 def container_words(cart_code) -> dict:
     """What to call the container in the operator's hands. Only the noun.
 

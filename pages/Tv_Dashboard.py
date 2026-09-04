@@ -18,6 +18,7 @@ from database import (
     do_logout,
     check_authentication,
     get_all_users_df,
+    role_can_administer,
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map
@@ -73,7 +74,7 @@ except Exception:
 current_role = st.session_state.get("user_role", "operator")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
+if role_can_administer(current_role):
     # God Mode (Now 6 Columns)
     nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
     with nav_1:

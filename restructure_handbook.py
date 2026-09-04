@@ -277,6 +277,11 @@ EDITS = {
          "    production is one people learn to work around. Every flag and every pulled container reaches\n"
          "    the manager's review page."),
     ],
+    # NOTE: this key appeared twice while this file was being written, and a
+    # duplicate key in a dict literal keeps only the last one - which silently
+    # dropped the stats rewrite and shipped a page still boasting "34 interface
+    # themes" in a document whose whole point was not to. Both sets of edits
+    # for a page belong in one list.
     3: [
         ("Every capability described in this\n  handbook past section 3 works the same way",
          "Everything in Part Two of this\n  handbook works the same way"),

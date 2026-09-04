@@ -102,7 +102,7 @@ GUIDE_CSS = """
 
 
 def page(inner, folio=None):
-    f = (f'<div class="folio"><span>Formlabs MES &middot; Operator Guide</span>'
+    f = (f'<div class="folio"><span>Resin Pouring Production Logging &middot; Operator Guide</span>'
          f'<span>{folio}</span></div>') if folio else ""
     return f'<section class="page">{inner}{f}</section>'
 
@@ -417,6 +417,8 @@ PAGES.append(page(
       '<div><b>Work orders</b>Optional, and off unless a plant turns it on. When it is on, a '
       'manager dispatches runs to a pump; that is where an expected lot comes from, and how your '
       'units count towards a target.</div>'
+      '<div><b>Who runs it</b>In most plants, your manager &mdash; accounts, PIN resets, pumps and '
+      'settings are all theirs. There is no separate IT person to wait for.</div>'
       '<div><b>The floor display</b>A screen showing the shift&rsquo;s pace, built from the same '
       'logs. No extra entry &mdash; it is your hourly figures, shown large.</div>'
       '<div><b>Trends and reports</b>Yield, scrap and downtime over weeks, and a shift handover '
@@ -434,8 +436,8 @@ PAGES.append(page(
               "reporting &mdash; they are the ones nobody else can see.")
     + '<div style="margin-top:20pt; padding-top:11pt; border-top:.7pt solid var(--line);'
       'font-size:9.6pt; color:var(--faint);">'
-      'A fuller description of the system, for managers and IT, is in the '
-      '<em>Capability &amp; Operations Handbook</em>.</div>'
+      'A fuller description of the system, for whoever runs it, is in the '
+      '<em>Resin Pouring &mdash; Production Logging Operations Handbook</em>.</div>'
 , 11))
 
 html = ("<!doctype html><html><head><meta charset='utf-8'>"

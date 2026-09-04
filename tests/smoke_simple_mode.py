@@ -18,6 +18,8 @@ from playwright.async_api import async_playwright
 
 sys.path.insert(0, "/root/mes")
 BASE, USER, PIN = "http://localhost:8501", "keagan", "1234"
+# A real manager account, to check the half of the rule that is a refusal.
+MANAGER = "mvega"
 
 FAILS, CHECKS = [], 0
 
@@ -133,8 +135,90 @@ async def main():
                   "Work Orders" in tv, False)
             await pg.screenshot(path="/root/mes/tests/smoke_shots/simple_mode_tv.png",
                                 full_page=True)
-
             await ctx.close()
+
+            # --- the manager IS the administrator, in this mode --------------
+            # A plant running this as a record has one person in charge of it.
+            # Both halves are checked in a browser rather than only against
+            # crud.can_administer, because the rule is applied at eleven call
+            # sites and it is the page gate, not the predicate, that decides
+            # whether somebody actually gets in.
+            mctx = await b.new_context(viewport={"width": 1440, "height": 950})
+            mpg = await mctx.new_page()
+            await mpg.goto(BASE, wait_until="networkidle")
+            await mpg.wait_for_timeout(5000)
+            await mpg.locator('input[type="text"]').first.fill(MANAGER)
+            await mpg.locator('input[type="password"]').first.fill(PIN)
+            await mpg.wait_for_timeout(400)
+            await mpg.get_by_text("INITIALIZE SESSION").first.click()
+            await mpg.wait_for_timeout(13000)
+
+            body = await mpg.inner_text("body")
+            check("a manager is offered the console in logging mode",
+                  "IT Admin" in body)
+
+            await mpg.get_by_text("IT Admin", exact=False).first.click()
+            await mpg.wait_for_timeout(14000)
+            body = await mpg.inner_text("body")
+            check("and is let in", "IT Administrator Console" in body)
+            check("not refused", "Access Denied" in body, False)
+            check("and is told why they have it",
+                  "no separate IT role" in body)
+            check("the console offers what a plant with no IT person needs",
+                  "System Access & User Roster" in body)
+            await mpg.screenshot(path="/root/mes/tests/smoke_shots/simple_mode_manager_admin.png",
+                                 full_page=True)
+
+            await mctx.close()
+
+            # --- and is refused the moment the plant becomes an execution one -
+            # The wait is the settings cache, not padding. database.py caches
+            # plant settings for 60 seconds and clears that cache after its own
+            # writes - but this test writes from a different process, so the
+            # server keeps serving the old mode until its copy expires. Acting
+            # sooner would be testing the cache and passing for the wrong
+            # reason. In the application this does not arise: the write happens
+            # inside the server that holds the cache.
+            #
+            # A fresh sign-in rather than a reload of the console: reloading a
+            # Streamlit page mid-session races the cookie round trip, and a
+            # bounce to the sign-in screen is indistinguishable from a refusal
+            # in the page text. Signing in again is also what the manager would
+            # actually do next.
+            db.update_plant_settings({"simple_mode": False})
+            await asyncio.sleep(63)
+
+            xctx = await b.new_context(viewport={"width": 1440, "height": 950})
+            xpg = await xctx.new_page()
+            await xpg.goto(BASE, wait_until="networkidle")
+            await xpg.wait_for_timeout(6000)
+            body = await xpg.inner_text("body")
+            check("the sign-in screen follows the mode", "SCADA" in body)
+            check("and drops the logging wording", "POURING" in body, False)
+
+            await xpg.locator('input[type="text"]').first.fill(MANAGER)
+            await xpg.locator('input[type="password"]').first.fill(PIN)
+            await xpg.wait_for_timeout(400)
+            await xpg.get_by_text("INITIALIZE SESSION").first.click()
+            await xpg.wait_for_timeout(14000)
+            body = await xpg.inner_text("body")
+            check("the same manager is not offered the console in execution mode",
+                  "IT Admin" in body, False)
+
+            # And is refused it by the page itself, not only by the missing
+            # link - a URL typed into the address bar has to hit the same rule.
+            await xpg.goto(BASE + "/Admin_Panel", wait_until="networkidle")
+            await xpg.wait_for_timeout(14000)
+            body = await xpg.inner_text("body")
+            check("nor let in by typing the address",
+                  "Save Operational Parameters" in body, False)
+            check("and the roster is not rendered behind the refusal",
+                  "System Access & User Roster" in body, False)
+            await xpg.screenshot(path="/root/mes/tests/smoke_shots/execution_mode_refusal.png",
+                                 full_page=True)
+            await xctx.close()
+
+            db.update_plant_settings({"simple_mode": True})
             await b.close()
     finally:
         db.update_plant_settings({"simple_mode": saved})

@@ -25,6 +25,7 @@ from database import (
     add_suggestion,
     do_logout,
     check_authentication,
+    role_can_administer,
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map
@@ -93,7 +94,7 @@ st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 current_role = st.session_state.get("user_role", "operator")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
+if role_can_administer(current_role):
     # God Mode (Now 6 Columns)
     nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
     with nav_1:
@@ -157,8 +158,10 @@ with st.sidebar:
     st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
     st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
 
-    # Only show IT Admin to actual admins
-    if st.session_state.get("user_role") == "admin":
+    # In execution mode this is administrators only. In logging mode there is
+    # no separate IT role and a manager reaches it too - see
+    # crud.can_administer.
+    if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
 
     st.markdown("---")
@@ -255,7 +258,7 @@ st.markdown(f"""
 <div class="brand-header">
     <div style="display:flex; align-items:center;">
         <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain;">
-        <div style="font-size:1.4rem; font-weight:900; color:#FFFFFF; margin-left:15px;">🛢️ REAL-TIME REACTOR FLEET</div>
+        <div style="font-size:1.4rem; font-weight:900; color:inherit; margin-left:15px;">🛢️ REAL-TIME REACTOR FLEET</div>
     </div>
     <span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; border-radius: 20px; padding: 4px 12px; font-weight: 800;">● LIVE SENSOR SYNC</span>
 </div>

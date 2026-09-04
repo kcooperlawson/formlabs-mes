@@ -24,6 +24,7 @@ from database import (
     get_assigned_runs_df,
     get_downtime_logs_df,
     get_plant_settings,
+    role_can_administer,
     get_production_logs_df,
     init_db,
     seed_initial_data,
@@ -317,6 +318,26 @@ if not st.session_state["authenticated"] and cached_token is not None:
 
 
 if not st.session_state["authenticated"]:
+    # The front door says which system this is. A plant running this as a
+    # record was greeting its operators - and anyone being shown it for the
+    # first time - with SCADA TERMINAL over MANUFACTURING EXECUTION SYSTEM,
+    # which is the largest claim the application makes and, in that
+    # configuration, not a true one. Set the mode to an execution system and
+    # the original wording comes back, because then it is.
+    #
+    # Read before authentication on purpose: this is the one screen that has
+    # to describe the plant to somebody who has not signed in yet.
+    try:
+        _login_simple = bool(get_plant_settings().get("simple_mode", True))
+    except Exception:
+        _login_simple = True
+    if _login_simple:
+        _title_lead, _title_tail = "POURING", "LOG"
+        _title_sub = "Resin Pouring &middot; Production Record"
+    else:
+        _title_lead, _title_tail = "SCADA", "TERMINAL"
+        _title_sub = "Manufacturing Execution System"
+
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     auth_col1, auth_col2, auth_col3 = st.columns([1, 1.2, 1])
     with auth_col2:
@@ -326,8 +347,8 @@ if not st.session_state["authenticated"]:
                 <div style="display:flex; justify-content:center; align-items:center; margin-bottom:15px;">
                     <img src="data:image/png;base64,{logo_b64}" style="height: 85px; object-fit: contain; filter: drop-shadow(0px 0px 10px rgba(0, 210, 255, 0.5));">
                 </div>
-                <h1 style="color:#FFFFFF; font-weight:900; margin-top: 15px; font-size: 2.8rem; letter-spacing: 0.02em;">SCADA <span style="color:#00D2FF; font-weight:300;">TERMINAL</span></h1>
-                <p style="color:#00D2FF; font-family: monospace; letter-spacing: 0.15em; font-size: 0.85rem; text-transform: uppercase; border-top: 1px solid #1E293B; border-bottom: 1px solid #1E293B; padding: 8px 0; display: inline-block;">Manufacturing Execution System</p>
+                <h1 style="color:#FFFFFF; font-weight:900; margin-top: 15px; font-size: 2.8rem; letter-spacing: 0.02em;">{_title_lead} <span style="color:#00D2FF; font-weight:300;">{_title_tail}</span></h1>
+                <p style="color:#00D2FF; font-family: monospace; letter-spacing: 0.15em; font-size: 0.85rem; text-transform: uppercase; border-top: 1px solid #1E293B; border-bottom: 1px solid #1E293B; padding: 8px 0; display: inline-block;">{_title_sub}</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -445,7 +466,7 @@ if not st.session_state["authenticated"]:
 current_role = st.session_state.get("user_role", "operator")
 
 st.markdown("<br>", unsafe_allow_html=True)
-if current_role == "admin":
+if role_can_administer(current_role):
     # God Mode (Now 6 Columns)
     nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
     with nav_1:
@@ -512,8 +533,10 @@ with st.sidebar:
         st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
         st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
 
-    # Only show IT Admin to Admins
-    if st.session_state.get("user_role") == "admin":
+    # In execution mode this is administrators only. In logging mode there is
+    # no separate IT role and a manager reaches it too - see
+    # crud.can_administer.
+    if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
 
     st.markdown("---")
