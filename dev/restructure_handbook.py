@@ -32,7 +32,9 @@ as the record of what moved where, not as a build step.
 import re
 import pathlib
 
-SRC = pathlib.Path("/root/mes/handbook.html")
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+SRC = pathlib.Path(__file__).resolve().parent.parent / "docs" / "handbook.html"
 
 FOLIO_LABEL = "Resin Pouring Production Logging &middot; Operations Handbook"
 

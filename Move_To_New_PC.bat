@@ -76,9 +76,17 @@ set STAGE=%~dp0_MOVE_PACKAGE
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%STAGE%"
 
+rem Only what runs ships. tests\ is the release check, dev\ is the
+rem screenshot and document tooling, docs\ is the handbook sources and their
+rem figures - none of it is needed on the floor PC, and together they are most
+rem of the folder by size. The finished PDFs are printed from docs\ on this
+rem PC, not served by the app. Transfer archives in backups\ (*.tgz) are not
+rem database backups and do not ship; the .sql dumps do.
 robocopy "%~dp0." "%STAGE%" /E ^
-    /XD venv .git __pycache__ .idea logs _MOVE_PACKAGE ^
-    /XF combined_code.txt mes_production.db *.pyc formlabs_mes_move_*.zip ^
+    /XD venv .git __pycache__ .idea logs _MOVE_PACKAGE tests dev docs ^
+        "Claude outputs" _to_delete ^
+    /XF combined_code.txt mes_production.db *.pyc *.tgz *.bak *.log ^
+        formlabs_mes_move_*.zip ^
     /NFL /NDL /NJH >nul
 if %ERRORLEVEL% GEQ 8 (
     echo.

@@ -2,7 +2,9 @@
 so the screenshots in the handbook show the app doing its actual job."""
 import os, sys, pathlib, random, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pgserver
 PGDATA = str(pathlib.Path.home() / "pgdata")
 srv = pgserver.get_server(PGDATA, cleanup_mode=None)

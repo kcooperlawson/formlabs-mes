@@ -16,8 +16,11 @@ Rules it follows, because they are what make a floor document get used:
 """
 import pathlib
 
-ROOT = pathlib.Path("/root/mes")
-css_src = (ROOT / "handbook.html").read_text(encoding="utf-8")
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+DOCS = ROOT / "docs"
+css_src = (DOCS / "handbook.html").read_text(encoding="utf-8")
 BASE_CSS = css_src[css_src.index("<style>"):css_src.index("</style>") + len("</style>")]
 
 # Larger type, more air, and a two-column step/figure rhythm. An operator guide
@@ -444,6 +447,6 @@ html = ("<!doctype html><html><head><meta charset='utf-8'>"
         "<title>Formlabs MES — Operator Guide</title>"
         + BASE_CSS + GUIDE_CSS + "</head><body>" + "\n".join(PAGES) + "</body></html>")
 
-out = ROOT / "operator_guide.html"
+out = DOCS / "operator_guide.html"
 out.write_text(html, encoding="utf-8")
 print(f"operator_guide.html written: {len(PAGES)} pages, {len(html):,} chars")

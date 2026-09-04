@@ -19,8 +19,12 @@ import sys
 
 from playwright.async_api import async_playwright
 
-sys.path.insert(0, "/root/mes")
-OUT = "/root/mes/figs_print"
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+OUT = os.path.join(ROOT, "docs", "figs_print")
+PREP = os.path.join(ROOT, "dev", "print_prep.py")
 BASE, USER, PIN = "http://localhost:8501", "aruiz", "1234"
 
 
@@ -140,5 +144,5 @@ asyncio.run(main())
 # to idempotent but not exactly so, and pointing it at an already-lifted file
 # washes it out - which is how a stale figure on page 19 got visibly paler than
 # its neighbours before it was re-shot.
-os.system(f"cd /root/mes && python print_prep.py "
+os.system(f"python {PREP} "
           f"{OUT}/13_gate.png {OUT}/14_gate_stop.png {OUT}/21_gate_pass.png")

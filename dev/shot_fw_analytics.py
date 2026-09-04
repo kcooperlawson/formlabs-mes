@@ -11,8 +11,11 @@ import sys
 
 from playwright.async_api import async_playwright
 
-sys.path.insert(0, os.path.expanduser("~/mes"))
-OUT = os.path.expanduser("~/mes/figs_print")
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+OUT = os.path.join(ROOT, "docs", "figs_print")
 BASE = "http://localhost:8501"
 USER, PIN = "keagan", "1234"
 

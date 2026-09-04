@@ -11,6 +11,10 @@ a standalone script that's easy to point people at for debugging - if
 THIS doesn't get found by test_gateway_discover.py on another PC, the
 problem is network/firewall, not anything in the Streamlit app.
 """
+import os
+import sys
+# Lives in dev/, so the modules it exercises are one level up.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
 from dotenv import load_dotenv
 load_dotenv()

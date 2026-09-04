@@ -8,10 +8,20 @@ echo ===================================================
 echo.
 
 if not exist .env (
-    echo [ERROR] No .env file here - this doesn't look like the unzipped
-    echo         move package. Run this from inside that folder.
-    pause
-    exit /b 1
+    if exist .env.example (
+        copy .env.example .env >nul
+        echo [NOTICE] No .env here yet - created one from .env.example.
+        echo          Open .env in Notepad and set DB_URL to this PC's Postgres
+        echo          login before continuing. The line looks like:
+        echo            DB_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/formlabs_mes
+        echo.
+        pause
+    ) else (
+        echo [ERROR] No .env file and no .env.example - this doesn't look like
+        echo         the project folder. Run this from inside it.
+        pause
+        exit /b 1
+    )
 )
 
 echo [1/6] Checking for Python...
@@ -95,21 +105,116 @@ if errorlevel 1 (
 )
 echo     Found psql and pg_dump.
 
-echo [5/6] Checking database host and preparing the database...
+echo [5/6] Preparing the database...
+python _migration_helper.py ensure_db
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Couldn't reach the Postgres server or create the database.
+    echo         Double-check .env's DB_URL / PG_PASS match this PC's
+    echo         Postgres installation, and that the Postgres service is
+    echo         running (services.msc -^> postgresql-x64-...).
+    pause
+    exit /b 1
+)
+
+rem A backup in backups\ is an OFFER, not a requirement. A plant starting
+rem fresh should start fresh: the app builds its own schema on first run and
+rem seeds one administrator account, three placeholder pumps and the downtime
+rem reasons, and the real pumps and people get entered from the console. The
+rem restore path exists for moving an established database between machines,
+rem and it asks before it does anything, because restoring over a database
+rem that is already in use replaces it.
+set LATEST_DUMP=
+for /f "delims=" %%f in ('dir /b /o-d "backups\*.sql" 2^>nul') do (
+    if not defined LATEST_DUMP set LATEST_DUMP=%%f
+)
+if not defined LATEST_DUMP (
+    echo     No database backup in backups\ - starting clean.
+    set CLEAN_START=1
+    goto :schema
+)
+
+echo.
+echo     A database backup is included: %LATEST_DUMP%
+echo.
+echo       R = Restore it into this PC's database ^(brings across every log,
+echo           account and setting from the PC it was taken on^)
+echo       C = Start Clean ^(empty database; one administrator account^)
+echo.
+choice /c RC /m "     Restore the backup, or start clean"
+if errorlevel 2 (
+    echo     Starting clean. The backup stays in backups\ if you want it later:
+    echo       python _migration_helper.py restore %LATEST_DUMP%
+    set CLEAN_START=1
+    goto :schema
+)
+
 for /f "delims=" %%h in ('python _migration_helper.py db_host') do set DB_HOST=%%h
-echo     .env points at: %DB_HOST%
 if /i not "%DB_HOST%"=="localhost" if /i not "%DB_HOST%"=="127.0.0.1" (
     echo.
-    echo     [NOTICE] This is NOT pointing at a local database - it's pointing
-    echo     at "%DB_HOST%", which may already be a live, shared database.
-    echo     Restoring the backup on top of it could OVERWRITE current data.
+    echo     [NOTICE] .env is NOT pointing at a local database - it points at
+    echo     "%DB_HOST%", which may be a live, shared database. Restoring the
+    echo     backup on top of it would OVERWRITE whatever is there now.
     echo.
-    choice /c YN /m "     Are you SURE you want to restore the backup into %DB_HOST% now"
+    choice /c YN /m "     Are you SURE you want to restore into %DB_HOST%"
     if errorlevel 2 (
-        echo     Skipping restore. You can launch the app once you're sure -
-        echo     just re-run this script and answer Y, or run it manually:
-        echo     python _migration_helper.py restore ^<filename in backups\^>
-        goto :launch
+        echo     Skipping the restore. Starting clean instead.
+        set CLEAN_START=1
+        goto :schema
+    )
+)
+
+python _migration_helper.py check_dump_compat "%LATEST_DUMP%"
+if errorlevel 1 (
+    echo.
+    echo [STOP] The PostgreSQL installed on this PC is OLDER than the one the
+    echo        backup came from, and cannot read this dump. The restore would
+    echo        fail partway through with a message about an "invalid command"
+    echo        that says nothing about the real problem.
+    echo.
+    echo        Install a PostgreSQL at least as new as the version shown
+    echo        above from https://www.postgresql.org/download/windows/
+    echo        then run this script again - or run it again and choose C.
+    pause
+    exit /b 1
+)
+
+echo     Restoring %LATEST_DUMP% ...
+python _migration_helper.py restore "%LATEST_DUMP%"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Restore failed - check the logs\ folder for the exact
+    echo         Postgres error ^(often a password mismatch in .env^). The
+    echo         restore stops on the FIRST real error rather than skipping
+    echo         bad tables, so whatever is in the logs is the problem.
+    pause
+    exit /b 1
+)
+echo     Database restored.
+
+:schema
+echo     Bringing the database schema up to date...
+rem Deliberately NOT "alembic stamp head". A restored dump carries its own
+rem alembic_version, and "stamp" would overwrite that with head without
+rem running anything - silently skipping every migration added since the
+rem dump was taken, invisible until something touches a column that was
+rem never created.
+rem
+rem Importing crud runs the same boot the app itself runs: an empty database
+rem gets every migration and the seed accounts; a restored one gets only the
+rem migrations it is missing; one from before Alembic existed is stamped at
+rem the baseline and then brought forward. All three are tested, in separate
+rem processes, by tests\test_boot_paths.py.
+python -c "import crud"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Could not build or update the database schema - see logs\.
+    pause
+    exit /b 1
+)
+echo     Schema is up to date.
+
+:launch
     )
 )
 
@@ -191,8 +296,20 @@ echo     Schema is up to date.
 echo [6/6] Launching the app...
 echo.
 echo ===================================================
-echo  Setup complete. Starting Formlabs MES...
-echo  (Close this window to stop the app later.)
+echo  Setup complete.
+if defined CLEAN_START (
+    echo.
+    echo  This is a clean database. Sign in with:
+    echo      username:  manager
+    echo      PIN:       admin
+    echo  and do these first, from IT Admin:
+    echo    1. Change that PIN ^(Account ^& Preferences, top of the sidebar^).
+    echo    2. Replace the three placeholder pumps with the real ones.
+    echo    3. Add the operators.
+    echo  Day to day, start the app with run_mes.bat.
+)
+echo.
+echo  Starting... close this window to stop the app.
 echo ===================================================
 streamlit run Home.py
 pause

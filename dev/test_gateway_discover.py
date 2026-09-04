@@ -6,6 +6,10 @@ Run this on the LAPTOP (or whichever PC is trying to find the database)
 while test_gateway_announce.py is running on the desktop. Prints exactly
 what it finds, or a clear diagnosis of what to check if it finds nothing.
 """
+import os
+import sys
+# Lives in dev/, so the modules it exercises are one level up.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import socket
 import time
 

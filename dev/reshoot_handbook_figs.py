@@ -26,8 +26,12 @@ import sys
 
 from playwright.async_api import async_playwright
 
-sys.path.insert(0, "/root/mes")
-OUT = "/root/mes/figs_print"
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+OUT = os.path.join(ROOT, "docs", "figs_print")
+PREP = os.path.join(ROOT, "dev", "print_prep.py")
 BASE, PIN = "http://localhost:8501", "1234"
 
 
@@ -158,5 +162,5 @@ NAMES = asyncio.run(main())
 # neighbours on the sheet - which is what happened to this very set the first
 # time this script ran and one of its three shots failed.
 if NAMES:
-    os.system("cd /root/mes && python print_prep.py "
+    os.system(f"python {PREP} "
               + " ".join(f"{OUT}/{n}.png" for n in NAMES))

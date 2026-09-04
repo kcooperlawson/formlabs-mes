@@ -1,6 +1,9 @@
 import asyncio, os
 from playwright.async_api import async_playwright
-OUT="/root/mes/shots_phone"; os.makedirs(OUT,exist_ok=True); BASE="http://localhost:8501"
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dev", "_scratch_shots")
+os.makedirs(OUT, exist_ok=True); BASE = "http://localhost:8501"
 async def main():
     async with async_playwright() as p:
         b=await p.chromium.launch(executable_path="/opt/pw-browsers/chromium")

@@ -1,7 +1,10 @@
 import asyncio, os, pathlib
 from playwright.async_api import async_playwright
-SRC = pathlib.Path("~/mes/handbook.html").expanduser().resolve()
-OUT = pathlib.Path("~/mes/Formlabs_MES_Handbook.pdf").expanduser()
+# Lives in dev/, so the project root is one level up. Every path below is
+# relative to that, never to wherever this happens to be run from.
+DOCS = pathlib.Path(__file__).resolve().parent.parent / "docs"
+SRC = DOCS / "handbook.html"
+OUT = DOCS / "Formlabs_MES_Handbook.pdf"
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
