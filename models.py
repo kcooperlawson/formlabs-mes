@@ -206,6 +206,12 @@ class PlantSettings(Base):
     shift_3_break_mins = Column(Float, default=60.0)
     handover_emails = Column(Text, default="")
     enable_packing = Column(Integer, default=1)  # 1 = True, 0 = False
+    # Whether this plant dispatches work orders at all. On (the default), the
+    # operator form is a log and the work-order screens stay out of the way;
+    # off, they come back. See migration 0009 - the point is that "nobody has
+    # set this up yet" and "this plant does not work that way" look identical
+    # to the app otherwise, and it guesses the first.
+    simple_mode = Column(Integer, default=1)  # 1 = True, 0 = False
     # An external form the plant links out to - today the pump form behind the
     # QR sticker on the pump. Held here rather than in source because this
     # application does not own that form and whoever does can move it. Empty

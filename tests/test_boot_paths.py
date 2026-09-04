@@ -39,7 +39,35 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
 DB = "formlabs_boot_paths"
-HEAD = "0008_pump_form_url"
+
+
+def _head_revision():
+    """The revision nothing else revises - read from the chain, not remembered.
+
+    This was a literal, and the next migration added after it failed all three
+    cases of this file with "reaches head (got 0009_...)": a test that breaks
+    on correct work, whose fix is to edit the expectation, teaches you to edit
+    expectations. The files in migrations/versions already know the answer, so
+    ask them - the head is the one revision id that is not some other file's
+    down_revision.
+    """
+    revs, parents = set(), set()
+    for f in (ROOT / "migrations" / "versions").glob("*.py"):
+        for line in f.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            for key, sink in (("revision =", revs), ("down_revision =", parents)):
+                if s.startswith(key):
+                    val = s.split("=", 1)[1].split("#")[0].strip().strip('"\'')
+                    if val and val != "None":
+                        sink.add(val)
+    tips = revs - parents
+    if len(tips) != 1:
+        raise SystemExit(
+            f"migrations/versions does not have exactly one head: {sorted(tips)}")
+    return tips.pop()
+
+
+HEAD = _head_revision()
 
 # Columns added after the baseline, one per migration that added any. If the
 # boot path stopped short, these are what would be missing - and they are what
@@ -51,6 +79,7 @@ LATE_COLUMNS = [
     ("production_logs", "check_weight_g"),  # 0006
     ("plant_settings", "shift_count"),      # 0007
     ("plant_settings", "pump_form_url"),    # 0008
+    ("plant_settings", "simple_mode"),      # 0009
 ]
 
 

@@ -1789,6 +1789,11 @@ def get_plant_settings() -> dict:
                 "shift_3_break_mins": getattr(settings, 'shift_3_break_mins', 60.0),
                 "handover_emails": getattr(settings, 'handover_emails', ""),
                 "enable_packing": bool(getattr(settings, 'enable_packing', 1)),
+                # True on a row written before this column existed: an install
+                # that has never been told it dispatches work orders is a log,
+                # and should look like one rather than like a half-finished
+                # copy of something bigger.
+                "simple_mode": bool(getattr(settings, 'simple_mode', 1)),
                 # shift_count was stored and saved but never read back out of
                 # here, so every caller fell through to shifts.py's default of
                 # two. That is the right answer for this plant today, which is
@@ -1803,7 +1808,8 @@ def get_plant_settings() -> dict:
             "shift_2_start": "14:30", "shift_2_hours": 8.5, "shift_3_start": "23:00", "shift_3_hours": 7.0,
             "yield_target_pct": 99.0, "packing_yield_target_pct": 99.5, "shift_1_break_mins": 60.0,
             "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "handover_emails": "", "enable_packing": True,
-            "shift_count": 2, "pump_form_url": "", "pump_form_label": ""
+            "shift_count": 2, "pump_form_url": "", "pump_form_label": "",
+            "simple_mode": True
         }
     finally:
         session.close()
@@ -1830,8 +1836,18 @@ def update_plant_settings(values: dict) -> bool:
         if not settings:
             settings = PlantSettings()
             session.add(settings)
+        # The on/off settings are stored as INTEGER, and every caller is a
+        # checkbox handing back a Python bool. Postgres will not widen one to
+        # the other on its own - it raises DatatypeMismatch and the whole save
+        # is lost, including the fields that had nothing to do with it. Cast
+        # here rather than at each call site, because the next checkbox added
+        # to that form would hit this again and the failure names a column
+        # rather than the pattern.
+        int_flags = {"enable_packing", "simple_mode"}
         for key, value in (values or {}).items():
             if hasattr(settings, key) and key not in ("id",):
+                if key in int_flags and isinstance(value, bool):
+                    value = int(value)
                 setattr(settings, key, value)
         session.commit()
         return True

@@ -288,11 +288,23 @@ async def phone_pass(browser):
 
 
 async def main():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
-        await desktop_pass(browser)
-        await phone_pass(browser)
-        await browser.close()
+    # Half of the desktop pass is the lot gate comparing a typed code against
+    # the lot on an open run, which only exists in a plant that dispatches
+    # them. A new install does not - see migration 0009 - so this pass states
+    # which shape of plant it is testing rather than inheriting whatever the
+    # last run of something else left in the settings table. The logger-only
+    # shape has its own file: tests/smoke_simple_mode.py.
+    import database as _db
+    _was = bool(_db.get_plant_settings().get("simple_mode", True))
+    _db.update_plant_settings({"simple_mode": False})
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+            await desktop_pass(browser)
+            await phone_pass(browser)
+            await browser.close()
+    finally:
+        _db.update_plant_settings({"simple_mode": _was})
 
     print("\n" + "=" * 62)
     if FAILS:

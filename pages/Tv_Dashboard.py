@@ -411,10 +411,22 @@ if packing_enabled:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ===================== DYNAMIC BREAKDOWN ROW =====================
-if packing_enabled:
+# The row already adapts to whether this plant packs; it now also adapts to
+# whether it dispatches work orders. A floor display is the one screen nobody
+# is standing in front of to interpret, so a card reading "No Work Orders
+# configured" all shift, in a plant that has decided not to use them, is the
+# worst place in the application to leave that sentence.
+show_runs_card = not bool(settings.get("simple_mode", True))
+if packing_enabled and show_runs_card:
     b1, b2, b3 = st.columns((1.1, 1.5, 1.5))
-else:
+elif packing_enabled:
+    b1, b2 = st.columns((1.1, 1.5))
+    b3 = None
+elif show_runs_card:
     b1, b3 = st.columns(2)
+else:
+    b1 = st.container()
+    b3 = None
 
 with b1:
     st.markdown("<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>💧 TOP POURERS (L/h)</div>", unsafe_allow_html=True)
@@ -478,26 +490,27 @@ if packing_enabled:
             st.caption("No packing data logged yet today.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-with b3:
-    st.markdown(
-        "<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>⚙️ ACTIVE REACTOR WORK ORDERS</div>",
-        unsafe_allow_html=True)
-    df_runs = get_assigned_runs_df()
-    _run_colours = stored_color_map(get_all_resin_specs_df("ALL"))
-    if not df_runs.empty:
-        active_runs = df_runs[df_runs["status"].isin(["Active", "Pouring"])]
-        if not active_runs.empty:
-            for _, run in active_runs.iterrows():
-                prog_pct = min(1.0, run["current_units"] / run["target_units"]) if run["target_units"] > 0 else 0.0
-                st.markdown(
-                    f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'>{resin_chip(run['resin_type'], _run_colours.get(str(run['resin_type'])), size='lg')} &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
-                    unsafe_allow_html=True)
-                st.progress(prog_pct)
+if b3 is not None:
+    with b3:
+        st.markdown(
+            "<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>⚙️ ACTIVE REACTOR WORK ORDERS</div>",
+            unsafe_allow_html=True)
+        df_runs = get_assigned_runs_df()
+        _run_colours = stored_color_map(get_all_resin_specs_df("ALL"))
+        if not df_runs.empty:
+            active_runs = df_runs[df_runs["status"].isin(["Active", "Pouring"])]
+            if not active_runs.empty:
+                for _, run in active_runs.iterrows():
+                    prog_pct = min(1.0, run["current_units"] / run["target_units"]) if run["target_units"] > 0 else 0.0
+                    st.markdown(
+                        f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'>{resin_chip(run['resin_type'], _run_colours.get(str(run['resin_type'])), size='lg')} &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
+                        unsafe_allow_html=True)
+                    st.progress(prog_pct)
+            else:
+                st.info("No active Work Orders in progress.")
         else:
-            st.info("No active Work Orders in progress.")
-    else:
-        st.info("No Work Orders configured.")
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.info("No Work Orders configured.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # Wait 10 seconds, then force the entire script to run again from top to bottom.

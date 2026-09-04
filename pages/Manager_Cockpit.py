@@ -17,7 +17,7 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
-st.set_page_config(page_title="Manager Work Order Dispatch & Cockpit | Formlabs MES", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Manager Cockpit | Formlabs MES", page_icon="📊", layout="wide")
 
 
 # ===================== DYNAMIC THEME INJECTION =====================
@@ -34,7 +34,7 @@ st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 st.logo("assets/formlabs_logo.png")
 
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
-from database import do_logout, check_authentication
+from database import do_logout, check_authentication, get_plant_settings
 
 cookie_manager = stx.CookieManager(key="mgr_cookies")
 try:
@@ -189,30 +189,59 @@ st.markdown("---")
 st.markdown(f"""
 <div style="display:flex; align-items:center; margin-bottom: 5px;">
     <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain; margin-right: 15px;">
-    <h1 style="margin:0; padding:0; font-size: 2.2rem;">📊 Plant Manager Operations & Work Order Dispatch</h1>
+    <h1 style="margin:0; padding:0; font-size: 2.2rem;">📊 Plant Manager — Production Records</h1>
 </div>
 """, unsafe_allow_html=True)
-st.caption("Select a Management Module below to access isolated operations.")
+# This page used to be titled "Plant Manager Operations & Work Order Dispatch"
+# and led with the work-order screen, which told anybody who opened it that
+# somebody has to dispatch runs before this application does anything. Nobody
+# does. Every screen in the first group reads the operators' logs and needs no
+# input from a manager at all; the things a manager has to set up are grouped
+# as such, at the bottom, where they belong.
+st.caption("Everything here reads what the operators logged. Nothing on this page "
+           "has to be filled in first.")
 st.markdown("<br>", unsafe_allow_html=True)
 
+_orders_on = not bool(get_plant_settings().get("simple_mode", True))
+
 # ===================== GHOST PAGE LAUNCHPAD =====================
+st.markdown("##### 📈 What was poured")
 col1, col2, col3 = st.columns(3, gap="medium")
-
 with col1:
-    st.page_link("pages/Mgr_Assigned_Runs.py", label="🎯 Work Orders & Assigned Runs", use_container_width=True)
-    st.page_link("pages/Mgr_Resin_Canvas.py", label="⚖️ Master Resin Specifications", use_container_width=True)
-    st.page_link("pages/Mgr_Scrap_Intel.py", label="📊 Scrap & Yield Intelligence", use_container_width=True)
-
-with col2:
-    st.page_link("pages/Mgr_Cleanliness.py", label="📸 Cleanliness & Photo Audits", use_container_width=True)
-    st.page_link("pages/Mgr_Lot_Verification.py", label="🔒 Cartridge Lot Verification", use_container_width=True)
     st.page_link("pages/Mgr_Historical.py", label="📈 Historical Production Trends", use_container_width=True)
-    st.page_link("pages/Mgr_Floor_Comms.py", label="💬 Floor Communications", use_container_width=True)
-
+    st.page_link("pages/Mgr_Scrap_Intel.py", label="📊 Scrap & Yield Intelligence", use_container_width=True)
+with col2:
+    st.page_link("pages/Mgr_Lot_Verification.py", label="🔒 Cartridge Lot Verification", use_container_width=True)
+    st.page_link("pages/Mgr_Cleanliness.py", label="📸 Cleanliness & Photo Audits", use_container_width=True)
 with col3:
-    st.page_link("pages/Mgr_Roster.py", label="👥 Floor Staff Roster", use_container_width=True)
-    st.page_link("pages/Mgr_Google_Sync.py", label="☁️ Google Cloud Sheets Sync", use_container_width=True)
     st.page_link("pages/Mgr_Shift_Handover.py", label="📤 PDF Shift Handover", use_container_width=True)
+    st.page_link("pages/Mgr_Google_Sync.py", label="☁️ Google Cloud Sheets Sync", use_container_width=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("##### 👥 The floor")
+col4, col5, col6 = st.columns(3, gap="medium")
+with col4:
+    st.page_link("pages/Mgr_Roster.py", label="👥 Floor Staff Roster", use_container_width=True)
+with col5:
+    st.page_link("pages/Mgr_Floor_Comms.py", label="💬 Floor Communications", use_container_width=True)
+with col6:
+    st.page_link("pages/Tv_Dashboard.py", label="📺 Floor Display (TV Mode)", use_container_width=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("##### ⚙️ Setup — optional")
+st.caption("None of this is needed to log a pour. Set a piece up when you want the "
+           "answer it gives you.")
+col7, col8, col9 = st.columns(3, gap="medium")
+with col7:
+    st.page_link("pages/Mgr_Assigned_Runs.py", label="🎯 Work Orders & Assigned Runs",
+                 use_container_width=True,
+                 disabled=not _orders_on)
+    if not _orders_on:
+        st.caption("Off. IT Admin → Work Orders turns it on.")
+with col8:
+    st.page_link("pages/Mgr_Resin_Canvas.py", label="⚖️ Master Resin Specifications", use_container_width=True)
+    st.caption("Target fill weights, so an out-of-band pour flags itself.")
+with col9:
     st.page_link("pages/Mgr_Log_Management.py", label="🗑️ Log Management & Cleanup", use_container_width=True)
     # Added because it was built and then left with no way in: nothing in the
     # app linked to it, so the contrast audit and the component gallery could

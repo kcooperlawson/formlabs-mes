@@ -17,7 +17,7 @@ from database import (
     unlock_user_account,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
     get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
-    check_authentication
+    check_authentication, get_assigned_runs_df
 )
 from database import esc
 from shifts import picker_options as shift_picker_options
@@ -399,6 +399,25 @@ with tab_settings:
             en_pack = st.checkbox("📦 Enable Packing Module globally",
                                   value=current_settings.get("enable_packing", True), key="en_pack_input")
 
+        # ------------------ HOW MUCH OF THE APP THIS PLANT USES ------------------
+        # The application grew work orders first, so every screen assumed a
+        # manager had dispatched a run and the operator was logging against it.
+        # A plant that just wants the log had no way to say so, and got told it
+        # was misconfigured on every screen instead.
+        st.markdown("##### 🗂️ Work Orders")
+        st.caption(
+            "Off by default. Leave it off and the operator terminal is a log: station, "
+            "material, lot, counts — nothing for a manager to enter first. Turn it on "
+            "when somebody wants to dispatch runs to stations and track them against a "
+            "target, and the work-order screens come back."
+        )
+        simple_now = bool(current_settings.get("simple_mode", True))
+        use_orders = st.checkbox(
+            "📋 This plant dispatches work orders",
+            value=not simple_now, key="use_work_orders_input",
+            help="Nothing is deleted either way. Runs already entered stay in the "
+                 "database and reappear the moment this is ticked again.")
+
         st.markdown("##### 📧 Automated Reporting")
         emails = st.text_input("Shift Handover Email Recipients (comma separated)",
                                value=current_settings.get("handover_emails", ""), key="emails_input")
@@ -435,10 +454,38 @@ with tab_settings:
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
                 "handover_emails": emails,
+                # Stored as the negative of the checkbox: the setting is named
+                # for the smaller configuration, so the default value of a
+                # column nobody has touched is the smaller one.
+                "simple_mode": (not use_orders),
                 "pump_form_url": pump_clean,
                 "pump_form_label": (pump_label or "").strip()[:60],
             }
             update_plant_settings(update_dict)
+
+            # Switching work orders off while runs are still open hides them
+            # from the operators standing at those stations, and takes the lot
+            # check's expected value with them - it stops comparing and starts
+            # recording. A legitimate thing to want; not a thing to find out
+            # about a shift later. Checked after the save rather than beside
+            # the checkbox because a widget inside a form does not rerun the
+            # page, so a notice there would describe the previous state.
+            st.session_state.pop("_orders_off_warning", None)
+            if simple_now is False and use_orders is False:
+                try:
+                    _runs = get_assigned_runs_df()
+                    _live = 0 if _runs.empty else int(
+                        _runs["status"].isin(["Active", "Pouring", "Queued"]).sum())
+                except Exception:
+                    _live = 0
+                if _live:
+                    st.session_state["_orders_off_warning"] = (
+                        f"{_live} run{'s are' if _live != 1 else ' is'} still open. "
+                        "They are hidden from the operator terminal now, and the lot "
+                        "check records what was poured instead of comparing it against "
+                        "an expected lot. Nothing was deleted — tick the box again to "
+                        "bring them back.")
+
             if pump_problem:
                 # Everything else saved; say plainly which part did not, rather
                 # than a success toast over a setting that quietly did nothing.
@@ -452,6 +499,9 @@ with tab_settings:
 
     if st.session_state.get("_pump_form_warning"):
         st.warning("⚠️ " + st.session_state["_pump_form_warning"])
+
+    if st.session_state.get("_orders_off_warning"):
+        st.warning("⚠️ " + st.session_state["_orders_off_warning"])
 
     st.markdown("---")
     st.subheader("⚙️ Master Plant Equipment & Configuration")

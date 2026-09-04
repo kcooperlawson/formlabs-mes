@@ -17,7 +17,7 @@
 html,body{margin:0;padding:0;}
 body{font-family:var(--sans); color:var(--body); font-size:10pt; line-height:1.55;
      background:var(--ground); -webkit-print-color-adjust:exact; print-color-adjust:exact;}
-.page{width:8.5in; height:11in; padding:0.7in 0.78in 0.55in; position:relative;
+.page{width:8.5in; height:11in; padding:0.62in 0.78in 0.42in; position:relative;
       page-break-after:always; overflow:hidden; background:var(--ground);}
 .page:last-child{page-break-after:auto;}
 
@@ -65,7 +65,7 @@ figcaption{font-size:7.6pt; color:var(--muted); margin-top:5pt; line-height:1.42
 figcaption b{color:var(--ink); font-weight:600;}
 
 /* blocks */
-.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12pt 16pt;}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:9pt 14pt;}
 .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10pt 13pt;}
 .card{border:.6pt solid var(--line); border-radius:3pt; padding:10pt 11pt; background:var(--surface);}
 .card h4{margin-bottom:3pt;}
@@ -82,7 +82,7 @@ figcaption b{color:var(--ink); font-weight:600;}
 .note.warn{border-left-color:var(--warn);} .note.warn .eyebrow{color:var(--warn);}
 
 ul.tight{margin:0 0 8pt; padding-left:13pt;}
-ul.tight li{margin-bottom:4pt; font-size:9.3pt; line-height:1.45; color:var(--muted);}
+ul.tight li{margin-bottom:3pt; font-size:9.2pt; line-height:1.4; color:var(--muted);}
 ul.tight li::marker{color:var(--accent);}
 ul.tight li strong{color:var(--ink);}
 
@@ -141,23 +141,23 @@ td.k{font-weight:600; color:var(--ink);}
 .onepager h3{font-family:var(--disp); font-size:10.6pt; font-weight:800; color:var(--ink);
              margin:0 0 5pt;}
 .lead-block{background:var(--surface-2); border-left:3pt solid var(--accent);
-            padding:9pt 13pt 8pt; margin-bottom:11pt;}
+            padding:8pt 13pt 7pt; margin-bottom:9pt;}
 ul.qs{margin:0; padding-left:14pt;}
-ul.qs li{font-size:10.1pt; line-height:1.45; color:var(--ink); margin-bottom:3pt;}
+ul.qs li{font-size:10pt; line-height:1.38; color:var(--ink); margin-bottom:2pt;}
 ul.qs li::marker{color:var(--accent);}
-.ans{margin:8pt 0 0; font-size:10pt; color:var(--muted); font-style:italic;}
-.two{display:grid; grid-template-columns:1.32fr 1fr; gap:16pt; margin-bottom:11pt;}
+.ans{margin:6pt 0 0; font-size:9.7pt; line-height:1.45; color:var(--muted); font-style:italic;}
+.two{display:grid; grid-template-columns:1.32fr 1fr; gap:16pt; margin-bottom:9pt;}
 ol.steps{margin:0 0 7pt; padding-left:15pt;}
-ol.steps li{font-size:9.6pt; line-height:1.5; color:var(--body); margin-bottom:2pt;}
+ol.steps li{font-size:9.5pt; line-height:1.42; color:var(--body); margin-bottom:1.5pt;}
 .tiny{font-size:8.8pt; color:var(--faint); margin:0;}
-.phone img{width:100%; max-height:3.05in; object-fit:contain; object-position:top;
+.phone img{width:100%; max-height:2.45in; object-fit:contain; object-position:top;
            border:.6pt solid var(--line); border-radius:5pt;}
 .phone figcaption{font-size:8.2pt; color:var(--faint); text-align:center; margin-top:4pt;}
-.gives{margin-bottom:9pt;}
+.gives{margin-bottom:7pt;}
 .onepager .note{padding:8pt 12pt; margin:0;}
-.gives .card{padding:8pt 10pt;}
+.gives .card{padding:6.5pt 9pt;}
 .gives .card h4{margin:0 0 3pt; font-size:9.6pt;}
-.gives .card p{font-size:8.8pt; line-height:1.45;}
+.gives .card p{font-size:8.6pt; line-height:1.36;}
 </style>
 </head><body>
 <div class="page onepager">
@@ -180,6 +180,8 @@ ol.steps li{font-size:9.6pt; line-height:1.5; color:var(--body); margin-bottom:2
     </ul>
     <p class="ans">Every one of those is answered from memory, or not at all. Resin pouring has
     never had a production record.</p>
+    <p class="ans" style="margin-top:4pt;">Nothing below asks a manager to enter anything. The
+    operators log at the pump; everything else is read back out of that.</p>
   </div>
 
   <div class="two">
@@ -192,14 +194,14 @@ ol.steps li{font-size:9.6pt; line-height:1.5; color:var(--body); margin-bottom:2
         <li>Type the lot code off the bottom of the container.</li>
         <li>Enter units filled and scrap. Submit.</li>
       </ol>
-      <p class="tiny">That is the whole operator screen. The rest of this page is what comes out
-      of it.</p>
+      <p class="tiny">That is the whole operator screen.</p>
 
       <h3 style="margin-top:13pt;">What it costs to try</h3>
       <ul class="tight">
         <li>Runs on one PC already on site.</li>
         <li>No software licences, nothing charged per person.</li>
         <li>Operators use the phone they already carry.</li>
+        <li>No scheduling, assigning or approving by anyone.</li>
         <li>Stopping it is deleting a folder &mdash; nothing else depends on it.</li>
       </ul>
     </div>
@@ -214,24 +216,25 @@ ol.steps li{font-size:9.6pt; line-height:1.5; color:var(--body); margin-bottom:2
   <h3>What that gives you</h3>
   <div class="grid2 gives">
     <div class="card"><h4>The numbers, by anything</h4>
-      <p>Units, scrap and first-pass yield &mdash; by day, shift, operator, station or resin.
-      Comparable week to week, because it is the same record every time.</p></div>
+      <p>Units, scrap and first-pass yield &mdash; by day, shift, operator, station or resin,
+      comparable week to week.</p></div>
     <div class="card"><h4>Downtime with a cause on it</h4>
-      <p>Minutes lost ranked by reason, so the argument for fixing something is a number rather
-      than an impression.</p></div>
+      <p>Minutes lost ranked by reason, so the case for fixing something is a number rather than
+      an impression.</p></div>
     <div class="card"><h4>Traceability</h4>
       <p>Which lot went into which containers, at which pump, by whom and at what hour &mdash;
-      answerable for a customer question or an audit without a paper search.</p></div>
+      without a paper search.</p></div>
     <div class="card"><h4>Out of the system</h4>
-      <p>Any filtered view exports to CSV. The shift handover comes out as a PDF, and can be
-      emailed automatically at the end of a shift.</p></div>
+      <p>Any filtered view exports to CSV. The shift handover comes out as a PDF, emailed
+      automatically if you want it.</p></div>
   </div>
 
   <div class="note">
     <span class="eyebrow">Where to start</span>
-    <p>The logger works on its own &mdash; nothing to set up beyond the list of pumps. Work orders,
-    the lot check, fill-weight tracking and the floor display are there when a question calls for
-    them. The handbook covers each.</p>
+    <p>It installs as a log and nothing else &mdash; the only setup is the list of pumps.
+    Assigning work to stations is switched off until somebody switches it on; fill-weight limits,
+    the floor display and the handover email are each one setting, and none is needed to record a
+    pour. Day one changes nothing on a manager's desk.</p>
   </div>
 
 </div>

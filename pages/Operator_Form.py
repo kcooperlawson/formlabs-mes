@@ -23,6 +23,7 @@ from database import (
     save_lot_photo,
     is_placeholder_lot,
     lots_match,
+    normalize_lot,
     GATED_FORMATS,
     container_words,
     add_downtime_log,
@@ -513,6 +514,18 @@ if current_role in ["operator", "packer"]:
         # This function strictly stops the rest of the page from rendering until the form is passed!
         st.stop()
 df_runs = get_assigned_runs_df()
+
+# Does this plant dispatch work orders at all? Off by default - see migration
+# 0009. Blanking the frame here rather than testing the setting at each of the
+# four places that read it means there is one answer for the whole page: no
+# run cards, no "no run matched" notice, and - the part that matters - the lot
+# check compares against nothing rather than against a run the operator was
+# never shown. A stale run left open in the database cannot reach out and stop
+# a pour on a terminal that has no way to display it.
+simple_mode = bool(get_plant_settings().get("simple_mode", True))
+if simple_mode and not df_runs.empty:
+    df_runs = df_runs.iloc[0:0]
+
 active_pumps = get_active_pumps()
 dt_reasons = get_downtime_reasons()
 
@@ -731,9 +744,15 @@ st.markdown("---")
 #
 # Deliberately a toggle rather than a separate page: it has to be one tap to
 # leave, because the moment they need it is the moment they need to log.
-_focus = st.toggle("🔍 Focus mode — big numbers, nothing else", value=False,
-                   key="focus_mode",
-                   help="For reading from across the station while you pour.")
+# Everything it displays - resin, lot, poured, remaining - comes off the run
+# it is pointed at, so in a plant that does not dispatch runs the toggle can
+# only ever open an empty screen. A control whose one outcome is a message
+# about something this plant does not do is worse than no control.
+_focus = False
+if not simple_mode:
+    _focus = st.toggle("🔍 Focus mode — big numbers, nothing else", value=False,
+                       key="focus_mode",
+                       help="For reading from across the station while you pour.")
 
 if _focus:
     _my_runs = df_runs[
@@ -788,9 +807,15 @@ if _focus:
     st.caption("Turn focus mode off to log, record downtime or run a cleanliness check.")
     st.stop()
 
-st.subheader("🎯 Active Assigned Production Runs (Assigned by Manager)")
-
+# Nothing above the log unless there is something to say. A plant that does
+# not dispatch work orders, and a plant that has not dispatched one yet, both
+# used to get a heading with a manager's name on it and an empty space under
+# it - which reads as a setup step somebody skipped rather than as a screen
+# that is finished. The log below is the whole job; this section is a bonus
+# when a run exists.
 if not df_runs.empty:
+    st.subheader("🎯 Active Assigned Production Runs (Assigned by Manager)")
+
     target_run_type = "Packing" if current_role == "packer" else "Pouring"
     
     # Gated by station, not by who the manager originally dispatched it
@@ -856,10 +881,12 @@ Progress: <b style="color:inherit;">{run['current_units']:,} / {run['target_unit
                         st.rerun()
                 st.markdown("---")
     else:
-        st.info(f"No active {target_run_type.lower()} runs at **{my_station}** right now. "
-                f"Check with your Plant Manager, or pick a different station above if you're working elsewhere this shift.")
-else:
-    st.info("No production runs in database.")
+        # Said plainly, without sending anybody to find a manager: the log
+        # below works either way, and an operator who reads "check with your
+        # Plant Manager" reasonably concludes it does not.
+        st.caption(f"Nothing assigned to **{my_station}** right now — logging below works "
+                   f"as normal. Pick a different station above if you're working elsewhere "
+                   f"this shift.")
 
 # ===================== SECTION 2: DIGITAL LOGGING TRAVELER =====================
 
@@ -1152,11 +1179,20 @@ if tab1 is not None:
                         "<span style='color:inherit; opacity:0.72; font-size:0.85rem;'>"
                         f"hidden on purpose — read the {words['noun']}, not the screen</span>",
                         unsafe_allow_html=True)
-                else:
-                    st.warning(
-                        "No active run matched this station / resin / format, so there is no lot "
-                        f"to check against. Read the {words['noun']} anyway — it gets recorded against "
-                        "this log instead of the placeholder the app would otherwise invent.")
+                elif not simple_mode:
+                    # Only worth saying in a plant that dispatches runs, where
+                    # a missing match means a real mismatch somewhere. In a
+                    # plant that logs and nothing else there is no run to miss,
+                    # and a yellow box saying so is the app calling its own
+                    # normal state a problem - which is what made this screen
+                    # look half-configured. Recording the lot with no expected
+                    # value to compare it to is a complete answer to "which lot
+                    # went into this pour"; it is only the comparison that is
+                    # absent, and the caption below already says what to type.
+                    st.info(
+                        f"No open run matches this station, resin and format, so the "
+                        f"{words['noun']} lot is recorded rather than checked. Read it "
+                        f"the same way.")
                 st.caption(f"{words['where']} "
                            "Type it exactly as printed — spacing, case and the prefix don't matter.")
 
@@ -1184,7 +1220,16 @@ if tab1 is not None:
                 if result == "verified":
                     st.success("✅ **Lot matches this run.**")
                 elif result == "recorded":
-                    st.info(f"📝 Stamp recorded: **L-{typed}**. Nothing to compare it against.")
+                    # normalize_lot, not the raw field: the caption above
+                    # promises the prefix does not matter, and an operator who
+                    # types the L- they can see on the label was being read
+                    # back "L-L-2411A0742" - which looks like the app
+                    # mistyped, on the one screen whose entire job is being
+                    # trusted about a code. "Stamp" is gone with it; the label
+                    # on the bottom of the container is a label, and calling
+                    # it two things is how an instruction stops being read.
+                    st.info(f"📝 Lot recorded: **L-{normalize_lot(typed) or typed}** — "
+                            "saved against this log.")
                 elif result == "mismatch":
                     st.error(f"⛔ **STOP — DO NOT POUR.** This {words['noun']} is not from the lot "
                              "assigned to your run. Set it aside and get your lead.")
@@ -1419,6 +1464,12 @@ if tab1 is not None:
                     icon="⚖️")
             if matched_run:
                 st.toast(f"Recorded {bottles_filled} units of {resin}! Credited to your active run.", icon="🧪")
+            elif simple_mode:
+                # The log is the product here, not a contribution to a run, so
+                # a successful log is a success. It used to close with a
+                # warning triangle and a note about a progress bar that this
+                # plant does not have - every log, all shift.
+                st.toast(f"Recorded {bottles_filled} units of {resin}.", icon="🧪")
             else:
                 st.toast(
                     f"Recorded {bottles_filled} units of {resin} to Analytics — "

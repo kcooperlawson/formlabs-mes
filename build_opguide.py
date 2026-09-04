@@ -52,6 +52,7 @@ GUIDE_CSS = """
        margin-bottom:15pt;}
   .row.wide{grid-template-columns:1fr 2.05in;}
   .row .shot img{width:100%; border:.7pt solid var(--line); border-radius:6pt;}
+  .row .shot.tall img{max-height:2.55in; object-fit:cover; object-position:top center;}
   .row .shot .cap{font-size:8pt; color:var(--faint); text-align:center; margin-top:4pt;
                   line-height:1.35;}
 
@@ -64,8 +65,18 @@ GUIDE_CSS = """
   .stepbig p{margin:0; font-size:10.6pt; line-height:1.55; color:var(--body);}
   .stepbig p + p{margin-top:5pt;}
 
+  /* The bottom margin is spacing between a callout and whatever follows it.
+     On a fixed-height page the last element on the sheet has nothing following
+     it, and that margin is the difference between a page that fits and one
+     that silently clips its last line - which is how page 7 lost the end of
+     its own callout. */
   .callout{border-left:3.5pt solid var(--accent); background:var(--surface-2);
-           padding:11pt 14pt; margin:0 0 13pt;}
+           padding:10pt 14pt; margin:0 0 13pt;}
+  /* :last-of-type would match the last DIV on the page, and the folio is a
+     div too, so it never matched the callout. nth-last-child(2) is the
+     element with only the folio after it, which is what "last on the
+     sheet" actually means here. */
+  .page > .callout:nth-last-child(2){margin-bottom:0;}
   .callout .lab{font-family:var(--mono); font-size:7.6pt; letter-spacing:.13em;
                 text-transform:uppercase; color:var(--accent); display:block; margin-bottom:4pt;}
   .callout p{margin:0; font-size:10.4pt; line-height:1.55;}
@@ -105,8 +116,17 @@ def step(n, head, *paras):
     return f'<div class="stepbig"><div class="n">{n}</div><div><h4>{head}</h4>{ps}</div></div>'
 
 
-def shot(src, cap):
-    return f'<div class="shot"><img src="{src}" alt=""><div class="cap">{cap}</div></div>'
+def shot(src, cap, cls=""):
+    """A framed screenshot with a caption.
+
+    cls is for pages that carry more than one figure: the phone captures are
+    tall, and two of them at full width push whatever follows off the bottom
+    of a fixed-height sheet. "tall" crops the figure to the part the caption
+    is talking about rather than shrinking the whole page's type.
+    """
+    c = f" {cls}" if cls else ""
+    return (f'<div class="shot{c}"><img src="{src}" alt="">'
+            f'<div class="cap">{cap}</div></div>')
 
 
 def callout(lab, text, kind=""):
@@ -231,10 +251,12 @@ PAGES.append(page(
     + '</div>'
     + shot("figs_op/02_material.png", "Station and material, with the target weight underneath.")
     + '</div>'
-    + callout("If nothing is assigned to your station",
-              "You will see a note saying no run matched. Keep going &mdash; your log still "
-              "records and still counts. Tell your lead, because it means the work order side "
-              "has not been set up, not that you did anything wrong.")
+    + callout("If the screen never mentions a run",
+              "That is normal, and nothing is missing. Most plants use this as a log: you pick "
+              "the station and material, read the lot, enter the counts, and that is the whole "
+              "job. If yours does assign work to stations and you see a note saying no open run "
+              "matches, keep going anyway &mdash; your log still records and still counts &mdash; "
+              "and mention it to your lead afterwards.")
 , 5))
 
 # ------------------------------------------------------------ logging: lot ---
@@ -252,10 +274,10 @@ PAGES.append(page(
     + '</div>'
     + shot("figs_op/03_lot_blank.png", "The lot check, before you type.")
     + '</div>'
-    + callout("The lot the run expects is hidden on purpose",
-              "You will see dots instead of a number. That is not a fault. If the screen showed "
-              "you the answer, the check would be checking nothing &mdash; <b>read the container, "
-              "not the screen.</b>")
+    + callout("If a lot is expected, it is hidden on purpose",
+              "Where the screen has something to check yours against, you will see dots instead "
+              "of a number. That is not a fault. If it showed you the answer, the check would be "
+              "checking nothing &mdash; <b>read the container, not the screen.</b>")
 , 6))
 
 # ------------------------------------------------------------ lot outcomes ---
@@ -265,12 +287,11 @@ PAGES.append(page(
     + '<div>'
     + '<h3 style="font-size:12.6pt; margin:0 0 6pt;">Green &mdash; it matches</h3>'
     + '<p style="font-size:10.6pt;">Carry on and enter your counts. Nothing else to do.</p>'
-    + '<p style="font-size:10.6pt; margin-top:7pt;">On your next log at the same station, with '
-      'the same resin and lot, this becomes a single tap to confirm the container in your hand '
-      'still reads the same code. The full check comes back whenever anything changes, after '
-      'four hours, and on every tenth log.</p>'
+    + '<p style="font-size:10.6pt; margin-top:7pt;">Next time, at the same station on the same '
+      'resin and lot, it becomes a single tap to confirm the container still reads the same code. '
+      'The full check returns on any change, after four hours, and every tenth log.</p>'
     + '</div>'
-    + shot("figs_op/05_lot_ok.png", "A clean check.")
+    + shot("figs_op/05_lot_ok.png", "A clean check.", "tall")
     + '</div>'
     + '<div class="row wide">'
     + '<div>'
@@ -278,14 +299,17 @@ PAGES.append(page(
     + '<p style="font-size:10.6pt;">This container is not from the lot your run expects. '
       '<b>Set it aside and get your lead.</b></p>'
     + '<p style="font-size:10.6pt; margin-top:7pt;">If you pull it, press <em>Wrong cartridge '
-      '&mdash; pulled it, nothing poured</em>. That records the catch, which is worth having: it '
-      'is the system working.</p>'
-    + '<p style="font-size:10.6pt; margin-top:7pt;">If your lead decides the pour goes ahead '
-      'anyway, choose a reason, add the detail, and photograph the label. The log then saves with '
-      'a flag on it so it can be reviewed later.</p>'
+      '&mdash; pulled it, nothing poured</em>. That records the catch: it is the system working.</p>'
+    + '<p style="font-size:10.6pt; margin-top:7pt;">If your lead decides it goes ahead anyway, '
+      'choose a reason, add the detail, and photograph the label. The log saves with a flag on it '
+      'for review.</p>'
     + '</div>'
-    + shot("figs_op/04_lot_stop.png", "A mismatch.")
+    + shot("figs_op/04_lot_stop.png", "A mismatch.", "tall")
     + '</div>'
+    + '<h3 style="font-size:12.6pt; margin:7pt 0 5pt;">Blue &mdash; recorded</h3>'
+    + '<p style="font-size:10.6pt;">If your plant does not assign work to stations there is '
+      'nothing to compare yours against, so the screen reads your code back and saves it with the '
+      'log. Nothing has gone wrong &mdash; <b>read and type it exactly the same way.</b></p>'
     + callout("A mismatch never stops you working",
               "It asks for an explanation, and it never blocks you from pulling the container "
               "&mdash; the safe thing to do is always the quickest thing to do.", "stop")
@@ -360,10 +384,11 @@ PAGES.append(page(
           "Do not pour. Set the container aside and press <em>Wrong cartridge &mdash; pulled it, "
           "nothing poured</em>. That is a complete, correct outcome on its own; nothing is left "
           "hanging by choosing it.")
-    + fix("It says no active run matched my station",
+    + fix("It says no open run matches my station",
           "Log the hour anyway &mdash; it records and it counts. Read the code off the container "
-          "as normal; it gets stored against your log. Tell your lead so the work order can be "
-          "set up.")
+          "as normal; it is stored against your log either way. If your plant assigns work to "
+          "stations, tell your lead afterwards so it can be set up. If it does not, this is "
+          "simply how the screen looks and there is nothing to report.")
     + fix("I typed the wrong number and already submitted",
           "Press <em>Undo last</em> within two minutes. After that, ask your lead &mdash; they can "
           "correct it from their side, and it is better fixed than left.")
@@ -375,9 +400,11 @@ PAGES.append(page(
           "<em>Glove mode</em> makes every button and box bigger for gloved hands, and there are "
           "light themes for working under bright shop lighting. Both are remembered.")
     + fix("I keep losing my place while pouring",
-          "Turn on <em>Focus mode</em> at the top of the logging tab. It strips the screen down "
-          "to the four things you need mid-run &mdash; resin, lot, count so far, how many left "
-          "&mdash; big enough to read from across the station.")
+          "If there is a <em>Focus mode</em> toggle at the top of the logging tab, turn it on: it "
+          "strips the screen down to the four things you need mid-run &mdash; resin, lot, count "
+          "so far, how many left &mdash; big enough to read from across the station. It only "
+          "appears in plants that assign work to stations, because those four numbers come off "
+          "the assignment.")
 , 10))
 
 # ------------------------------------------------------------- what else -----
@@ -387,8 +414,9 @@ PAGES.append(page(
       'anything from you beyond the hourly log. It is here so you know what happens to what you '
       'type, and who is looking at it.</p>'
     + '<div class="later" style="margin-top:14pt;">'
-      '<div><b>Work orders</b>Managers dispatch runs to a pump. That is where the expected lot '
-      'in your check comes from, and how your units count towards a target.</div>'
+      '<div><b>Work orders</b>Optional, and off unless a plant turns it on. When it is on, a '
+      'manager dispatches runs to a pump; that is where an expected lot comes from, and how your '
+      'units count towards a target.</div>'
       '<div><b>The floor display</b>A screen showing the shift&rsquo;s pace, built from the same '
       'logs. No extra entry &mdash; it is your hourly figures, shown large.</div>'
       '<div><b>Trends and reports</b>Yield, scrap and downtime over weeks, and a shift handover '

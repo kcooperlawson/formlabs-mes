@@ -54,6 +54,15 @@ print("=" * 66)
 print("UI RENDER: pages/Operator_Form.py")
 print("=" * 66)
 
+# Most of this file is about the lot gate comparing a typed code against the
+# lot on an open run, so this plant has to be one that dispatches runs. A new
+# install is not - see migration 0009 - and with work orders off the page
+# deliberately cannot see a run at all, which would fail every gate assertion
+# below for the right reason and the wrong purpose. Simple mode gets its own
+# section at the end, where it is the thing under test rather than the setup.
+import database as _db_setup
+_db_setup.update_plant_settings({"simple_mode": False})
+
 # --- A. an operator who has NOT done the checklist sees the lock -----------
 import uuid
 OP = "Dee " + uuid.uuid4().hex[:6].upper()
@@ -266,6 +275,54 @@ try:
 finally:
     _db.update_plant_settings({"pump_form_url": _saved.get("pump_form_url", ""),
                                 "pump_form_label": _saved.get("pump_form_label", "")})
+
+
+# --- G. simple mode: a plant that logs and does not dispatch --------------
+# The default for a new install. The point of this section is that the page
+# stops describing what is missing: no run cards, no notice about a run that
+# did not match, and - the one that matters for safety rather than tone - no
+# comparison against a run the operator was never shown.
+try:
+    _db.update_plant_settings({"simple_mode": True})
+    at8 = run_as(OP, h_pump=STATION)
+    body8 = texts(at8)
+
+    check("page still renders with work orders off", at8.exception, [])
+    check("no run cards headed by a manager's name",
+          "Active Assigned Production Runs" in body8, False)
+    check("no notice about a run that did not match",
+          "No open run matches" in body8, False)
+    check("nothing sends the operator to find a manager",
+          "Plant Manager" in body8, False)
+    check("and no leftover 'no production runs in database'",
+          "No production runs" in body8, False)
+    check("focus mode is not offered when it could only show an empty screen",
+          any("Focus mode" in (t.label or "") for t in at8.toggle), False)
+
+    # The lot field is still there, and still asks for the same thing. This is
+    # the part that has to survive: recording which lot went into a pour is
+    # the whole traceability answer, and it needs nothing set up.
+    check("the lot field is still asked for",
+          any("lot on the" in (ti.label or "") for ti in at8.text_input), True)
+    check("and the instruction still points at the label on the bottom",
+          "lot label on the bottom" in body8, True)
+
+    # A stale open run must not reach a terminal that cannot display it. The
+    # workflow fixture leaves a real V1 run on this station with a real lot;
+    # with work orders off, typing a WRONG code must not raise a stop screen
+    # for a run the operator has no way to know about.
+    for ti in at8.text_input:
+        if "lot on the" in (ti.label or ""):
+            ti.set_value("L-0000WRONG").run()
+            break
+    body8b = texts(at8)
+    check("a hidden run cannot stop a pour it was never shown for",
+          "DO NOT POUR" in body8b, False)
+    check("the wrong-looking code is simply recorded",
+          "Recorded" in body8b or "recorded" in body8b, True)
+    print("  simple mode OK (logs, records the lot, invents no missing setup)")
+finally:
+    _db.update_plant_settings({"simple_mode": False})
 
 print("\n" + "=" * 66)
 if FAILS:

@@ -136,9 +136,10 @@ td.k{font-weight:600; color:var(--ink);}
   <h1>Manufacturing Execution System</h1>
   <div class="sub">Capability &amp; Operations Handbook</div>
   <div class="rule"></div>
-  <div class="blurb">What the resin pouring station's production system does today, screen
-  by screen, with a working guide for each role that uses it &mdash; and an honest account
-  of what is still experimental.</div>
+  <div class="blurb">A reference, not a proposal. What the resin pouring station's production
+  system does today, screen by screen &mdash; most of it optional, all of it built on one hourly
+  log &mdash; with a working guide for each role and an honest account of what is still
+  experimental.</div>
   <div class="meta">
     <div>Release<b>Version 3.10</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
@@ -154,9 +155,9 @@ td.k{font-weight:600; color:var(--ink);}
   their first shift. Section 12 covers readability on the floor, and section 14 what exists but is
   not in service.</p>
   <div class="toc">
-    <div class="row"><span class="num">01</span><span class="t">Overview</span><span class="d">What it replaced and what it records</span><span class="pg">3</span></div>
+    <div class="row"><span class="num">01</span><span class="t">Overview</span><span class="d">What it records, and what it asks of anyone</span><span class="pg">3</span></div>
     <div class="row"><span class="num">02</span><span class="t">How it fits together</span><span class="d">Architecture and where data goes</span><span class="pg">4</span></div>
-    <div class="row"><span class="num">03</span><span class="t">Production execution</span><span class="d">Work orders, hourly logging, run tracking</span><span class="pg">5</span></div>
+    <div class="row"><span class="num">03</span><span class="t">Production execution</span><span class="d">Hourly logging, and optional work orders</span><span class="pg">5</span></div>
     <div class="row"><span class="num">04</span><span class="t">Quality &amp; traceability</span><span class="d">Lot verification, scrap, photo audits</span><span class="pg">7</span></div>
     <div class="row"><span class="num">05</span><span class="t">Live plant visibility</span><span class="d">SCADA, reactor fleet, floor display</span><span class="pg">11</span></div>
     <div class="row"><span class="num">06</span><span class="t">Analytics &amp; reporting</span><span class="d">Trends, handover PDFs, cloud export</span><span class="pg">13</span></div>
@@ -188,9 +189,15 @@ td.k{font-weight:600; color:var(--ink);}
   quality question after the fact.</p>
   <p style="margin-top:9pt;">This is that record. A web application opened in a browser &mdash; on an
   operator's phone at the pump, on a desk in the office, and on the floor display &mdash; backed by a
-  PostgreSQL database. Managers dispatch work orders; operators log against them as the hour
-  happens. The figures on the wall display, in the analytics charts and in the emailed shift handover
-  are not separate reports: they are the same rows, read different ways.</p>
+  PostgreSQL database. Operators log the hour as it happens, at the pump. That log is the whole
+  input: the figures on the wall display, in the analytics charts and in the emailed shift handover
+  are not separate reports, they are the same rows read different ways.</p>
+  <p style="margin-top:9pt;">Nothing here asks a manager to enter anything. The system installs
+  with work orders switched off &mdash; a plant that wants to dispatch runs to stations and track
+  them against a target turns that on, and the screens for it appear; a plant that does not is a
+  log, and the operator terminal never mentions runs at all. Every capability described in this
+  handbook past section 3 works the same way: a setting, answering a question somebody asked
+  first, not a step in getting the record.</p>
 
   <div class="grid3" style="margin:16pt 0 14pt;">
     <div class="stat"><span class="n">18</span><span class="l">screens, from the operator terminal to the IT console</span></div>
@@ -294,9 +301,13 @@ td.k{font-weight:600; color:var(--ink);}
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">03 &nbsp;/&nbsp; Production execution</span><h2>Work orders</h2></div>
-  <p class="lead" style="margin-bottom:11pt;">A manager creates a work order against a reactor, resin,
-  container format and lot. Hourly logs submitted at that station are matched to it automatically.</p>
+  <div class="sec-head"><span class="eyebrow">03 &nbsp;/&nbsp; Production execution</span><h2>Work orders &mdash; optional</h2></div>
+  <p class="lead" style="margin-bottom:9pt;">Off unless a plant turns it on, and the operator
+  terminal on the next page is complete without it. This page is what becomes available if somebody
+  wants work dispatched to stations and tracked against a target.</p>
+  <p style="margin-bottom:11pt;">A manager creates a work order against a reactor, resin,
+  container format and lot. Hourly logs submitted at that station are matched to it automatically,
+  and the lot check gains something to compare against instead of only recording what was read.</p>
   <figure><img src="figs_print/03_workorders.png" alt="Work order dispatch">
     <figcaption><b>Work Orders &amp; Assigned Runs.</b> Fleet-wide progress across active runs, with status,
     assigned operator, pump station and lot. Completed orders move to a separate history tab.</figcaption></figure>
