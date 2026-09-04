@@ -55,3 +55,7 @@ tests/visual_diffs/
 
 # Scratch left by tooling that cannot delete files here
 _to_delete/
+
+# The desktop app drops a copy of anything sent into the chat here. The
+# deliverables already live at the repo root; this folder is duplicates.
+Claude outputs/

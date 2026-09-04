@@ -129,19 +129,44 @@ td.k{font-weight:600; color:var(--ink);}
 .theme .nm{font-size:8.4pt; font-weight:600; color:var(--ink);}
 .theme .sw{font-family:var(--mono); font-size:6.8pt; color:var(--faint);}
 .chip{display:inline-block; width:7pt; height:7pt; border-radius:1.5pt; margin-left:3pt; vertical-align:-.5pt;}
-</style></head><body>
+
+/* Part banding and section status. The distinction between what runs and what
+   is merely available has to survive somebody opening the document in the
+   middle, so it lives on every section header rather than only in the
+   contents. */
+.partband{font-family:var(--mono); font-size:6.4pt; letter-spacing:.18em;
+          text-transform:uppercase; color:var(--ground); background:var(--ink);
+          display:inline-block; padding:2.5pt 7pt; border-radius:2pt; margin-bottom:7pt;}
+.sec-head .hrow{display:flex; justify-content:space-between; align-items:baseline;
+                gap:10pt; margin-bottom:5pt;}
+.sec-head .hrow .eyebrow{display:inline; margin-bottom:0;}
+.status{font-family:var(--mono); font-size:6.4pt; letter-spacing:.13em; text-transform:uppercase;
+        padding:2pt 6pt; border-radius:2pt; border:.5pt solid var(--line);
+        color:var(--muted); background:var(--surface-2); white-space:nowrap; flex:none;}
+.status.in{color:#166534; border-color:#BBF7D0; background:#F0FDF4;}
+.status.opt{color:#92400E; border-color:var(--accent-dim); background:#FFFBEB;}
+.status.no{color:var(--faint); border-color:var(--line); background:var(--surface-2);}
+/* The contents now carries three part bands and a scope note as well as its
+   rows, so the rows themselves give up a point of leading each. */
+.toc .row{padding:4.2pt 0;}
+
+/* contents banding */
+.toc-band{font-family:var(--mono); font-size:6.8pt; letter-spacing:.16em;
+          text-transform:uppercase; color:var(--accent); margin:11pt 0 3pt;}
+.toc .row:first-of-type{border-top:none;}
+</style></head>
+<body>
 
 <section class="page cover">
   <img class="logo" src="assets/formlabs_logo.png" alt="Formlabs">
-  <h1>Manufacturing Execution System</h1>
-  <div class="sub">Capability &amp; Operations Handbook</div>
+  <h1>Resin Pouring &mdash; Production Logging</h1>
+  <div class="sub">Operations Handbook</div>
   <div class="rule"></div>
-  <div class="blurb">A reference, not a proposal. What the resin pouring station's production
-  system does today, screen by screen &mdash; most of it optional, all of it built on one hourly
-  log &mdash; with a working guide for each role and an honest account of what is still
-  experimental.</div>
+  <div class="blurb">An hourly production record for the pouring station, kept by the operators on
+  the phones they already carry. Part One is what runs today and what comes out of it. Part Two is
+  what the same record can be asked to do, each of which is a setting rather than a requirement.</div>
   <div class="meta">
-    <div>Release<b>Version 3.10</b></div>
+    <div>Release<b>Version 3.11</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -149,40 +174,34 @@ td.k{font-weight:600; color:var(--ink);}
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">Contents</span><h2>What's in this handbook</h2></div>
-  <p class="lead" style="margin-bottom:15pt;">Sections 1 to 8 describe what the system does.
-  Sections 9 to 11 are working guides for each role, written so a new starter can follow them on
-  their first shift. Section 12 covers readability on the floor, and section 14 what exists but is
-  not in service.</p>
+  <div class="sec-head"><span class="eyebrow">Contents</span><h2>What is in this handbook</h2></div>
+  <p class="lead" style="margin-bottom:12pt;">Part One is the system as it runs: one screen an operator uses, and everything read back out of what they enter. <strong>Nothing in it requires an entry from anyone but the operator.</strong> Part Two is what the same record supports if it is wanted, each one a setting that is switched off until somebody switches it on.</p>
   <div class="toc">
-    <div class="row"><span class="num">01</span><span class="t">Overview</span><span class="d">What it records, and what it asks of anyone</span><span class="pg">3</span></div>
-    <div class="row"><span class="num">02</span><span class="t">How it fits together</span><span class="d">Architecture and where data goes</span><span class="pg">4</span></div>
-    <div class="row"><span class="num">03</span><span class="t">Production execution</span><span class="d">Hourly logging, and optional work orders</span><span class="pg">5</span></div>
-    <div class="row"><span class="num">04</span><span class="t">Quality &amp; traceability</span><span class="d">Lot verification, scrap, photo audits</span><span class="pg">7</span></div>
-    <div class="row"><span class="num">05</span><span class="t">Live plant visibility</span><span class="d">SCADA, reactor fleet, floor display</span><span class="pg">11</span></div>
-    <div class="row"><span class="num">06</span><span class="t">Analytics &amp; reporting</span><span class="d">Trends, handover PDFs, cloud export</span><span class="pg">13</span></div>
-    <div class="row"><span class="num">07</span><span class="t">Administration &amp; security</span><span class="d">Accounts, configuration, backups</span><span class="pg">15</span></div>
-    <div class="row"><span class="num">08</span><span class="t">Who can do what</span><span class="d">Roles and the access matrix</span><span class="pg">17</span></div>
-    <div class="row"><span class="num">09</span><span class="t">Guide &mdash; Operator</span><span class="d">Start of shift to end of shift</span><span class="pg">18</span></div>
-    <div class="row"><span class="num">10</span><span class="t">Guide &mdash; Manager</span><span class="d">Dispatching work, reading the floor</span><span class="pg">21</span></div>
-    <div class="row"><span class="num">11</span><span class="t">Guide &mdash; Administrator</span><span class="d">Provisioning and recovery</span><span class="pg">23</span></div>
-    <div class="row"><span class="num">12</span><span class="t">Interface &amp; readability</span><span class="d">Thirty-four themes, gloves, glare and night shifts</span><span class="pg">24</span></div>
-    <div class="row"><span class="num">13</span><span class="t">Engineering quality</span><span class="d">How it's tested</span><span class="pg">26</span></div>
-    <div class="row"><span class="num">14</span><span class="t">Built but not in service</span><span class="d">Pack-out and machine integration</span><span class="pg">27</span></div>
+    <div class="toc-band">Part One &mdash; in service</div>
+    <div class="row"><span class="num">01</span><span class="t">What it records</span><span class="d">What the record holds, and what it asks of anyone</span><span class="pg">3</span></div>
+    <div class="row"><span class="num">02</span><span class="t">How it fits together</span><span class="d">One database, and every screen a window onto it</span><span class="pg">4</span></div>
+    <div class="row"><span class="num">03</span><span class="t">The operator terminal</span><span class="d">The one screen an operator uses</span><span class="pg">5</span></div>
+    <div class="row"><span class="num">04</span><span class="t">Lot traceability</span><span class="d">Which lot went into which containers</span><span class="pg">6</span></div>
+    <div class="row"><span class="num">05</span><span class="t">What comes out of it</span><span class="d">Scrap, trends, exports and the shift handover</span><span class="pg">7</span></div>
+    <div class="row"><span class="num">06</span><span class="t">The floor as it is now</span><span class="d">The live view of the floor as it stands</span><span class="pg">10</span></div>
+    <div class="row"><span class="num">07</span><span class="t">Who can do what</span><span class="d">Roles, and what each one can reach</span><span class="pg">11</span></div>
+    <div class="row"><span class="num">08</span><span class="t">Running it</span><span class="d">Backups, accounts, and keeping the record honest</span><span class="pg">12</span></div>
+    <div class="toc-band">Part Two &mdash; available if wanted</div>
+    <div class="row"><span class="num">09</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">14</span></div>
+    <div class="row"><span class="num">10</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">15</span></div>
+    <div class="row"><span class="num">11</span><span class="t">Reactors and the floor display</span><span class="d">Vessel levels and the wall display</span><span class="pg">17</span></div>
+    <div class="toc-band">Appendices</div>
+    <div class="row"><span class="num">A</span><span class="t">Guide &mdash; Operator</span><span class="d">Working guides for operator, manager and administrator</span><span class="pg">18</span></div>
+    <div class="row"><span class="num">B</span><span class="t">Reading the screen on the floor</span><span class="d">Gloves, lighting, contrast and colour on the floor</span><span class="pg">24</span></div>
+    <div class="row"><span class="num">C</span><span class="t">How it is tested</span><span class="d">What is checked before a release, and what that has caught</span><span class="pg">25</span></div>
+    <div class="row"><span class="num">D</span><span class="t">Built, not in service</span><span class="d">Built, not in use, and not proposed</span><span class="pg">26</span></div>
   </div>
-  <div class="note" style="margin-top:18pt;">
-    <span class="eyebrow">About the screenshots</span>
-    <p>Every screen shown is a live capture of the running system against a representative fortnight
-    of activity. The operator and manager names in them are fictional. Most are in the dark house theme
-    with their black floor lifted so the page can be printed without soaking the sheet; the two fill-weight
-    figures are captured in <b>Paper White</b>, one of the light themes described in section 12, because
-    lifting a dark capture washes out exactly the small labels those two are about.</p>
-  </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>2</span></div>
+  <div class="note" style="margin-top:14pt;"><span class="eyebrow">On scope</span><p>This system was built on the floor alongside the job, and it covers more ground than the plant needs today. The marker on each section says which is which: <b>In service</b> runs now; <b>Optional</b> is finished and switched off until somebody wants it; <b>Not in service</b> was built to find out whether an approach works, with nothing depending on it. <b>Part One is what is being proposed</b> &mdash; the rest is here so the capability is known, not because it is being asked for.</p></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>2</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">01 &nbsp;/&nbsp; Overview</span><h2>What the system is</h2></div>
+  <div class="sec-head"><div class="partband">Part One &mdash; In service</div><div class="hrow"><span class="eyebrow">01 &nbsp;/&nbsp; What it records</span><span class="status in">In service</span></div><h2>A production record for resin pouring</h2></div>
   <p class="lead">Resin pouring has never had a production tracking system. Counts, downtime,
   changeovers and cartridge lots lived on paper and in people's heads, which means the plant has been
   running without a record it could query, an hourly pace it could see, or any way to answer a
@@ -195,8 +214,8 @@ td.k{font-weight:600; color:var(--ink);}
   <p style="margin-top:9pt;">Nothing here asks a manager to enter anything. The system installs
   with work orders switched off &mdash; a plant that wants to dispatch runs to stations and track
   them against a target turns that on, and the screens for it appear; a plant that does not is a
-  log, and the operator terminal never mentions runs at all. Every capability described in this
-  handbook past section 3 works the same way: a setting, answering a question somebody asked
+  log, and the operator terminal never mentions runs at all. Everything in Part Two of this
+  handbook works the same way: a setting, answering a question somebody asked
   first, not a step in getting the record.</p>
 
   <div class="grid3" style="margin:16pt 0 14pt;">
@@ -222,14 +241,14 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note" style="margin-top:12pt;">
     <span class="eyebrow">Scope</span>
     <p>The system is in service for resin pouring. Pack-out logging and machine integration are built
-    but not in use; both are described in section 14 rather than here, because neither has been
+    but not in use; both are described in Appendix D rather than here, because neither has been
     committed to.</p>
   </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>3</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>3</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">02 &nbsp;/&nbsp; How it fits together</span><h2>One database, many windows</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">02 &nbsp;/&nbsp; How it fits together</span><span class="status in">In service</span></div><h2>One database, many windows</h2></div>
   <p class="lead" style="margin-bottom:12pt;">Nothing on the floor keeps its own copy of the numbers.</p>
   <svg viewBox="0 0 720 300" style="width:100%;height:auto;margin-bottom:14pt;">
     <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto">
@@ -297,45 +316,18 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="step"><span class="n">4</span><div><h4>Everything else follows</h4><p>Display, analytics,
       handover and exports all read those same rows.</p></div></div>
   </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>4</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>4</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">03 &nbsp;/&nbsp; Production execution</span><h2>Work orders &mdash; optional</h2></div>
-  <p class="lead" style="margin-bottom:9pt;">Off unless a plant turns it on, and the operator
-  terminal on the next page is complete without it. This page is what becomes available if somebody
-  wants work dispatched to stations and tracked against a target.</p>
-  <p style="margin-bottom:11pt;">A manager creates a work order against a reactor, resin,
-  container format and lot. Hourly logs submitted at that station are matched to it automatically,
-  and the lot check gains something to compare against instead of only recording what was read.</p>
-  <figure><img src="figs_print/03_workorders.png" alt="Work order dispatch">
-    <figcaption><b>Work Orders &amp; Assigned Runs.</b> Fleet-wide progress across active runs, with status,
-    assigned operator, pump station and lot. Completed orders move to a separate history tab.</figcaption></figure>
-  <div class="grid2" style="margin-top:11pt;">
-    <div class="card"><span class="tag">Dispatch</span><h4>Create and assign</h4>
-      <p>Reactor, size, resin, container format, target units, station and lot number, dispatched to a
-      station rather than to one named person.</p></div>
-    <div class="card"><span class="tag">Counting</span><h4>Progress from logs</h4>
-      <p>A run's count is recomputed from the production logs that match it, so deleting a bad entry
-      re-syncs the order instead of leaving it overstated.</p></div>
-    <div class="card"><span class="tag">Shared stations</span><h4>Several operators, one run</h4>
-      <p>Progress follows the pump station, so any number of operators can work the same run without a
-      duplicate assignment being created for each.</p></div>
-    <div class="card"><span class="tag">Closeout</span><h4>Finish on the real number</h4>
-      <p>A run can be completed on a custom final total when the physical count differs, and the reactor
-      it drew from is released.</p></div>
-  </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>5</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">03 &nbsp;/&nbsp; Production execution</span><h2>The operator terminal</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">03 &nbsp;/&nbsp; The operator terminal</span><span class="status in">In service</span></div><h2>The operator terminal</h2></div>
   <p class="lead" style="margin-bottom:11pt;">One screen, sized for a gloved thumb on a phone: stacked
   inputs, large targets, no navigation to get lost in. Operators open it on their own
   handsets rather than at a shared terminal.</p>
-  <figure><img class="med" src="figs_print/20_activeruns.png" alt="Active runs on the operator terminal">
-    <figcaption><b>Active runs at this station.</b> Reactor, container format, dispatching manager and live
-    progress. The lot is masked for operators &mdash; see section 4.</figcaption></figure>
+  <figure><img class="med" src="figs_print/20_terminal.png" alt="The pouring log on the operator terminal">
+    <figcaption><b>The hourly log.</b> Station and material, the lot read off the container, then the
+    counts. This is the screen in full &mdash; there is nothing above it and nothing after the submit
+    button.</figcaption></figure>
   <div class="grid2" style="margin-top:11pt;">
     <div class="card"><span class="tag">Tab 1</span><h4>Log hourly pouring</h4>
       <p>Station, container format, resin, verified lot, good units and both scrap categories, with the
@@ -352,11 +344,11 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note" style="margin-top:12pt;"><span class="eyebrow">Always visible</span>
     <p>Units poured, scrap and quality yield for that operator sit at the top of the screen and update as
     they log. It is the same figure management sees; there is no separate scoring.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>6</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>5</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">04 &nbsp;/&nbsp; Quality &amp; traceability</span><h2>Lot verification</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">04 &nbsp;/&nbsp; Lot traceability</span><span class="status in">In service</span></div><h2>Lot verification</h2></div>
   <p class="lead" style="margin-bottom:11pt;">Lot labels get mixed up at the pumps: a pallet of
   pre-labelled empties is staged that belongs to a different lot, and resin goes into it. An earlier build
   of this form auto-filled the run's lot and printed it on screen, which meant an hour could be logged
@@ -380,19 +372,19 @@ td.k{font-weight:600; color:var(--ink);}
       slower one.</p></div>
   </div>
   <figure style="margin-top:11pt;"><img src="figs_print/13b_gate_rps.png" alt="The same check on an RPS jug"
-       style="max-height:1.15in;">
+       style="max-height:0.98in;">
     <figcaption><b>The same check on a bulk jug.</b> RPS was the one exempt format, on the understanding
     that jugs carried nothing to read. They carry the same lot label a cartridge does, in the same place
     &mdash; so it is the same check, and only the noun changes with the format picked above.</figcaption></figure>
   <div class="note" style="margin-top:10pt;"><span class="eyebrow">Design note</span>
-    <p>A mismatch does not stop the line; it requires an explanation, because a control that halts
-    production is one people learn to work around. Every flag and every pulled container reaches the
-    manager's review page.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>7</span></div>
+    <p>A mismatch does not stop the line; it asks for an explanation, because a control that halts
+    production is one people learn to work around. Every flag and every pulled container reaches
+    the manager's review page.</p></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>6</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">04 &nbsp;/&nbsp; Quality &amp; traceability</span><h2>Review and scrap intelligence</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">05 &nbsp;/&nbsp; What comes out of it</span><span class="status in">In service</span></div><h2>Review and scrap intelligence</h2></div>
   <figure><img class="med" src="figs_print/05_lotverify.png" alt="Lot verification review">
     <figcaption><b>Lot Verification review.</b> Every check completed, pass or fail. The passes record that
     the check happened; the flags are the mix-ups. Coverage per operator shows who is completing full
@@ -409,11 +401,166 @@ td.k{font-weight:600; color:var(--ink);}
       <p>The verification register exports directly, so a quality question or customer audit can be
       answered without a database query.</p></div>
   </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>8</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>7</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">04 &nbsp;/&nbsp; Quality &amp; traceability</span><h2>Fill weight and giveaway</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">05 &nbsp;/&nbsp; What comes out of it</span><span class="status in">In service</span></div><h2>Trends</h2></div>
+  <figure><img class="med" src="figs_print/04_analytics.png" alt="Analytics hub">
+    <figcaption><b>Analytics Hub.</b> Output trend over the selected horizon, share of production by resin
+    formulation, and downtime ranked by reason.</figcaption></figure>
+  <figure style="margin-top:10pt;"><img class="med" src="figs_print/08_historical.png" alt="Historical trends">
+    <figcaption><b>Historical Production Trends.</b> The same data filtered by horizon, resin and individual
+    operator, for month-to-date, year-to-date or any range.</figcaption></figure>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>8</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">05 &nbsp;/&nbsp; What comes out of it</span><span class="status in">In service</span></div><h2>Reporting out</h2></div>
+  <figure><img class="sml" src="figs_print/11_handover.png" alt="Shift handover">
+    <figcaption><b>Automated Shift Handover.</b> Output, yield, downtime and scrap for the shift, rendered as
+    a PDF in one of two layouts and emailed to the plant's distribution list.</figcaption></figure>
+  <div class="grid2" style="margin-top:11pt;">
+    <div class="card"><span class="tag">Cloud export</span><h4>Google Sheets sync</h4>
+      <p>Two payload shapes &mdash; an aggregated KPI summary or the raw production audit stream &mdash;
+      across four time horizons, pushed on demand, at shift handover, or on a scheduled webhook. Columns
+      are selectable, and internal-only fields are stripped before anything leaves the app.</p></div>
+    <div class="card"><span class="tag">Self-service</span><h4>CSV from any view</h4>
+      <p>Filtered log views and the verification register export directly, so finance, quality or an audit
+      can be answered without a developer.</p></div>
+  </div>
+  <div class="note" style="margin-top:11pt;"><span class="eyebrow">One source</span>
+    <p>The handover PDF, the Google Sheet, the CSV export and the floor display all render from the same
+    production log rows. There is no second system to keep in step.</p></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>9</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">06 &nbsp;/&nbsp; The floor as it is now</span><span class="status in">In service</span></div><h2>The floor as it is now</h2></div>
+  <p class="lead" style="margin-bottom:11pt;">The landing screen for every role. Filters across time
+  horizon, station, resin, operator and shift recalculate every figure on the page.</p>
+  <figure><img class="med" src="figs_print/01_scada.png" alt="Live SCADA">
+    <figcaption><b>Live SCADA.</b> Volume output, resin mass poured (calculated from each formulation's
+    master fill weight), run velocity against the configured target, and pouring yield.</figcaption></figure>
+  <figure style="margin-top:10pt;"><img class="med" src="figs_print/01b_scada_lower.png" alt="SCADA lower">
+    <figcaption><b>Below the fold.</b> Shift trajectory against pace, a pouring leaderboard, and the
+    filtered production stream &mdash; the individual logs behind the figures above.</figcaption></figure>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>10</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">07 &nbsp;/&nbsp; Who can do what</span><span class="status in">In service</span></div><h2>Roles</h2></div>
+  <p class="lead" style="margin-bottom:12pt;">Everyone signs into the same application and sees a
+  different one. Access is checked on every page, so the difference is enforced rather than cosmetic.</p>
+  <table>
+    <thead><tr><th style="width:40%">Capability</th><th>Operator</th><th>Manager</th><th>Admin</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Live SCADA dashboard</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Startup checklist &amp; terminal unlock</td><td class="yes">Required</td><td class="no">n/a</td><td class="no">n/a</td></tr>
+      <tr><td class="k">Log hourly pouring &amp; lot verification</td><td class="yes">Yes</td><td class="part">Test mode</td><td class="part">Test mode</td></tr>
+      <tr><td class="k">Log downtime &amp; cleanliness audits</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Message the plant lead</td><td class="yes">Yes</td><td class="yes">Both ways</td><td class="yes">Both ways</td></tr>
+      <tr><td class="k">Live reactor fleet &amp; reconciliation</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">See the lot a run expects</td><td class="no">Masked</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Create &amp; dispatch work orders</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Analytics hub &amp; historical trends</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Lot verification review &amp; scrap intelligence</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Shift handover PDF &amp; Google sync</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Floor roster &amp; PIN resets</td><td class="no">&mdash;</td><td class="yes">Floor staff</td><td class="yes">All users</td></tr>
+      <tr><td class="k">Master resin specifications</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Log management &amp; bulk cleanup</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Plant configuration, shift count &amp; parameters</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Record a check weight against an hourly log</td><td class="yes">Optional</td><td class="yes">Optional</td><td class="yes">Optional</td></tr>
+      <tr><td class="k">Undo your own last log, within two minutes</td><td class="yes">Own only</td><td class="yes">Own only</td><td class="yes">Own only</td></tr>
+      <tr><td class="k">Database backup &amp; restore</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">Yes</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.4pt;color:var(--faint);margin-top:9pt;"><em>Test mode</em> lets a manager or
+  administrator log on behalf of an operator for training and troubleshooting. The entry is attributed to
+  the operator selected and is visible in the log.</p>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>11</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">08 &nbsp;/&nbsp; Running it</span><span class="status in">In service</span></div><h2>Running the system</h2></div>
+  <figure><img class="sml" src="figs_print/09_admin.png" alt="Admin panel" style="max-height:1.6in;">
+    <figcaption><b>IT Administration.</b> Roster, the issue inbox, database utilities and global plant
+    configuration.</figcaption></figure>
+  <div class="grid2" style="margin-top:11pt;">
+    <div class="card"><span class="tag">People</span><h4>Accounts and roles</h4>
+      <p>Provision staff, assign role and shift, set per-operator rate targets, reset PINs and unlock
+      accounts. Managers can provision floor personnel without full IT access.</p></div>
+    <div class="card"><span class="tag">Plant</span><h4>Global parameters</h4>
+      <p><strong>How many shifts the plant runs</strong> &mdash; this one runs two &mdash; with start
+      times, lengths and breaks; rate and yield targets; handover email recipients; and the address of
+      the pump form the operator terminal links out to.</p></div>
+    <div class="card"><span class="tag">Equipment</span><h4>Stations, reactors, reasons</h4>
+      <p>Pump stations, the reactor fleet and capacities, and the downtime reason list, so the vocabulary
+      stays the plant's own.</p></div>
+    <div class="card"><span class="tag">Recovery</span><h4>Backup and restore</h4>
+      <p>Full database snapshots on demand or on schedule, and a restore path from any snapshot.</p></div>
+  </div>
+  <figure style="margin-top:10pt;"><img class="sml" src="figs_print/18_resins.png" alt="Resin specs">
+    <figcaption><b>Master Resin Specifications.</b> Target fill weight, tolerance band and shelf life
+    &mdash; what every check weight is judged against, and what turns a bottle count into resin mass.
+    Each formulation carries its colour from the plant's own master sheet.</figcaption></figure>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>12</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">08 &nbsp;/&nbsp; Running it</span><span class="status in">In service</span></div><h2>Access control and data integrity</h2></div>
+  <div class="grid2" style="margin-bottom:12pt;">
+    <div><h3>Accounts</h3><ul class="tight">
+      <li><strong>PINs are hashed.</strong> Salted with bcrypt; the database holds no readable PIN, including for administrators.</li>
+      <li><strong>Lockout.</strong> Five failed attempts locks the account for fifteen minutes, with an instant IT unlock.</li>
+      <li><strong>Sessions are tokens.</strong> A signed token with a fixed lifetime backs "remember this device", revocable server-side.</li>
+      <li><strong>Every page checks the role.</strong> Enforced on the page itself, so typing a URL for a screen your role lacks returns access denied.</li>
+      <li><strong>Output is escaped.</strong> Values typed on the floor are escaped before rendering, so a note cannot inject markup or break its own card.</li>
+    </ul></div>
+    <div><h3>The record</h3><ul class="tight">
+      <li><strong>History survives a rename.</strong> Logs carry foreign keys to the person and station as well as the name text.</li>
+      <li><strong>Deletions re-sync.</strong> Removing a log recalculates whatever work order it counted toward.</li>
+      <li><strong>Bulk deletion is deliberately hard.</strong> Disabled until the word DELETE is typed into a confirmation box.</li>
+      <li><strong>Corrections are visible.</strong> A plant-level correction is written as a labelled system adjustment, not by editing an operator's entries.</li>
+      <li><strong>Credentials are kept out of the application itself.</strong> Connection strings and passwords live in a configuration file on the machine, not written into the program.</li>
+    </ul></div>
+  </div>
+  <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management">
+    <figcaption><b>Log Management &amp; Cleanup.</b> Filter production and downtime logs by date, station,
+    resin or operator, review, and delete with the work-order re-sync handled automatically.</figcaption></figure>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>13</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="partband">Part Two &mdash; Available if wanted</div><div class="hrow"><span class="eyebrow">09 &nbsp;/&nbsp; Assigning work to stations</span><span class="status opt">Optional</span></div><h2>Work orders</h2></div>
+  <p class="lead" style="margin-bottom:9pt;">Off unless a plant turns it on, and the operator
+  terminal in Part One is complete without it. This page is what becomes available if somebody
+  wants work dispatched to stations and tracked against a target.</p>
+  <p style="margin-bottom:11pt;">A manager creates a work order against a reactor, resin,
+  container format and lot. Hourly logs submitted at that station are matched to it automatically,
+  and the lot check gains something to compare against instead of only recording what was read.</p>
+  <figure><img src="figs_print/03_workorders.png" alt="Work order dispatch">
+    <figcaption><b>Work Orders &amp; Assigned Runs.</b> Fleet-wide progress across active runs, with status,
+    assigned operator, pump station and lot. Completed orders move to a separate history tab.</figcaption></figure>
+  <div class="grid2" style="margin-top:11pt;">
+    <div class="card"><span class="tag">Dispatch</span><h4>Create and assign</h4>
+      <p>Reactor, size, resin, container format, target units, station and lot number, dispatched to a
+      station rather than to one named person.</p></div>
+    <div class="card"><span class="tag">Counting</span><h4>Progress from logs</h4>
+      <p>A run's count is recomputed from the production logs that match it, so deleting a bad entry
+      re-syncs the order instead of leaving it overstated.</p></div>
+    <div class="card"><span class="tag">Shared stations</span><h4>Several operators, one run</h4>
+      <p>Progress follows the pump station, so any number of operators can work the same run without a
+      duplicate assignment being created for each.</p></div>
+    <div class="card"><span class="tag">Closeout</span><h4>Finish on the real number</h4>
+      <p>A run can be completed on a custom final total when the physical count differs, and the reactor
+      it drew from is released.</p></div>
+  </div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">10 &nbsp;/&nbsp; Fill weight and giveaway</span><span class="status opt">Optional</span></div><h2>Fill weight and giveaway</h2></div>
   <p class="lead" style="margin-bottom:11pt;">The system has always known what every cartridge is
   supposed to weigh. Until now it never recorded what one actually weighed, so it could say how many
   units were poured but not how much resin went into them.</p>
@@ -449,11 +596,11 @@ td.k{font-weight:600; color:var(--ink);}
       <p>For the same reason the run card had to stop printing the lot the check was hiding: a field that
       already contains the right-looking answer gets accepted, not measured.</p></div>
   </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>9</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">04 &nbsp;/&nbsp; Quality &amp; traceability</span><h2>What the readings add up to</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">10 &nbsp;/&nbsp; Fill weight and giveaway</span><span class="status opt">Optional</span></div><h2>What the readings add up to</h2></div>
   <figure><img class="med" src="figs_print/fw_analytics.png" alt="Fill weight analytics">
     <figcaption><b>Fill weight, across a fortnight of pouring.</b> Deviation from target rather than
     absolute grams, so resins with different targets can share an axis; zero is target and out-of-band
@@ -480,28 +627,15 @@ td.k{font-weight:600; color:var(--ink);}
     exception is the reason to look.</p></div>
 
   <div class="note" style="margin-top:11pt;"><span class="eyebrow">Where this leads</span>
-    <p>The machine-integration gateway described in section 14 already carries a serial adapter written
+    <p>The machine-integration gateway described in Appendix D already carries a serial adapter written
     for exactly these bench scales. If they have a serial output the weight arrives with no operator
     effort at all &mdash; and these manual readings are what that automated capture would have to be
     validated against, since checking it needs known-good numbers to check against.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>10</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">05 &nbsp;/&nbsp; Live plant visibility</span><h2>The floor as it is now</h2></div>
-  <p class="lead" style="margin-bottom:11pt;">The landing screen for every role. Filters across time
-  horizon, station, resin, operator and shift recalculate every figure on the page.</p>
-  <figure><img class="med" src="figs_print/01_scada.png" alt="Live SCADA">
-    <figcaption><b>Live SCADA.</b> Volume output, resin mass poured (calculated from each formulation's
-    master fill weight), run velocity against the configured target, and pouring yield.</figcaption></figure>
-  <figure style="margin-top:10pt;"><img class="med" src="figs_print/01b_scada_lower.png" alt="SCADA lower">
-    <figcaption><b>Below the fold.</b> Shift trajectory against pace, a pouring leaderboard, and the
-    filtered production stream &mdash; the individual logs behind the figures above.</figcaption></figure>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>11</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">05 &nbsp;/&nbsp; Live plant visibility</span><h2>Reactors and the floor display</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">11 &nbsp;/&nbsp; Reactors and the floor display</span><span class="status opt">Optional</span></div><h2>Reactors and the floor display</h2></div>
   <figure><img class="med" src="figs_print/07_reactors.png" alt="Live reactors">
     <figcaption><b>Live Reactor Fleet.</b> Each vessel's current resin, assigned pump and remaining volume,
     with reconciliation by visual fill percentage or measured litres when the calculated figure has drifted
@@ -509,125 +643,11 @@ td.k{font-weight:600; color:var(--ink);}
   <figure style="margin-top:10pt;"><img class="med" src="figs_print/15_tv.png" alt="TV dashboard">
     <figcaption><b>Floor display mode.</b> A full-screen, self-refreshing view that auto-detects the active
     shift or shows the full plant day, so the team can see its own pace without opening anything.</figcaption></figure>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>12</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>17</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">06 &nbsp;/&nbsp; Analytics &amp; reporting</span><h2>Trends</h2></div>
-  <figure><img class="med" src="figs_print/04_analytics.png" alt="Analytics hub">
-    <figcaption><b>Analytics Hub.</b> Output trend over the selected horizon, share of production by resin
-    formulation, and downtime ranked by reason.</figcaption></figure>
-  <figure style="margin-top:10pt;"><img class="med" src="figs_print/08_historical.png" alt="Historical trends">
-    <figcaption><b>Historical Production Trends.</b> The same data filtered by horizon, resin and individual
-    operator, for month-to-date, year-to-date or any range.</figcaption></figure>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>13</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">06 &nbsp;/&nbsp; Analytics &amp; reporting</span><h2>Reporting out</h2></div>
-  <figure><img class="sml" src="figs_print/11_handover.png" alt="Shift handover">
-    <figcaption><b>Automated Shift Handover.</b> Output, yield, downtime and scrap for the shift, rendered as
-    a PDF in one of two layouts and emailed to the plant's distribution list.</figcaption></figure>
-  <div class="grid2" style="margin-top:11pt;">
-    <div class="card"><span class="tag">Cloud export</span><h4>Google Sheets sync</h4>
-      <p>Two payload shapes &mdash; an aggregated KPI summary or the raw production audit stream &mdash;
-      across four time horizons, pushed on demand, at shift handover, or on a scheduled webhook. Columns
-      are selectable, and internal-only fields are stripped before anything leaves the app.</p></div>
-    <div class="card"><span class="tag">Self-service</span><h4>CSV from any view</h4>
-      <p>Filtered log views and the verification register export directly, so finance, quality or an audit
-      can be answered without a developer.</p></div>
-  </div>
-  <div class="note" style="margin-top:11pt;"><span class="eyebrow">One source</span>
-    <p>The handover PDF, the Google Sheet, the CSV export and the floor display all render from the same
-    production log rows. There is no second system to keep in step.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>14</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">07 &nbsp;/&nbsp; Administration &amp; security</span><h2>Running the system</h2></div>
-  <figure><img class="sml" src="figs_print/09_admin.png" alt="Admin panel" style="max-height:1.6in;">
-    <figcaption><b>IT Administration.</b> Roster, the issue inbox, database utilities and global plant
-    configuration.</figcaption></figure>
-  <div class="grid2" style="margin-top:11pt;">
-    <div class="card"><span class="tag">People</span><h4>Accounts and roles</h4>
-      <p>Provision staff, assign role and shift, set per-operator rate targets, reset PINs and unlock
-      accounts. Managers can provision floor personnel without full IT access.</p></div>
-    <div class="card"><span class="tag">Plant</span><h4>Global parameters</h4>
-      <p><strong>How many shifts the plant runs</strong> &mdash; this one runs two &mdash; with start
-      times, lengths and breaks; rate and yield targets; handover email recipients; and the address of
-      the pump form the operator terminal links out to.</p></div>
-    <div class="card"><span class="tag">Equipment</span><h4>Stations, reactors, reasons</h4>
-      <p>Pump stations, the reactor fleet and capacities, and the downtime reason list, so the vocabulary
-      stays the plant's own.</p></div>
-    <div class="card"><span class="tag">Recovery</span><h4>Backup and restore</h4>
-      <p>Full database snapshots on demand or on schedule, and a restore path from any snapshot.</p></div>
-  </div>
-  <figure style="margin-top:10pt;"><img class="sml" src="figs_print/18_resins.png" alt="Resin specs">
-    <figcaption><b>Master Resin Specifications.</b> Target fill weight, tolerance band and shelf life
-    &mdash; what every check weight is judged against, and what turns a bottle count into resin mass.
-    Each formulation carries its colour from the plant's own master sheet.</figcaption></figure>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>15</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">07 &nbsp;/&nbsp; Administration &amp; security</span><h2>Access control and data integrity</h2></div>
-  <div class="grid2" style="margin-bottom:12pt;">
-    <div><h3>Accounts</h3><ul class="tight">
-      <li><strong>PINs are hashed.</strong> Salted with bcrypt; the database holds no readable PIN, including for administrators.</li>
-      <li><strong>Lockout.</strong> Five failed attempts locks the account for fifteen minutes, with an instant IT unlock.</li>
-      <li><strong>Sessions are tokens.</strong> A signed token with a fixed lifetime backs "remember this device", revocable server-side.</li>
-      <li><strong>Every page checks the role.</strong> Enforced on the page itself, so typing a URL for a screen your role lacks returns access denied.</li>
-      <li><strong>Output is escaped.</strong> Values typed on the floor are escaped before rendering, so a note cannot inject markup or break its own card.</li>
-    </ul></div>
-    <div><h3>The record</h3><ul class="tight">
-      <li><strong>History survives a rename.</strong> Logs carry foreign keys to the person and station as well as the name text.</li>
-      <li><strong>Deletions re-sync.</strong> Removing a log recalculates whatever work order it counted toward.</li>
-      <li><strong>Bulk deletion is deliberately hard.</strong> Disabled until the word DELETE is typed into a confirmation box.</li>
-      <li><strong>Corrections are visible.</strong> A plant-level correction is written as a labelled system adjustment, not by editing an operator's entries.</li>
-      <li><strong>Credentials are kept out of the application itself.</strong> Connection strings and passwords live in a configuration file on the machine, not written into the program.</li>
-    </ul></div>
-  </div>
-  <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management">
-    <figcaption><b>Log Management &amp; Cleanup.</b> Filter production and downtime logs by date, station,
-    resin or operator, review, and delete with the work-order re-sync handled automatically.</figcaption></figure>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>16</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">08 &nbsp;/&nbsp; Who can do what</span><h2>Roles</h2></div>
-  <p class="lead" style="margin-bottom:12pt;">Everyone signs into the same application and sees a
-  different one. Access is checked on every page, so the difference is enforced rather than cosmetic.</p>
-  <table>
-    <thead><tr><th style="width:40%">Capability</th><th>Operator</th><th>Manager</th><th>Admin</th></tr></thead>
-    <tbody>
-      <tr><td class="k">Live SCADA dashboard</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Startup checklist &amp; terminal unlock</td><td class="yes">Required</td><td class="no">n/a</td><td class="no">n/a</td></tr>
-      <tr><td class="k">Log hourly pouring &amp; lot verification</td><td class="yes">Yes</td><td class="part">Test mode</td><td class="part">Test mode</td></tr>
-      <tr><td class="k">Log downtime &amp; cleanliness audits</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Message the plant lead</td><td class="yes">Yes</td><td class="yes">Both ways</td><td class="yes">Both ways</td></tr>
-      <tr><td class="k">Live reactor fleet &amp; reconciliation</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">See the lot a run expects</td><td class="no">Masked</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Create &amp; dispatch work orders</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Analytics hub &amp; historical trends</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Lot verification review &amp; scrap intelligence</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Shift handover PDF &amp; Google sync</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Floor roster &amp; PIN resets</td><td class="no">&mdash;</td><td class="yes">Floor staff</td><td class="yes">All users</td></tr>
-      <tr><td class="k">Master resin specifications</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Log management &amp; bulk cleanup</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Plant configuration, shift count &amp; parameters</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Record a check weight against an hourly log</td><td class="yes">Optional</td><td class="yes">Optional</td><td class="yes">Optional</td></tr>
-      <tr><td class="k">Undo your own last log, within two minutes</td><td class="yes">Own only</td><td class="yes">Own only</td><td class="yes">Own only</td></tr>
-      <tr><td class="k">Database backup &amp; restore</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">Yes</td></tr>
-    </tbody>
-  </table>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:9pt;"><em>Test mode</em> lets a manager or
-  administrator log on behalf of an operator for training and troubleshooting. The entry is attributed to
-  the operator selected and is visible in the log.</p>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>17</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">09 &nbsp;/&nbsp; Guide &mdash; Operator</span><h2>Your shift, start to finish</h2></div>
+  <div class="sec-head"><div class="partband">Appendices</div><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Operator</span></div><h2>Your shift, start to finish</h2></div>
   <div class="role-band"><div class="me"><b>Operator</b>Pours resin at a pump station</div>
     <div><b>Manager</b>Dispatches and reviews</div><div><b>Admin</b>Runs the system</div></div>
   <div class="step"><span class="n">1</span><div><h4>Sign in on your phone</h4>
@@ -644,10 +664,12 @@ td.k{font-weight:600; color:var(--ink);}
   <figure style="margin:10pt 0;"><img class="sml" src="figs_print/19_checklist_lock.png" alt="Terminal locked">
     <figcaption><b>Terminal locked.</b> Choose your pump here; the answer carries through to your logging
     tab, so you pick your station once.</figcaption></figure>
-  <div class="step"><span class="n">3</span><div><h4>Check the run you have been assigned</h4>
-    <p>Runs assigned to your station appear at the top with reactor, container format and live progress. If
-    nothing is listed, tell your lead before pouring &mdash; your units will still be recorded, but they
-    will not count toward a work order.</p></div></div>
+  <div class="step"><span class="n">3</span><div><h4>Check the run, if your plant assigns them</h4>
+    <p>Work orders are optional and off unless the plant turns them on. Where they are in use, a run
+    assigned to your station appears at the top with reactor, container format and live progress, and
+    if nothing is listed you can mention it to your lead afterwards &mdash; your units are recorded
+    either way. Where they are not in use the screen never mentions runs, and there is nothing here
+    to check.</p></div></div>
   <div class="grid2" style="margin-top:12pt;">
     <div class="card"><span class="tag">If you are locked out</span><h4>Five attempts, fifteen minutes</h4>
       <p>The lock releases on its own, but a manager can reset your PIN from the floor roster
@@ -658,11 +680,11 @@ td.k{font-weight:600; color:var(--ink);}
       hand your phone to someone else to log their hour. If you lose it, tell your lead and have your PIN
       reset.</p></div>
   </div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>18</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>18</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">09 &nbsp;/&nbsp; Guide &mdash; Operator</span><h2>Logging an hour of pouring</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Operator</span></div><h2>Logging an hour of pouring</h2></div>
   <div class="step"><span class="n">4</span><div><h4>Set your station and material</h4>
     <p>Pump station, container format (V2, V1, RPS bulk jug or Pigment) and resin formulation. The target
     fill weight and tolerance for that resin appear underneath &mdash; check it against your scale.</p></div></div>
@@ -692,11 +714,11 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step"><span class="n">9</span><div><h4>Typed the wrong number? Take it back</h4>
     <p>Two minutes to undo your own most recent log &mdash; a 2500 that should have been 250 no longer
     needs a manager. Your latest entry only, and never a flagged one.</p></div></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>19</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>19</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">09 &nbsp;/&nbsp; Guide &mdash; Operator</span><h2>The rest of your terminal</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Operator</span></div><h2>The rest of your terminal</h2></div>
   <div class="grid2">
     <div class="card"><span class="tag">When the line stops</span><h4>Log the downtime</h4>
       <p>Reason, minutes, and anything useful. Log it as it happens rather than reconstructing it later:
@@ -726,11 +748,12 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">The one rule</span>
     <p>Log it when it happens. An hour reconstructed at the end of a shift is a guess, and every pace figure,
     yield number and downtime decision downstream is built on what you enter.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>20</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>20</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">10 &nbsp;/&nbsp; Guide &mdash; Manager</span><h2>Dispatching the day</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Manager</span><span class="status opt">Optional</span></div><h2>Dispatching the day</h2></div>
+  <p class="lead" style="margin-bottom:11pt;">This page applies only where work orders are switched on. Where they are not, a manager enters nothing at all &mdash; the next page, reading the floor and closing the day, is the whole of the role.</p>
   <div class="role-band"><div><b>Operator</b>Pours resin at a pump station</div>
     <div class="me"><b>Manager</b>Dispatches and reviews</div><div><b>Admin</b>Runs the system</div></div>
   <figure><img class="sml" src="figs_print/02_cockpit.png" alt="Manager cockpit">
@@ -751,11 +774,11 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Almost always one of three things: the operator's station does not match the run's, the resin or
     container format differs, or the lot on the run does not match what is staged. The verification review
     shows which.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>21</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>21</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">10 &nbsp;/&nbsp; Guide &mdash; Manager</span><h2>Reading the floor, closing the day</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Manager</span></div><h2>Reading the floor, closing the day</h2></div>
   <div class="grid2">
     <div class="card"><span class="tag">Daily</span><h4>Flagged lot checks</h4>
       <p>Mismatches poured anyway and cartridges pulled, each with the photograph, both lot numbers and the
@@ -780,11 +803,11 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step"><span class="n">6</span><div><h4>Answer the floor</h4>
     <p>The communications page holds every operator's thread. A question left unanswered there gets solved
     badly on the floor instead.</p></div></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>22</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>22</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">11 &nbsp;/&nbsp; Guide &mdash; Administrator</span><h2>Keeping it running</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Administrator</span></div><h2>Keeping it running</h2></div>
   <div class="role-band"><div><b>Operator</b>Pours resin at a pump station</div>
     <div><b>Manager</b>Dispatches and reviews</div><div class="me"><b>Admin</b>Runs the system</div></div>
   <div class="grid2">
@@ -811,108 +834,68 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Do not edit production rows directly in the database to fix a number. Use log management to remove the
     bad entry &mdash; it re-syncs the affected work order &mdash; or a reconciliation to book a variance. Both
     leave a visible record; a direct edit leaves the totals right and the story wrong.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>23</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>23</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">12 &nbsp;/&nbsp; Interface &amp; readability</span><h2>Thirty-four themes</h2></div>
-  <p class="lead" style="margin-bottom:12pt;">Selectable per user and remembered across sessions. This is
-  less cosmetic than it sounds: a phone held under bright shop lighting, an office monitor and a wall
-  display twenty feet from the viewer are three different readability problems. <strong>Formlabs Forge</strong>
-  is the house theme and the one this document is set in.</p>
-  <div class="themes">
-    <div class="theme"><img src="figs_print/theme_formlabs_forge.png" alt="Formlabs Forge">
-      <div class="cap"><span class="nm">Formlabs Forge</span><span class="sw">#0F172A
-        <span class="chip" style="background:#0F172A"></span><span class="chip" style="background:#EA580C"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_formlabs_onyx.png" alt="Formlabs Onyx">
-      <div class="cap"><span class="nm">Formlabs Onyx</span><span class="sw">#0B0B0C
-        <span class="chip" style="background:#0B0B0C"></span><span class="chip" style="background:#F2F2F2"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_neon_cyberpunk.png" alt="Neon Cyberpunk">
-      <div class="cap"><span class="nm">Neon Cyberpunk</span><span class="sw">#090117
-        <span class="chip" style="background:#090117"></span><span class="chip" style="background:#00FFCC"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_the_matrix.png" alt="The Matrix">
-      <div class="cap"><span class="nm">The Matrix</span><span class="sw">#000000
-        <span class="chip" style="background:#000000"></span><span class="chip" style="background:#39FF14"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_amber_crt.png" alt="Amber CRT">
-      <div class="cap"><span class="nm">Amber CRT</span><span class="sw">#0D0800
-        <span class="chip" style="background:#0D0800"></span><span class="chip" style="background:#FFB000"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_glass_aurora.png" alt="Glass Aurora">
-      <div class="cap"><span class="nm">Glass Aurora</span><span class="sw">gradient
-        <span class="chip" style="background:#8B5CF6"></span><span class="chip" style="background:#EC4899"></span></span></div></div>
-  </div>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:10pt;">Six of the twenty-four dark themes, all
-  rendering the same Live SCADA screen. The rest include Deep Space, Titanium Alloy, Carbon Fiber, Resin
-  Flow, Powder Bed, Ocean Depths, Dracula and Obsidian Chrome. Light themes overleaf.</p>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>24</span></div>
-</section>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix B &nbsp;/&nbsp; Reading the screen on the floor</span></div><h2>Readability where the work happens</h2></div>
+  <p class="lead" style="margin-bottom:12pt;">A phone held in a gloved hand at arm's length, in a
+  room lit for pouring resin, is a different reading problem from an office monitor. These are the
+  settings that address it. All of them are per-user and remembered; none of them changes what is
+  recorded.</p>
 
-<section class="page">
-  <div class="sec-head"><span class="eyebrow">12 &nbsp;/&nbsp; Interface &amp; readability</span><h2>Reading the screen on the floor</h2></div>
-  <p class="lead" style="margin-bottom:12pt;">Six of the thirty-four themes are light, and the rest of
-  this page is about the other half of the problem: a phone held in a gloved hand, at arm's length, in a
-  room lit for pouring resin.</p>
-
-  <div class="themes three">
-    <div class="theme"><img src="figs_print/theme_paper_white.png" alt="Paper White">
-      <div class="cap"><span class="nm">Paper White</span><span class="sw">#FBF9F4
-        <span class="chip" style="background:#FBF9F4; border:.4pt solid #CBD5E1"></span><span class="chip" style="background:#8A5A2B"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_daylight.png" alt="Daylight">
-      <div class="cap"><span class="nm">Daylight</span><span class="sw">#F8FAFC
-        <span class="chip" style="background:#F8FAFC; border:.4pt solid #CBD5E1"></span><span class="chip" style="background:#2563EB"></span></span></div></div>
-    <div class="theme"><img src="figs_print/theme_hc_light.png" alt="High Contrast Light">
-      <div class="cap"><span class="nm">High Contrast Light</span><span class="sw">#FFFFFF
-        <span class="chip" style="background:#FFFFFF; border:.4pt solid #CBD5E1"></span><span class="chip" style="background:#000000"></span></span></div></div>
-  </div>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;">Three of the six light themes, all
-  rendering the same Live SCADA screen as the dark ones on the previous page. The others are
-  <b>Forge Light</b>, <b>Blueprint</b> and <b>Clean Room</b>. Four dark themes were added alongside them:
-  <b>Nordic Frost</b>, <b>Solarized Deep</b>, <b>Workshop Retro</b> and <b>High Contrast Dark</b>.</p>
-
-  <div class="grid2" style="margin-top:13pt;">
-    <div class="card"><span class="tag">Contrast</span><h4>Checked, not assumed</h4>
-      <p>Every theme is measured against the accessibility floor &mdash; 4.5:1 for body text. The check
-      found two real failures in themes already in use: card labels in <b>Default Dark</b>, the one most
-      people are looking at, and in <b>Dracula</b>. Both fixed. All thirty-four now pass, and a Theme
-      Gallery screen re-runs the audit on demand, so it is something you can see rather than something
-      that was checked once.</p></div>
+  <div class="grid2" style="margin-bottom:12pt;">
     <div class="card"><span class="tag">Gloves</span><h4>Glove mode</h4>
       <p>Nitrile still registers on a touchscreen, but precision drops, and the pouring form asks for
-      number steppers and a lot field. One toggle pushes every target past the accessibility touch size
-      and scales the type. It is remembered against the <em>terminal</em>, not the account &mdash; being
-      gloved is a property of where you are standing, not of who you are.</p></div>
+      number steppers and a lot field. One toggle pushes every target past the accessibility touch
+      size and scales the type. It is remembered against the <em>terminal</em>, not the account
+      &mdash; being gloved is a property of where you are standing, not of who you are.</p></div>
+    <div class="card"><span class="tag">Lighting</span><h4>Light and dark</h4>
+      <p>A dark screen is unreadable under bright shop lighting and a light one is glare on a wall
+      display at night, so both exist and the operator picks. The choice follows the account, so a
+      shared terminal does not undo it.</p></div>
+    <div class="card"><span class="tag">Contrast</span><h4>Measured, not assumed</h4>
+      <p>Text is checked against the accessibility floor of 4.5:1 rather than eyeballed. The check
+      found real failures in themes already in use &mdash; card labels in the default, and again
+      across the sidebar, widget labels and popovers, where the worst measured 1.01:1. All fixed, and
+      an audit screen re-runs the measurement on demand, so it is something you can see rather than
+      something that was checked once.</p></div>
     <div class="card"><span class="tag">Nights</span><h4>Automatic dimming</h4>
       <p>Derived from the plant's own configured shift times rather than a fixed hour, because
       &ldquo;night&rdquo; here means &ldquo;not the day shift&rdquo;. A gentle brightness and warmth
-      reduction rather than a different set of colours, so it works with all thirty-four themes.
-      Photographs are exempt, so a lot label under review keeps its true colour.</p></div>
-    <div class="card"><span class="tag">Mid-pour</span><h4>Focus mode</h4>
-      <p>During a pour the operator is at the pump, not at the screen. One toggle strips the page to the
-      four things that matter mid-run &mdash; resin, lot, count so far, how many left &mdash; at a size
-      readable from across the station. A toggle rather than a separate screen, because the moment they
-      need it is the moment they need to log.</p></div>
+      reduction rather than a different set of colours. Photographs are exempt, so a lot label under
+      review keeps its true colour.</p></div>
   </div>
 
-  <h3 style="margin-top:11pt;">Resin colour, and why colour alone was not enough</h3>
+  <h3>Resin colour, and why colour alone was not enough</h3>
   <p>Wherever a resin is named it carries the colour from the plant's own master sheet, so screen and
-  sheet read as one document; a new formulation takes its family's colour from its name. But five pairs in
-  that palette are the same colour to the eye, and a Clear/Rigid mix-up is exactly what the lot gate exists
-  to catch &mdash; so each chip also carries a <strong>texture</strong> from the resin family: Clear V4 and
-  Clear V4.1 match, Clear and Rigid cannot. Texture survives greyscale printing and colour blindness.</p>
+  sheet read as one document; a new formulation takes its family's colour from its name. But five
+  pairs in that palette are the same colour to the eye, and a Clear/Rigid mix-up is exactly what the
+  lot check exists to catch &mdash; so each chip also carries a <strong>texture</strong> from the
+  resin family: Clear V4 and Clear V4.1 match, Clear and Rigid cannot. Texture survives greyscale
+  printing and colour blindness, which a colour alone does not.</p>
 
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>25</span></div>
+  <figure style="margin-top:10pt;"><img class="sml" src="figs_print/theme_paper_white.png"
+       alt="The same screen in a light theme"
+       style="max-height:1.2in; object-position:center 38%;">
+    <figcaption><b>The same screen, light.</b> Themes change presentation only &mdash; every figure,
+    filter and control is identical, so a handbook page describes one screen regardless of how the
+    reader has theirs set.</figcaption></figure>
+
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>24</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">13 &nbsp;/&nbsp; Engineering quality</span><h2>How it is tested</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix C &nbsp;/&nbsp; How it is tested</span></div><h2>How it is tested</h2></div>
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">839</span><span class="l">assertions across eight suites &mdash; workflow, interface, colour, fill weight, shifts and display, links, boot paths</span></div>
-    <div class="stat"><span class="n">23</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
-    <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
+    <div class="stat"><span class="n">869</span><span class="l">assertions across eight suites &mdash; workflow, interface, colour, fill weight, shifts and display, links, boot paths</span></div>
+    <div class="stat"><span class="n">35</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
+    <div class="stat"><span class="n">19</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
   <h3>What the simulation covers</h3>
-  <p>All eight migrations are applied to an empty database and the result compared table by table against
+  <p>All nine migrations are applied to an empty database and the result compared table by table against
   the application's own model definitions. A manager then creates three work orders; operators clear per-station
   checklists and pour &mdash; clean logs, a fast-path log, a mismatched cartridge, a cartridge pulled before
   pouring, a log with no run behind it, and a gated RPS jug &mdash; alongside downtime. Every
@@ -948,13 +931,12 @@ td.k{font-weight:600; color:var(--ink);}
     two rules that matter most about the check weight, that it never blocks a log and is never pre-filled
     &mdash; and a screenshot comparison catches a card that lost its border or a chart that came back
     empty, neither of which raises an error.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>26</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>25</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><span class="eyebrow">14 &nbsp;/&nbsp; Built but not in service</span><h2>Experiments, not commitments</h2></div>
-  <p class="lead" style="margin-bottom:13pt;">Two things exist in the codebase that are <strong>not in use and
-  not decided on</strong>. They are described here so the capability is known, not because there is a plan
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix D &nbsp;/&nbsp; Built, not in service</span><span class="status no">Not in service</span></div><h2>Experiments, not commitments</h2></div>
+  <p class="lead" style="margin-bottom:13pt;">Two things exist in the codebase that are <strong>not in use and not decided on</strong>. They are described here so the capability is known, not because there is a plan
   attached to either. Both were built to find out whether the approach works.</p>
 
   <div class="grid2" style="margin-bottom:13pt;">
@@ -973,11 +955,9 @@ td.k{font-weight:600; color:var(--ink);}
       <p style="font-size:9.2pt;">A protocol-agnostic gateway for reading floor equipment directly, so counts
       and weights would not have to be typed. Each machine is a row in a registry and the polling logic sits
       behind one shared interface, with adapters written for Modbus TCP, Modbus RTU, OPC-UA, MQTT, Serial
-      ASCII and HTTP. Readings would write through the same logging path the operator screen uses, so analytics and run
-      tracking would need no changes.</p>
-      <p style="font-size:9.2pt;"><strong>None of it has been tested against real equipment.</strong> The
-      adapters were written to cover whatever the scales or pump controllers turn out to speak; which of them
-      is correct is unknown until someone connects one.</p>
+      ASCII and HTTP. Readings would write through the same logging path the operator screen uses, so analytics and
+run tracking would need no changes. A registry screen for it is written &mdash; add a machine, point it at the pump station it sits on, map its raw tags &mdash; and is deliberately not linked from anywhere in the application, so it cannot be reached by an administrator who has not been told it is there.</p>
+      <p style="font-size:9.2pt;"><strong>None of it has been tested against real equipment.</strong> The adapters were written to cover whatever the scales or pump controllers turn out to speak; which of them is correct is unknown until someone connects one. Until then the screen stays unlinked rather than deleted, so nothing is lost if the plant ever wants it.</p>
     </div>
   </div>
   <figure><img class="sml" src="figs_print/22_packing.png" alt="Pack-out logging">
@@ -986,7 +966,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">Read this as</span>
     <p>Neither of these is a roadmap item or a commitment of dates. They are experiments that happen to be
     finished enough to demonstrate, and either could be abandoned without affecting anything in service.</p></div>
-  <div class="folio"><span>Formlabs MES &middot; Capability &amp; Operations Handbook</span><span>27</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>26</span></div>
 </section>
 
 </body></html>

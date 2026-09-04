@@ -89,13 +89,21 @@ with st.sidebar:
     # Only show IT Admin to actual admins
     if st.session_state.get("user_role") == "admin":
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-    # There was a link to pages/Device_Registry.py here. That page has never
-    # existed - the Device Gateway is a backend package with no screen - and
-    # st.page_link raises on a target it cannot find, so this single line took
-    # the whole IT Admin console down for every admin who opened it. The page
-    # sweep did not catch it because that harness stubs st.page_link out; it
-    # was found by opening the page in a browser. If the registry screen is
-    # ever written, link it back here.
+    # There was a link to pages/Device_Registry.py here, and it is gone on
+    # purpose rather than because that page is missing - it exists, it works,
+    # and it is listed in tests/test_links.py's KNOWN_ORPHANS with the reason.
+    # The Device Gateway behind it has never been tested against real
+    # equipment, so an administrator should not be able to arrive at a
+    # configuration screen for it by clicking. Link it back here on the day
+    # somebody connects a machine.
+    #
+    # A correction to what used to be written here: this line was removed
+    # after st.page_link raised on the target, and that was recorded as "the
+    # page has never existed". It had; the working copy the check ran in did
+    # not have it in pages/. The lesson stands anyway - st.page_link raises on
+    # a target it cannot find, and because the navigation renders near the top
+    # of the page, one bad line takes the whole console down. The page sweep
+    # cannot see it because that harness stubs st.page_link out.
 
     st.markdown("---")
     # ---------------------------

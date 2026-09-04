@@ -5,20 +5,25 @@ and because the navigation is rendered near the top of each page, that one call
 takes the entire screen down - not a broken link, a blank page with a stack
 trace on it.
 
-This is not hypothetical. `pages/Admin_Panel.py` linked to
-`pages/Device_Registry.py`, which was never written, so the IT Admin console
-was dead for every admin who opened it. The page sweep in `test_pages.py` could
-not see it: that harness stubs `st.page_link` out, because AppTest runs one
-script with no multipage registry behind it. So the check it needs is not
-another render - it is reading the source and confirming each target is a real
-file, which costs nothing and cannot be fooled by a stub.
+This is not hypothetical. The IT Admin console was dead for every admin who
+opened it, because it linked to a page that was not present in `pages/` at the
+time. The page sweep in `test_pages.py` could not see it: that harness stubs
+`st.page_link` out, because AppTest runs one script with no multipage registry
+behind it. So the check it needs is not another render - it is reading the
+source and confirming each target is a real file, which costs nothing and
+cannot be fooled by a stub.
 
-It also flags a page that nothing links to. That found a second one: the Theme
-Gallery had been built and then left with no route in, reachable only by typing
-its URL. Every page in the app is now linked from somewhere, so the exemption
-list below is empty - and an entry on it has to still be an exemption, because
-a name left there after the page gains a link would go on excusing that page
-for ever, including the day something removes its only link.
+It also flags a page that nothing links to. That found the Theme Gallery, built
+and then left with no route in, reachable only by typing its URL. Anything
+genuinely meant to be unreachable goes on the exemption list below with its
+reason - and an entry has to still be an exemption, because a name left there
+after the page gains a link would go on excusing that page for ever, including
+the day something removes its only link.
+
+A page's link to itself does not count as a route in. Every page renders the
+navigation row, so most of them name themselves in it; counting that would let
+a page with no way in look linked - which is exactly the case the orphan check
+exists to catch.
 """
 import ast
 import pathlib
@@ -29,8 +34,14 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 # Pages deliberately not in the sidebar. Each is reachable some other way, and
 # each is named here so a genuinely stranded page still stands out.
 KNOWN_ORPHANS = {
-    # Empty on purpose: every page is currently linked from somewhere. Add a
-    # page here only with the reason it is reached another way.
+    # The Device Gateway screen: register a floor machine, point it at the pump
+    # station it sits on, map its raw tags. It is written and it works, and the
+    # gateway behind it has never been tested against real equipment - see the
+    # handbook's Appendix D. Deliberately unreachable until somebody connects a
+    # machine, so that an administrator cannot arrive at a configuration screen
+    # for a capability the plant has not decided on. Unlinked rather than
+    # deleted: nothing is lost if it is ever wanted.
+    "pages/Device_Registry.py",
 }
 
 
@@ -87,7 +98,13 @@ def main():
         rel = path.relative_to(ROOT).as_posix()
         for target, line in targets_in(path):
             total += 1
-            linked.add(target)
+            # A page naming itself in its own navigation row is not a way in.
+            # Counting it would have let the Device Gateway screen - which
+            # links to itself on line 71 and is linked from nowhere else -
+            # register as reachable, which is the precise failure the orphan
+            # check below exists to catch.
+            if target != rel:
+                linked.add(target)
             exists = (ROOT / target).is_file()
             check(exists, f"{rel}:{line} links to {target}, which does not exist")
     print(f"  {total} navigation targets across {len(app_sources())} files, "
