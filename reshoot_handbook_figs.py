@@ -11,6 +11,9 @@
   22_packing     Carries two strings that were deleted - a run-cards heading
                  over an empty space, and a notice telling the operator to go
                  and find their plant manager.
+  11_export      Its page is "Reporting out", and the figure was of the shift
+                 handover, which has been removed. Replaced by the export
+                 screen that page is now about.
 
 Shot at the same viewport, scale and aspect as the figures they replace, so
 the page layouts do not move. print_prep afterwards, to the same black floor
@@ -125,6 +128,18 @@ async def main():
             await frame(pg, "22_packing", "Packing Details", -120, 759)
         except Exception as e:
             print("  !! packing:", str(e)[:90])
+        await ctx.close()
+
+        # --- 4. what reporting out actually is, now the handover is gone -----
+        ctx, pg = await session("keagan")
+        await pg.get_by_text("Manager", exact=False).first.click()
+        await pg.wait_for_timeout(14000)
+        try:
+            await pg.get_by_text("Google Cloud Sheets Sync", exact=False).first.click(timeout=9000)
+            await pg.wait_for_timeout(12000)
+            await frame(pg, "11_export", "External Reporting", -120, 700)
+        except Exception as e:
+            print("  !! export:", str(e)[:90])
         await ctx.close()
 
         await b.close()

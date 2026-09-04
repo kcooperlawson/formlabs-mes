@@ -27,17 +27,24 @@ cookie_manager = render_shell()
 current_role = st.session_state.get("user_role", "operator")
 
 st.subheader("☁️ External Reporting & Google Cloud Sync Control Panel")
-st.caption("Configure custom payload types, execution triggers, and metric filters to transmit plant telemetry directly to Google Sheets.")
+st.caption("Choose what to send and how far back, pick the columns, and push it to the plant's Google Sheet. Every push is manual and on demand.")
 
 df_logs = get_production_logs_df()
 
+# There was a third control here - "Automation Trigger Preference", offering a
+# manual push, an auto-sync on shift handover, and a scheduled webhook. Only
+# the first existed: the chosen value was never read except to word the
+# spinner, so the other two produced the same manual push with a different
+# sentence over it. A control that appears to configure something and does not
+# is worse than no control - and one of its options named a screen that has
+# since been removed for describing itself as more than it was, which is the
+# same fault twice.
 col_a, col_b = st.columns(2)
 with col_a:
     export_mode = st.radio("1. Select Data Payload Type", ["📊 Aggregated Calculated Metrics (KPI Summary)", "📋 Raw Production Audit Stream"], key="mgr_gsheet_payload")
-    sync_horizon = st.selectbox("2. Time Horizon Scope", ("⚡ Live Today (Active Shift)", "📆 Past 7 Days", "📊 Past 30 Days", "🌐 All Time History"))
 
 with col_b:
-    sync_trigger = st.radio("3. Automation Trigger Preference", ("👆 Manual On-Demand Push", "📤 Auto-Sync on Shift Handover", "⏱️ Scheduled Background Webhook"), key="mgr_gsheet_trigger")
+    sync_horizon = st.selectbox("2. Time Horizon Scope", ("⚡ Live Today (Active Shift)", "📆 Past 7 Days", "📊 Past 30 Days", "🌐 All Time History"))
 
 st.markdown("---")
 st.markdown("#### ⚙️ Payload Column Customization")
@@ -101,7 +108,7 @@ if st.button("🚀 Execute Google Sheets Transmission", type="primary", use_cont
     elif df_logs.empty:
         st.warning("⚠️ No production data currently exists in the database to sync.")
     else:
-        with st.spinner(f"Packaging payload and transmitting via {sync_trigger}..."):
+        with st.spinner("Packaging payload and transmitting..."):
             try:
                 import requests
                 final_df = export_payload_df[selected_export_cols].copy().astype(str)

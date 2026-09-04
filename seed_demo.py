@@ -167,7 +167,6 @@ ps = S.query(PlantSettings).first()
 if not ps:
     ps = PlantSettings(); S.add(ps)
 ps.target_lph, ps.packing_target_uph, ps.yield_target_pct = 400.0, 500.0, 99.0
-ps.handover_emails = "plantlead@example.com"
 S.commit()
 
 pl = S.query(ProductionLog).count(); lvc = S.query(LotVerification).count()

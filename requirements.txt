@@ -10,7 +10,6 @@ charset-normalizer==3.5.1
 click==8.5.0
 cryptography==50.0.1
 extra-streamlit-components==0.1.81
-fpdf==1.7.2
 google-auth==2.57.0
 google-auth-oauthlib==1.4.1
 greenlet==3.5.5

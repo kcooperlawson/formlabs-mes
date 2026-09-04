@@ -183,17 +183,18 @@ section("4b. PLANT SETTINGS SAVE")
 # The Admin Panel passes a dict of just the fields its form shows. This used
 # to raise TypeError, so no plant parameter could be saved from the UI at all.
 _before = get_plant_settings()
-update_plant_settings({"target_lph": 512.0, "handover_emails": "lead@plant.local",
+update_plant_settings({"target_lph": 512.0, "yield_target_pct": 97.5,
                        "shift_1_start": "05:45"})
 _after = get_plant_settings()
 check("target rate saved", _after.get("target_lph"), 512.0)
-check("handover recipients saved", _after.get("handover_emails"), "lead@plant.local")
+check("yield target saved", _after.get("yield_target_pct"), 97.5)
 check("shift start saved", _after.get("shift_1_start"), "05:45")
 check("fields not in the payload are left alone",
       _after.get("shift_3_start"), _before.get("shift_3_start"))
 update_plant_settings({"target_lph": _before.get("target_lph")})
 check("partial update touches nothing else",
-      get_plant_settings().get("handover_emails"), "lead@plant.local")
+      get_plant_settings().get("yield_target_pct"), 97.5)
+update_plant_settings({"yield_target_pct": _before.get("yield_target_pct")})
 print("  plant settings save verified end to end")
 
 section("5. STATISTICAL OUTPUTS  (recomputed from raw logs)")

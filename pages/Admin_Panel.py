@@ -454,10 +454,6 @@ with tab_settings:
                  "database and reappear the moment this is set back.")
         use_orders = (mode == MODE_MES)
 
-        st.markdown("##### 📧 Automated Reporting")
-        emails = st.text_input("Shift Handover Email Recipients (comma separated)",
-                               value=current_settings.get("handover_emails", ""), key="emails_input")
-
         # The form behind the QR sticker on the pump. A setting rather than a
         # constant because this application does not own that form - whoever
         # does can move it, and moving it should cost one field here.
@@ -514,7 +510,6 @@ with tab_settings:
                 "shift_2_start": s2_start, "shift_2_hours": s2_hrs, "shift_2_break_mins": s2_brk,
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
-                "handover_emails": emails,
                 # Stored as the negative of the picker: the column is named for
                 # the smaller configuration, so the default value of a row
                 # nobody has touched is the smaller one.

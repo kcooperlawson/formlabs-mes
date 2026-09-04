@@ -1809,7 +1809,6 @@ def get_plant_settings() -> dict:
                 "shift_1_break_mins": getattr(settings, 'shift_1_break_mins', 60.0),
                 "shift_2_break_mins": getattr(settings, 'shift_2_break_mins', 60.0),
                 "shift_3_break_mins": getattr(settings, 'shift_3_break_mins', 60.0),
-                "handover_emails": getattr(settings, 'handover_emails', ""),
                 "enable_packing": bool(getattr(settings, 'enable_packing', 1)),
                 # True on a row written before this column existed: an install
                 # that has never been told it dispatches work orders is a log,
@@ -1829,7 +1828,7 @@ def get_plant_settings() -> dict:
             "target_lph": 400.0, "packing_target_uph": 500.0, "shift_1_start": "06:00", "shift_1_hours": 8.5,
             "shift_2_start": "14:30", "shift_2_hours": 8.5, "shift_3_start": "23:00", "shift_3_hours": 7.0,
             "yield_target_pct": 99.0, "packing_yield_target_pct": 99.5, "shift_1_break_mins": 60.0,
-            "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "handover_emails": "", "enable_packing": True,
+            "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "enable_packing": True,
             "shift_count": 2, "pump_form_url": "", "pump_form_label": "",
             "simple_mode": True
         }

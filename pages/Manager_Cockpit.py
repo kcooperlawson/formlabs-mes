@@ -217,7 +217,6 @@ with col2:
     st.page_link("pages/Mgr_Lot_Verification.py", label="🔒 Cartridge Lot Verification", use_container_width=True)
     st.page_link("pages/Mgr_Cleanliness.py", label="📸 Cleanliness & Photo Audits", use_container_width=True)
 with col3:
-    st.page_link("pages/Mgr_Shift_Handover.py", label="📤 PDF Shift Handover", use_container_width=True)
     st.page_link("pages/Mgr_Google_Sync.py", label="☁️ Google Cloud Sheets Sync", use_container_width=True)
 
 st.markdown("<br>", unsafe_allow_html=True)

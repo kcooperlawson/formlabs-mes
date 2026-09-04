@@ -187,7 +187,7 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="row"><span class="num">02</span><span class="t">How it fits together</span><span class="d">One database, and every screen a window onto it</span><span class="pg">4</span></div>
     <div class="row"><span class="num">03</span><span class="t">The operator terminal</span><span class="d">The one screen an operator uses</span><span class="pg">5</span></div>
     <div class="row"><span class="num">04</span><span class="t">Lot traceability</span><span class="d">Which lot went into which containers</span><span class="pg">6</span></div>
-    <div class="row"><span class="num">05</span><span class="t">What comes out of it</span><span class="d">Scrap, trends, exports and the shift handover</span><span class="pg">7</span></div>
+    <div class="row"><span class="num">05</span><span class="t">What comes out of it</span><span class="d">Scrap, trends and getting the record out</span><span class="pg">7</span></div>
     <div class="row"><span class="num">06</span><span class="t">The floor as it is now</span><span class="d">The live view of the floor as it stands</span><span class="pg">10</span></div>
     <div class="row"><span class="num">07</span><span class="t">Who can do what</span><span class="d">Roles, and what each one can reach</span><span class="pg">11</span></div>
     <div class="row"><span class="num">08</span><span class="t">Running it</span><span class="d">Backups, accounts, and keeping the record honest</span><span class="pg">12</span></div>
@@ -214,7 +214,7 @@ td.k{font-weight:600; color:var(--ink);}
   <p style="margin-top:9pt;">This is that record. A web application opened in a browser &mdash; on an
   operator's phone at the pump, on a desk in the office, and on the floor display &mdash; backed by a
   PostgreSQL database. Operators log the hour as it happens, at the pump. That log is the whole
-  input: the figures on the wall display, in the analytics charts and in the emailed shift handover
+  input: the figures on the wall display, in the analytics charts and in the exports
   are not separate reports, they are the same rows read different ways.</p>
   <p style="margin-top:9pt;">Nothing here asks a manager to enter anything, and nothing asks the plant
   to find somebody to administer it: as a logging system a manager holds the console too, so a PIN reset
@@ -232,7 +232,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="grid3" style="margin-bottom:12pt;">
     <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
     <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
-    <div class="stat"><span class="n">959</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
+    <div class="stat"><span class="n">957</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
@@ -270,24 +270,21 @@ td.k{font-weight:600; color:var(--ink);}
       <text x="136" y="115" font-size="7.4" fill="#64748B">Versioned migrations, applied on start-up</text>
       <rect x="120" y="166" width="230" height="72" rx="4" fill="#F8FAFC" stroke="#C2410C" stroke-width="1.3"/>
       <text x="136" y="187" font-size="7.6" fill="#C2410C" letter-spacing="1.2">MES APPLICATION</text>
-      <text x="136" y="209" font-size="11" fill="#0F172A">18 role-gated screens</text>
+      <text x="136" y="209" font-size="11" fill="#0F172A">Role-gated screens</text>
       <text x="136" y="228" font-size="8.2" fill="#475569">One shared module of business logic</text>
       <line x1="212" y1="162" x2="212" y2="132" stroke="#C2410C" stroke-width="1.2" marker-end="url(#o)"/>
       <line x1="240" y1="132" x2="240" y2="162" stroke="#C2410C" stroke-width="1.2" marker-end="url(#o)"/>
-      <rect x="410" y="8" width="296" height="230" rx="4" fill="#F1F5F9" stroke="#CBD5E1"/>
+      <rect x="410" y="8" width="296" height="180" rx="4" fill="#F1F5F9" stroke="#CBD5E1"/>
       <text x="426" y="30" font-size="7.6" fill="#475569" letter-spacing="1.2">OUTBOUND</text>
       <rect x="426" y="42" width="264" height="42" rx="3" fill="#F8FAFC" stroke="#CBD5E1"/>
-      <text x="440" y="60" font-size="9.2" fill="#0F172A">Shift handover PDF</text>
-      <text x="440" y="74" font-size="7.6" fill="#475569">generated and emailed at shift end</text>
+      <text x="440" y="60" font-size="9.2" fill="#0F172A">Google Sheets sync</text>
+      <text x="440" y="74" font-size="7.6" fill="#475569">KPI summary or raw audit stream</text>
       <rect x="426" y="92" width="264" height="42" rx="3" fill="#F8FAFC" stroke="#CBD5E1"/>
-      <text x="440" y="110" font-size="9.2" fill="#0F172A">Google Sheets sync</text>
-      <text x="440" y="124" font-size="7.6" fill="#475569">KPI summary or raw audit stream</text>
-      <rect x="426" y="142" width="264" height="42" rx="3" fill="#F8FAFC" stroke="#CBD5E1"/>
-      <text x="440" y="160" font-size="9.2" fill="#0F172A">CSV export</text>
-      <text x="440" y="174" font-size="7.6" fill="#475569">from any filtered view</text>
-      <rect x="426" y="192" width="264" height="40" rx="3" fill="#F8FAFC" stroke="#CBD5E1"/>
-      <text x="440" y="210" font-size="9.2" fill="#0F172A">Scheduled backups</text>
-      <text x="440" y="224" font-size="7.6" fill="#475569">full database snapshots</text>
+      <text x="440" y="110" font-size="9.2" fill="#0F172A">CSV export</text>
+      <text x="440" y="124" font-size="7.6" fill="#475569">from any filtered view</text>
+      <rect x="426" y="142" width="264" height="40" rx="3" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="440" y="160" font-size="9.2" fill="#0F172A">Scheduled backups</text>
+      <text x="440" y="174" font-size="7.6" fill="#475569">full database snapshots</text>
       <line x1="354" y1="70" x2="404" y2="70" stroke="#475569" stroke-width="1.2" marker-end="url(#a)"/>
       <line x1="226" y1="270" x2="226" y2="244" stroke="#475569" stroke-width="1.2" marker-end="url(#a)"/>
       <line x1="40" y1="270" x2="380" y2="270" stroke="#CBD5E1" stroke-width="1.2"/>
@@ -319,8 +316,8 @@ td.k{font-weight:600; color:var(--ink);}
       record are written together; neither can exist without the other.</p></div></div>
     <div class="step"><span class="n">3</span><div><h4>The run re-counts</h4><p>Progress is recomputed from
       the logs matching its station, resin, format and lot.</p></div></div>
-    <div class="step"><span class="n">4</span><div><h4>Everything else follows</h4><p>Display, analytics,
-      handover and exports all read those same rows.</p></div></div>
+    <div class="step"><span class="n">4</span><div><h4>Everything else follows</h4><p>Display, analytics
+      and exports all read those same rows.</p></div></div>
   </div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>4</span></div>
 </section>
@@ -423,21 +420,27 @@ td.k{font-weight:600; color:var(--ink);}
 
 <section class="page">
   <div class="sec-head"><div class="hrow"><span class="eyebrow">05 &nbsp;/&nbsp; What comes out of it</span><span class="status in">In service</span></div><h2>Reporting out</h2></div>
-  <figure><img class="sml" src="figs_print/11_handover.png" alt="Shift handover">
-    <figcaption><b>Automated Shift Handover.</b> Output, yield, downtime and scrap for the shift, rendered as
-    a PDF in one of two layouts and emailed to the plant's distribution list.</figcaption></figure>
+  <p class="lead" style="margin-bottom:11pt;">Getting the record out of the application, for somebody
+  who is not going to open it. Both routes are manual and on demand: nothing is scheduled, nothing is
+  emailed, and nothing leaves the plant unless a person asks it to.</p>
+  <figure><img class="sml" src="figs_print/11_export.png" alt="Google Sheets export">
+    <figcaption><b>External reporting.</b> Pick the payload &mdash; an aggregated summary or the raw
+    audit stream &mdash; the time horizon and the columns, then push. Internal-only fields are stripped
+    before anything leaves the app.</figcaption></figure>
   <div class="grid2" style="margin-top:11pt;">
     <div class="card"><span class="tag">Cloud export</span><h4>Google Sheets sync</h4>
-      <p>Two payload shapes &mdash; an aggregated KPI summary or the raw production audit stream &mdash;
-      across four time horizons, pushed on demand, at shift handover, or on a scheduled webhook. Columns
-      are selectable, and internal-only fields are stripped before anything leaves the app.</p></div>
+      <p>For the people who work in a spreadsheet and are not going to stop. The sheet is a copy, not a
+      second system: it is written from the same rows and never read back.</p></div>
     <div class="card"><span class="tag">Self-service</span><h4>CSV from any view</h4>
       <p>Filtered log views and the verification register export directly, so finance, quality or an audit
       can be answered without a developer.</p></div>
   </div>
-  <div class="note" style="margin-top:11pt;"><span class="eyebrow">One source</span>
-    <p>The handover PDF, the Google Sheet, the CSV export and the floor display all render from the same
-    production log rows. There is no second system to keep in step.</p></div>
+  <div class="note" style="margin-top:11pt;"><span class="eyebrow">Removed, and worth saying why</span>
+    <p>There was a shift handover here: four whole-day figures rendered as a PDF and emailed to a
+    distribution list. Every one of them is on the landing screen, broken down by station, operator, resin
+    and shift &mdash; which the report was not, since it filtered by date rather than by shift. The lead
+    who arrives before the shift and opens the app was always going to see more than it could tell them,
+    and it was the only feature in the application that needed an outside credential to work at all.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>9</span></div>
 </section>
 
@@ -476,7 +479,7 @@ td.k{font-weight:600; color:var(--ink);}
       <tr><td class="k">Create &amp; dispatch work orders</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Analytics hub &amp; historical trends</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Lot verification review &amp; scrap intelligence</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-      <tr><td class="k">Shift handover PDF &amp; Google sync</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Google Sheets sync &amp; CSV export</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Floor roster &amp; PIN resets</td><td class="no">&mdash;</td><td class="yes">Floor staff</td><td class="yes">All users</td></tr>
       <tr><td class="k">Master resin specifications</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Log management &amp; bulk cleanup</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
@@ -510,7 +513,7 @@ td.k{font-weight:600; color:var(--ink);}
       accounts. Managers can provision floor personnel without full IT access.</p></div>
     <div class="card"><span class="tag">Plant</span><h4>Global parameters</h4>
       <p><strong>How many shifts the plant runs</strong> &mdash; this one runs two &mdash; with start
-      times, lengths and breaks; rate and yield targets; handover email recipients; and the address of
+      times, lengths and breaks; rate and yield targets; and the address of
       the pump form the operator terminal links out to.</p></div>
     <div class="card"><span class="tag">Equipment</span><h4>Stations, reactors, reasons</h4>
       <p>Pump stations, the reactor fleet and capacities, and the downtime reason list, so the vocabulary
@@ -815,10 +818,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step" style="margin-top:14pt;"><span class="n">4</span><div><h4>Close out finished runs</h4>
     <p>Complete a run on its real final count when the physical number differs. The correction is booked as a
     labelled system adjustment and the reactor is released.</p></div></div>
-  <div class="step"><span class="n">5</span><div><h4>Send the handover</h4>
-    <p>Generate the PDF and dispatch it to the recipient list. Use the print-friendly layout for anything read
-    on paper or forwarded outside the plant.</p></div></div>
-  <div class="step"><span class="n">6</span><div><h4>Answer the floor</h4>
+  <div class="step"><span class="n">5</span><div><h4>Answer the floor</h4>
     <p>The communications page holds every operator's thread. A question left unanswered there gets solved
     badly on the floor instead.</p></div></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>22</span></div>
@@ -911,12 +911,12 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">895</span><span class="l">assertions across nine suites &mdash; workflow, interface, roles, colour, fill weight, shifts, links, boot paths</span></div>
+    <div class="stat"><span class="n">894</span><span class="l">assertions across nine suites &mdash; workflow, interface, roles, colour, fill weight, shifts, links, boot paths</span></div>
     <div class="stat"><span class="n">45</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
-    <div class="stat"><span class="n">19</span><span class="l">screens rendered and checked for errors on every pass</span></div>
+    <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
   <h3>What the simulation covers</h3>
-  <p>All nine migrations are applied to an empty database and the result compared table by table against
+  <p>All ten migrations are applied to an empty database and the result compared table by table against
   the application's own model definitions. A manager then creates three work orders; operators clear per-station
   checklists and pour &mdash; clean logs, a fast-path log, a mismatched cartridge, a cartridge pulled before
   pouring, a log with no run behind it, and a gated RPS jug &mdash; alongside downtime. Every

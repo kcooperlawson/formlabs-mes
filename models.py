@@ -204,7 +204,6 @@ class PlantSettings(Base):
     shift_1_break_mins = Column(Float, default=60.0)
     shift_2_break_mins = Column(Float, default=60.0)
     shift_3_break_mins = Column(Float, default=60.0)
-    handover_emails = Column(Text, default="")
     enable_packing = Column(Integer, default=1)  # 1 = True, 0 = False
     # Whether this plant dispatches work orders at all. On (the default), the
     # operator form is a log and the work-order screens stay out of the way;
