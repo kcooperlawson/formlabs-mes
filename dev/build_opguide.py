@@ -434,8 +434,10 @@ PAGES.append(page(
       'above target &mdash; which is money, and invisible without them.</div>'
       '<div><b>Lot traceability</b>Which lot went into which containers, at which pump, by whom '
       'and when. That is the question a customer complaint asks.</div>'
-      '<div><b>Reactors and stock</b>Vessel levels reconciled against what has actually been '
-      'poured, rather than against what was assumed.</div>'
+      '<div><b>Reactors and stock</b>How much is left in each supply vessel, worked out from '
+      'what has actually been poured out of it. The lot you read off the container is what '
+      'tells it a vessel has been refilled &mdash; one more reason that field is worth '
+      'getting right.</div>'
       '</div>'
     + callout("If something about the app is wrong or annoying, say so",
               "There is a feedback box under <em>Account &amp; Preferences</em>, and it goes "

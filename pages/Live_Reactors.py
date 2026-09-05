@@ -14,9 +14,9 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 
 
 from database import (
-    get_assigned_runs_df,
     get_all_resin_specs_df,
-    calculate_logged_units_for_resin,
+    reactor_draw_litres,
+    container_litres,
     get_all_reactors_df,
     add_reactor,
     delete_reactor,
@@ -265,13 +265,27 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 df_reactors = get_all_reactors_df()
-df_runs = get_assigned_runs_df()
 specs_df = get_all_resin_specs_df("ALL")
 
-spec_dict = {}
+# How heavy a litre of each resin is.
+#
+# The tank is measured in litres - that is what a tank holds - and the second
+# number on the card is the same quantity in kilograms, because that is the
+# unit the resin is bought and reported in. Going between them needs a density
+# and nothing else: a spec of 1,110 g in a 1 L cartridge and one of 5,550 g in
+# a 5 L jug are the same 1.11 kg per litre, so it does not matter which format
+# the spec happens to be written against. That is the whole reason this is a
+# density map and not the old container lookup - the tank no longer knows, or
+# needs to know, which format is being poured out of it right now.
+DEFAULT_DENSITY_KG_L = 1.11
+density_by_resin = {}
 if not specs_df.empty:
     for _, r in specs_df.iterrows():
-        spec_dict[f"{str(r['cartridge_type']).strip().lower()}_{str(r['resin_name']).strip().lower()}"] = float(r["actual_spec_g"])
+        litres = container_litres(r["cartridge_type"])
+        if litres > 0:
+            density_by_resin.setdefault(
+                str(r["resin_name"]).strip().lower(),
+                (float(r["actual_spec_g"]) / 1000.0) / litres)
 
 _resin_colours = stored_color_map(specs_df)
 all_resins = ["None"] + sorted(specs_df["resin_name"].unique().tolist()) if not specs_df.empty else ["None"]
@@ -320,55 +334,47 @@ if not df_reactors.empty:
             r_resin = reactor.get("current_resin")
             r_pump = reactor.get("assigned_pump")
 
-            # Check if there happens to be a formal active run mapping to this tank
-            active_run = None
-            if not df_runs.empty:
-                matches = df_runs[(df_runs["reactor_id"] == r_name) & (df_runs["status"].isin(["Active", "Pouring"]))]
-                if not matches.empty:
-                    active_run = matches.iloc[0]
-
             if r_resin and r_resin != "None":
                 target_pump = r_pump if (r_pump and r_pump != "None") else ""
-                
-                # Pull active run lot if present to ensure exact batch matching
-                target_lot = str(active_run.get("lot_number", "")) if active_run is not None else ""
 
-                # Calculate fill level dynamically from database logs
-                current_poured_units = float(calculate_logged_units_for_resin(
-                    resin_name=r_resin, 
-                    pump_station=target_pump,
-                    lot_number=target_lot
-                ))
-
-                # If an active run exists, pull exact metadata from it. Otherwise assume V2 default format.
-                if active_run is not None:
-                    c_type = str(active_run.get("cartridge_type", "V2")).strip()
-                    op = str(active_run.get("assigned_operator", "Active Run")).strip()
-                else:
-                    c_type = "V2"
-                    op = "Manual Floor WIP"
-
-                vol_mult = 5.0 if "RPS" in c_type.upper() else (0.124 if "PIGMENT" in c_type.upper() else 1.0)
-                poured_l = current_poured_units * vol_mult
+                # What has come out of this tank since it was last filled.
+                #
+                # This used to be read off the work order assigned to the tank:
+                # the order's lot said which pours to count, and the order's
+                # container format said how big each pour was. Neither of those
+                # is a reactor fact, and with work orders switched off there was
+                # no order to read - so every tank summed every log ever taken
+                # at that station, drained to empty on the first day and stayed
+                # there, and sized every pour as a 1 L cartridge whatever had
+                # actually gone out.
+                #
+                # Both answers are already in the log itself. The operator reads
+                # the lot off the container each hour, so a new lot at the
+                # station is the tank being refilled; and each log carries the
+                # format it was poured in, so the litres are summed per log
+                # rather than assumed for the batch. The tank now reads the same
+                # whether or not anybody is dispatching runs, which is the point.
+                poured_l, batch_lot = reactor_draw_litres(r_resin, target_pump)
                 remaining_l = max(0.0, capacity_l - poured_l)
                 fill_pct = min(100.0, (remaining_l / capacity_l) * 100.0) if capacity_l > 0 else 100.0
-                
-                lookup_key = f"{str(c_type).lower()}_{str(r_resin).lower()}"
-                unit_g = spec_dict.get(lookup_key, 5500.0 if "RPS" in c_type.upper() else 1110.0)
-                unit_kg = unit_g / 1000.0
 
-                total_capacity_kg = (capacity_l / vol_mult) * unit_kg if vol_mult > 0 else 0.0
-                poured_kg = current_poured_units * unit_kg
-                remaining_kg = max(0.0, total_capacity_kg - poured_kg)
+                density = density_by_resin.get(str(r_resin).strip().lower(), DEFAULT_DENSITY_KG_L)
+                remaining_kg = remaining_l * density
 
                 tank_color = "linear-gradient(0deg, #EF4444 0%, #F87171 100%)" if fill_pct < 10 else "linear-gradient(0deg, #3B82F6 0%, #00D2FF 100%)"
                 # The tank's resin as a coloured chip rather than cyan text.
                 # This wall of tanks is read from across the room, and colour
                 # is the only thing legible at that distance.
+                #
+                # The second line is the lot, not the operator: the lot is what
+                # says which fill this reading belongs to, and it is the thing
+                # somebody standing at the tank can check against the container
+                # in front of them.
                 status_html = (
                     resin_chip(r_resin, _resin_colours.get(str(r_resin)))
                     + f"<br><span style='color:#64748B; font-size:0.7rem;'>"
-                      f"Station: {esc(target_pump) if target_pump else 'Any'} | Op: {esc(op)}</span>"
+                      f"Station: {esc(target_pump) if target_pump else 'Any'} | "
+                      f"Lot: {esc(batch_lot) if batch_lot else '—'}</span>"
                 )
                 rem_display = f"{remaining_l:,.0f} L"
             else:

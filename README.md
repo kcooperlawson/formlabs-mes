@@ -56,6 +56,11 @@ python tests\test_pages.py
 python tests\test_links.py
 python tests\test_boot_paths.py
 python tests\test_roles.py
+python tests\test_reactor_level.py
+python tests\test_fill_weight.py
+python tests\test_resin_colors.py
+python tests\test_shifts_and_display.py
+python tests\test_external_links.py
 ```
 
 Every test builds a throwaway database and refuses to run against the connection in `.env`, so a test run cannot touch production.
@@ -75,8 +80,10 @@ The browser ones matter more than their number suggests. Several defects have re
 The handbook, one-pager and operator guide are HTML in `docs/`, rendered to PDF with a headless browser:
 
 ```
-python dev\topdf.py            docs\handbook.html        -> docs\Formlabs_MES_Handbook.pdf
-python dev\build_opguide.py    generates docs\operator_guide.html from its script
+python dev\build_opguide.py             regenerates docs\operator_guide.html from its script
+python dev\topdf.py                     docs\handbook.html       -> Formlabs_MES_Handbook.pdf
+python dev\topdf.py operator_guide      docs\operator_guide.html -> Formlabs_MES_Operator_Guide.pdf
+python dev\topdf.py onepager            docs\onepager.html       -> Resin_Pouring_One_Page.pdf
 ```
 
 Figures under `docs/figs_print` and `docs/figs_op` are screenshots of the running application, taken by the `dev\shot_*.py` and `dev\reshoot_*.py` scripts and then run through `dev\print_prep.py`, which lifts the black floor of a dark screenshot so it prints without soaking the page. Re-shoot a figure when the screen it shows changes; a printed document does not update itself.

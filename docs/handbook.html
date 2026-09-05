@@ -171,7 +171,7 @@ td.k{font-weight:600; color:var(--ink);}
   the phones they already carry. Part One is what runs today and what comes out of it. Part Two is
   what the same record can be asked to do, each of which is a setting rather than a requirement.</div>
   <div class="meta">
-    <div>Release<b>Version 3.13</b></div>
+    <div>Release<b>Version 3.14</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -191,10 +191,10 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="row"><span class="num">06</span><span class="t">The floor as it is now</span><span class="d">The live view of the floor as it stands</span><span class="pg">10</span></div>
     <div class="row"><span class="num">07</span><span class="t">Who can do what</span><span class="d">Roles, and what each one can reach</span><span class="pg">11</span></div>
     <div class="row"><span class="num">08</span><span class="t">Running it</span><span class="d">Backups, accounts, and keeping the record honest</span><span class="pg">12</span></div>
+    <div class="row"><span class="num">09</span><span class="t">Vessel levels and the floor display</span><span class="d">What is left in each vessel, and the wall display</span><span class="pg">14</span></div>
     <div class="toc-band">Part Two &mdash; available if wanted</div>
-    <div class="row"><span class="num">09</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">14</span></div>
-    <div class="row"><span class="num">10</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">15</span></div>
-    <div class="row"><span class="num">11</span><span class="t">Reactors and the floor display</span><span class="d">Vessel levels and the wall display</span><span class="pg">17</span></div>
+    <div class="row"><span class="num">10</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">15</span></div>
+    <div class="row"><span class="num">11</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">16</span></div>
     <div class="toc-band">Appendices</div>
     <div class="row"><span class="num">A</span><span class="t">Guide &mdash; Operator</span><span class="d">Working guides for operator, manager and administrator</span><span class="pg">18</span></div>
     <div class="row"><span class="num">B</span><span class="t">Reading the screen on the floor</span><span class="d">Gloves, lighting, contrast and colour on the floor</span><span class="pg">24</span></div>
@@ -232,7 +232,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="grid3" style="margin-bottom:12pt;">
     <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
     <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
-    <div class="stat"><span class="n">973</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
+    <div class="stat"><span class="n">1,000</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
@@ -553,7 +553,35 @@ td.k{font-weight:600; color:var(--ink);}
 </section>
 
 <section class="page">
-  <div class="sec-head"><div class="partband">Part Two &mdash; Available if wanted</div><div class="hrow"><span class="eyebrow">09 &nbsp;/&nbsp; Assigning work to stations</span><span class="status opt">Optional</span></div><h2>Work orders</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">09 &nbsp;/&nbsp; Vessel levels and the floor display</span><span class="status in">In service</span></div><h2>Vessel levels and the floor display</h2></div>
+  <p class="lead">How much is left in each supply vessel, worked out from the same hourly logs
+  as everything else &mdash; and the same figures on a wall screen the floor can read without
+  opening anything.</p>
+  <p>A vessel's level is not a number anybody types in and it is not read off an instrument. It is
+  the vessel's capacity less what the record says has been drawn from it since it was last filled,
+  and both halves of that come from the hourly log the operator is already filling in. Each log
+  carries the lot number the operator read off the container, so a new lot at that station is the
+  vessel having been refilled; and each log carries the container format it was poured in, so a
+  bulk jug and a cartridge are counted at their own volumes rather than one assumed for all.
+  Nothing has to be entered anywhere else for the levels to be right.</p>
+  <p>The consequence worth stating plainly: the level does not depend on work orders. It reads
+  identically whether or not the plant is dispatching runs.</p>
+  <p>When a gauge disagrees with the calculated figure &mdash; a transfer nobody logged, a partial
+  fill &mdash; anyone at the vessel can correct it from the operator terminal, either by the
+  percentage on the sight glass or by the exact litres. The correction is written into the record
+  as a dated, attributed adjustment rather than quietly replacing what was there, so the
+  disagreement stays visible and the level goes on being derived from the record afterwards.</p>
+  <figure><img src="figs_print/07_reactors.png" alt="Live reactors">
+    <figcaption><b>Live Reactor Fleet.</b> Each vessel's resin, station, lot and remaining volume,
+    in litres and in kilograms.</figcaption></figure>
+  <figure style="margin-top:8pt;"><img src="figs_print/15_tv.png" alt="TV dashboard" style="max-height:1.7in;">
+    <figcaption><b>Floor display mode.</b> The active shift, or the whole plant day, refreshing
+    itself.</figcaption></figure>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="partband">Part Two &mdash; Available if wanted</div><div class="hrow"><span class="eyebrow">10 &nbsp;/&nbsp; Assigning work to stations</span><span class="status opt">Optional</span></div><h2>Work orders</h2></div>
   <p class="lead" style="margin-bottom:9pt;">Off unless a plant turns it on, and the operator
   terminal in Part One is complete without it. This page is what becomes available if somebody
   wants work dispatched to stations and tracked against a target.</p>
@@ -577,11 +605,11 @@ td.k{font-weight:600; color:var(--ink);}
       <p>A run can be completed on a custom final total when the physical count differs, and the reactor
       it drew from is released.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><div class="hrow"><span class="eyebrow">10 &nbsp;/&nbsp; Fill weight and giveaway</span><span class="status opt">Optional</span></div><h2>Fill weight and giveaway</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">11 &nbsp;/&nbsp; Fill weight and giveaway</span><span class="status opt">Optional</span></div><h2>Fill weight and giveaway</h2></div>
   <p class="lead" style="margin-bottom:11pt;">The system has always known what every cartridge is
   supposed to weigh. Until now it never recorded what one actually weighed, so it could say how many
   units were poured but not how much resin went into them.</p>
@@ -617,11 +645,11 @@ td.k{font-weight:600; color:var(--ink);}
       <p>For the same reason the run card had to stop printing the lot the check was hiding: a field that
       already contains the right-looking answer gets accepted, not measured.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
 </section>
 
 <section class="page">
-  <div class="sec-head"><div class="hrow"><span class="eyebrow">10 &nbsp;/&nbsp; Fill weight and giveaway</span><span class="status opt">Optional</span></div><h2>What the readings add up to</h2></div>
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">11 &nbsp;/&nbsp; Fill weight and giveaway</span><span class="status opt">Optional</span></div><h2>What the readings add up to</h2></div>
   <figure><img class="med" src="figs_print/fw_analytics.png" alt="Fill weight analytics">
     <figcaption><b>Fill weight, across a fortnight of pouring.</b> Deviation from target rather than
     absolute grams, so resins with different targets can share an axis; zero is target and out-of-band
@@ -652,18 +680,6 @@ td.k{font-weight:600; color:var(--ink);}
     for exactly these bench scales. If they have a serial output the weight arrives with no operator
     effort at all &mdash; and these manual readings are what that automated capture would have to be
     validated against, since checking it needs known-good numbers to check against.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><div class="hrow"><span class="eyebrow">11 &nbsp;/&nbsp; Reactors and the floor display</span><span class="status opt">Optional</span></div><h2>Reactors and the floor display</h2></div>
-  <figure><img class="med" src="figs_print/07_reactors.png" alt="Live reactors">
-    <figcaption><b>Live Reactor Fleet.</b> Each vessel's current resin, assigned pump and remaining volume,
-    with reconciliation by visual fill percentage or measured litres when the calculated figure has drifted
-    from what is in the tank.</figcaption></figure>
-  <figure style="margin-top:10pt;"><img class="med" src="figs_print/15_tv.png" alt="TV dashboard">
-    <figcaption><b>Floor display mode.</b> A full-screen, self-refreshing view that auto-detects the active
-    shift or shows the full plant day, so the team can see its own pace without opening anything.</figcaption></figure>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>17</span></div>
 </section>
 
@@ -911,7 +927,7 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">897</span><span class="l">assertions across nine suites &mdash; workflow, interface, roles, colour, fill weight, shifts, links, boot paths</span></div>
+    <div class="stat"><span class="n">924</span><span class="l">assertions across ten suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, links, boot paths</span></div>
     <div class="stat"><span class="n">58</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
@@ -945,6 +961,13 @@ td.k{font-weight:600; color:var(--ink);}
     after the tests had passed: an indented style block appended after other content is treated as a code
     listing and displayed rather than applied. The twenty-four older themes were never bitten because
     theirs comes first.</li>
+    <li><strong>Vessel levels only worked because work orders were switched on.</strong> The level looked
+    like a vessel feature and was not one: the work order was quietly supplying both the point the vessel
+    was last filled and the size of the containers coming out of it. With work orders off &mdash; which is
+    how the system is proposed to run &mdash; every vessel summed every log ever taken at its station,
+    emptied on the first day and stayed there, and counted a five-litre jug as one litre. Both answers were
+    already in the hourly log; the level is now taken from there, and a suite of its own asserts that a
+    vessel reads the same figure with work orders on and off.</li>
   </ul>
   <div class="note" style="margin-top:11pt;"><span class="eyebrow">Closed since the last issue</span>
     <p>The page sweep renders every screen but did not submit forms, which is how the settings save stayed

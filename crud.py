@@ -284,6 +284,98 @@ def seed_initial_data():
 
 
 
+# Litres in one container of each format. A production log counts containers
+# and a reactor is measured in litres, so this is the only place the two meet.
+# It was written out inline in six places, each deciding for itself what a jug
+# holds; the reactor page then applied ONE of those multipliers to a total that
+# had been summed across every format, so a tank drawn down by a mix of
+# cartridges and jugs was scaled by whichever format happened to be on the
+# work order.
+CONTAINER_LITRES = {"RPS": 5.0, "PIGMENT": 0.124}
+CARTRIDGE_LITRES = 1.0          # V1 and V2 are 1 L cartridges
+
+
+def container_litres(cartridge_type) -> float:
+    """Litres held by one container of this format."""
+    fmt = str(cartridge_type or "").strip().upper()
+    for key, litres in CONTAINER_LITRES.items():
+        if key in fmt:
+            return litres
+    return CARTRIDGE_LITRES
+
+
+# Lot values that are not a real lot: the app's own placeholders and the
+# marker the level calibrations write when there is no run to borrow one from.
+_NON_LOTS = {"", "n/a", "none", "null", "recon-adj"}
+
+
+def _is_real_lot(value) -> bool:
+    v = str(value or "").strip().lower()
+    return bool(v) and v not in _NON_LOTS and not is_placeholder_lot(value)
+
+
+def reactor_draw_litres(resin_name: str, pump_station: str = "") -> tuple[float, str]:
+    """Litres drawn from a tank since it was last filled, and the lot in it.
+
+    A tank is refilled when a new lot starts coming out of it - and the
+    operators already tell us when that happens, because the lot goes on every
+    hourly log and the lot check makes them read it off the container. So the
+    current batch is the newest lot logged at this pump, and everything logged
+    since that lot started is what has been drawn from the tank.
+
+    This used to be read off the work order instead. The run supplied the lot
+    to scope by and the container format to size the units with, and neither
+    has a substitute when a plant does not dispatch runs: with no lot the tank
+    summed every log ever recorded for that resin and pump, so it drained to
+    empty and stayed there, and with no format every unit was assumed to be a
+    1 L cartridge, so a tank drawn down in 5 L jugs emptied five times too
+    slowly. Deriving it from the lot costs a manager nothing and reads the same
+    in either mode - a plant that does dispatch runs puts the same lot on the
+    run and on the log, so the answer does not change.
+
+    Returns (litres_drawn, current_lot). No logs means a full tank.
+    """
+    session = ScopedSession()
+    try:
+        t_name = str(resin_name or "").strip().lower()
+        t_pump = str(pump_station or "").strip().lower()
+        if not t_name:
+            return 0.0, ""
+
+        rows = session.query(ProductionLog).filter(
+            ProductionLog.log_type.in_(["Hourly Bottle Count", "System Calibration"])
+        ).order_by(ProductionLog.timestamp.asc(), ProductionLog.id.asc()).all()
+
+        mine = [r for r in rows
+                if str(r.resin_type or "").strip().lower() == t_name
+                and (not t_pump or str(r.pump_station or "").strip().lower() == t_pump)]
+        if not mine:
+            return 0.0, ""
+
+        current_lot = ""
+        for row in reversed(mine):
+            if _is_real_lot(row.lot_number):
+                current_lot = str(row.lot_number).strip()
+                break
+
+        # Walk back from the newest log and stop at the first one carrying a
+        # DIFFERENT real lot - that is the moment this batch started. Logs with
+        # no real lot are kept: a level calibration writes no lot of its own
+        # and belongs to whatever batch was running when somebody took it.
+        batch = []
+        for row in reversed(mine):
+            if current_lot and _is_real_lot(row.lot_number) \
+                    and str(row.lot_number).strip().lower() != current_lot.lower():
+                break
+            batch.append(row)
+
+        drawn = sum(int(r.bottles_filled or 0) * container_litres(r.cartridge_type)
+                    for r in batch)
+        return float(drawn), current_lot
+    finally:
+        session.close()
+
+
 def calculate_logged_units_for_resin(resin_name: str, cartridge_type: str = "", pump_station: str = "",
                                      lot_number: str = "") -> int:
     session = ScopedSession()
@@ -831,33 +923,61 @@ def delete_user(user_id: int) -> bool:
         session.close()
 
 
-def reconcile_reactor_level(reactor_name: str, visual_fill_pct: float, operator_name: str, notes: str = "") -> bool:
+def _calibrate_reactor(reactor_name: str, remaining_l: float, operator_name: str,
+                       note: str) -> bool:
+    """Correct a tank to the level somebody has just read off its gauge.
+
+    The level is derived, not stored: it is the capacity less what the logs say
+    has come out since the tank was last filled (see reactor_draw_litres). So a
+    calibration cannot set the level directly - it writes the difference into
+    the record as one adjustment row, and the level follows from the record as
+    it always does.
+
+    The row is written in litres, as a 1 L format, because litres are what a
+    gauge reads and what a tank holds. It carries no lot of its own: an
+    adjustment is part of the batch it was taken during, not a new fill, and
+    RECON-ADJ is the marker that says so.
+    """
     session = ScopedSession()
     try:
         reactor = session.query(Reactor).filter(Reactor.reactor_name == reactor_name).first()
-        if not reactor or not reactor.current_resin: return False
-        capacity = float(reactor.max_capacity_l)
-        vol_mult = 1.0
-        active_run = session.query(AssignedRun).filter(AssignedRun.reactor_id == reactor_name,
-                                                       AssignedRun.status.in_(["Active", "Pouring"])).first()
-        if active_run and "RPS" in str(active_run.cartridge_type).upper(): vol_mult = 5.0
+        if not reactor or not reactor.current_resin:
+            return False
 
-        target_units_poured = int(max(0.0, capacity - (capacity * (visual_fill_pct / 100.0))) / vol_mult)
-        current_logged = calculate_logged_units_for_resin(resin_name=reactor.current_resin,
-                                                          pump_station=reactor.assigned_pump or "")
+        capacity = float(reactor.max_capacity_l)
+        pump = reactor.assigned_pump or ""
+        remaining_l = max(0.0, min(capacity, float(remaining_l)))
+
+        # Read the level before writing anything: reactor_draw_litres takes the
+        # same thread-scoped session and closes it when it is done.
+        drawn_now, _lot = reactor_draw_litres(reactor.current_resin, pump)
+        adjustment_l = int(round((capacity - remaining_l) - drawn_now))
 
         session.add(ProductionLog(
-            log_type="Hourly Bottle Count", operator_name=operator_name,
-            pump_station=reactor.assigned_pump or "Visual Check",
-            shift="Shift 1", cartridge_type="V2" if vol_mult == 1.0 else "RPS", resin_type=reactor.current_resin,
-            lot_number=(active_run.lot_number if active_run else "RECON-ADJ"),
-            bottles_filled=target_units_poured - current_logged,
-            notes=f"👀 VISUAL LEVEL CALIBRATION: Set to {visual_fill_pct}%. {notes}".strip(),
+            log_type="System Calibration",
+            operator_name=operator_name,
+            pump_station=pump or "Visual Check",
+            shift="Shift 1",
+            cartridge_type="V2",
+            resin_type=reactor.current_resin,
+            lot_number="RECON-ADJ",
+            bottles_filled=adjustment_l,
+            notes=note,
             operator_id=_resolve_user_id(session, operator_name),
-            pump_station_id=_resolve_pump_id(session, reactor.assigned_pump or ""),
+            pump_station_id=_resolve_pump_id(session, pump),
             resin_spec_id=_resolve_resin_id(session, reactor.current_resin),
         ))
-        if active_run: active_run.current_units = target_units_poured
+
+        # In execution mode a run is tracked in units of its own format, so it
+        # is brought along in those units rather than in litres.
+        active_run = session.query(AssignedRun).filter(
+            AssignedRun.reactor_id == reactor_name,
+            AssignedRun.status.in_(["Active", "Pouring"])).first()
+        if active_run:
+            per_unit = container_litres(active_run.cartridge_type)
+            if per_unit > 0:
+                active_run.current_units = int((capacity - remaining_l) / per_unit)
+
         session.commit()
         return True
     except Exception as e:
@@ -865,6 +985,19 @@ def reconcile_reactor_level(reactor_name: str, visual_fill_pct: float, operator_
         raise e
     finally:
         session.close()
+
+
+def reconcile_reactor_level(reactor_name: str, visual_fill_pct: float, operator_name: str, notes: str = "") -> bool:
+    """Calibrate from a percentage read off the sight glass."""
+    session = ScopedSession()
+    try:
+        reactor = session.query(Reactor).filter(Reactor.reactor_name == reactor_name).first()
+        capacity = float(reactor.max_capacity_l) if reactor else 0.0
+    finally:
+        session.close()
+    return _calibrate_reactor(
+        reactor_name, capacity * (float(visual_fill_pct) / 100.0), operator_name,
+        f"👀 VISUAL LEVEL CALIBRATION: Set to {visual_fill_pct}%. {notes}".strip())
 
 
 # ============================================================================
@@ -1479,51 +1612,10 @@ def reconcile_pouring_to_packing(lot_number: str, final_packed_qty: int) -> bool
 
 
 def reconcile_reactor_liters(reactor_name: str, actual_liters: float, operator_name: str, notes: str = "") -> bool:
-    session = ScopedSession()
-    try:
-        reactor = session.query(Reactor).filter(Reactor.reactor_name == reactor_name).first()
-        if not reactor or not reactor.current_resin: return False
-
-        capacity = float(reactor.max_capacity_l)
-        vol_mult = 1.0
-
-        active_run = session.query(AssignedRun).filter(AssignedRun.reactor_id == reactor_name,
-                                                       AssignedRun.status.in_(["Active", "Pouring"])).first()
-        if active_run and "RPS" in str(active_run.cartridge_type).upper():
-            vol_mult = 5.0
-
-        # Calculate poured units directly from the exact liters remaining
-        remaining_liters = max(0.0, min(capacity, actual_liters))
-        target_units_poured = int(max(0.0, capacity - remaining_liters) / vol_mult)
-
-        current_logged = calculate_logged_units_for_resin(resin_name=reactor.current_resin,
-                                                          pump_station=reactor.assigned_pump or "")
-
-        session.add(ProductionLog(
-            log_type="System Calibration",
-            operator_name=operator_name,
-            pump_station=reactor.assigned_pump or "Visual Check",
-            shift="Shift 1",
-            cartridge_type="V2" if vol_mult == 1.0 else "RPS",
-            resin_type=reactor.current_resin,
-            lot_number=(active_run.lot_number if active_run else "RECON-ADJ"),
-            bottles_filled=target_units_poured - current_logged,
-            notes=f"👀 EXACT LITERS CALIBRATION: Set to {actual_liters}L remaining. {notes}".strip(),
-            operator_id=_resolve_user_id(session, operator_name),
-            pump_station_id=_resolve_pump_id(session, reactor.assigned_pump or ""),
-            resin_spec_id=_resolve_resin_id(session, reactor.current_resin),
-        ))
-
-        if active_run:
-            active_run.current_units = target_units_poured
-
-        session.commit()
-        return True
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
+    """Calibrate from an exact volume read off the tank gauge."""
+    return _calibrate_reactor(
+        reactor_name, actual_liters, operator_name,
+        f"👀 EXACT LITERS CALIBRATION: Set to {actual_liters}L remaining. {notes}".strip())
 
 
 def has_completed_daily_checklist(operator_name: str, shift: str, pump_station: str = None) -> bool:

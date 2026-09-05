@@ -6,6 +6,26 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.14 — Saturday, September 5, 2026
+**The reactor levels were never a reactor feature, and switching work orders off is what made that visible**
+
+Reported from the floor: with work orders disabled, the Live Reactor page stopped working. It was worse than "stopped" — it was confidently wrong, which is the failure mode that matters. Every tank drained to empty on the first day and stayed there, and the figures it showed on the way down were understated by up to five times.
+
+- **The diagnosis, before any code.** The `Reactor` model holds a name, a capacity, a status, a current resin and an assigned pump. **There is no fill state on it at all** — the level was always derived. What it was derived *from* is the problem: the work order assigned to the tank was silently doing two jobs neither of which is a work-order job. Its lot number was answering *when was this tank last filled* (count only the logs on this lot), and its container format was answering *how big is each unit coming out* (multiply by 1, 5 or 0.124). Take the work order away and both answers vanish, so the page summed every log ever recorded for that resin and pump, and sized every one of them as a 1 L cartridge.
+- **Reproduced on a throwaway database with numbers before touching the page**, because "it looks wrong" is not a diagnosis. A 5,000 L tank with two lots behind it read 4,000 L remaining with a run present and 400 L without — the second batch and the first one, added together. A 3,000 L tank drawn down in 120 five-litre jugs read 2,400 L with a run and 2,880 L without: 600 litres of resin counted as 120.
+- **The fix is that operators already tell us both things, every hour.** The lot number goes on every hourly log — the lot check makes them read it off the container in front of them — so **a new lot at a station is that tank having been refilled.** And every log already carries the container format it was poured in, so the litres are summed per log rather than assumed for the batch. `crud.reactor_draw_litres` returns what has come out since the last fill and which lot is in the tank; the page subtracts it from capacity. **No new field, no new screen, and nothing extra for anybody to enter.**
+- **It reads identically in both modes, and that is the point.** Dispatching a run puts the same lot on the run and on the log, so the tank's answer does not depend on whether work orders are on. That is asserted, not asserted-about: the suite creates a run against a tank and checks the reading does not move.
+- **The container volumes now have one definition.** `CONTAINER_LITRES` and `container_litres()` in `crud.py`, replacing seven copies of `5.0 if "RPS" in c_type else (0.124 if "PIGMENT" ... else 1.0)` scattered across the reactors page, Home, the TV dashboard and the Google sync. Seven places to edit is seven places for the plant totals and the tank levels to start disagreeing.
+- **Both level calibrations were rebuilt on the same footing.** They divided the correction by a container format read off the work order, so with no run they assumed 1 L and wrote the wrong adjustment — and on a tank nobody had poured from yet they could not calibrate at all. They now work in litres, which is what a gauge reads and what a tank holds, and write the difference as a `RECON-ADJ` row that belongs to the batch it was taken in rather than reading as a refill. Still an adjustment in the record, still dated and attributed, never an overwrite.
+- **The tank card's second line is now the lot, not the operator.** The operator name was only ever there because the work order was already being consulted. The lot is the thing somebody standing at the vessel can check against the container in front of them.
+- **The kilogram figure stopped depending on the format too.** A 1,110 g cartridge in 1 L and a 5,550 g jug in 5 L are the same 1.11 kg per litre — it was only ever a density, so it is now computed as one from whatever spec exists for that resin.
+
+- **New `tests/test_reactor_level.py`** — 27 assertions, no browser and no Streamlit, because this is arithmetic over rows. Container volumes; an empty tank reads full; a lot change refills; 120 jugs are 600 litres and not 120; a batch mixing three formats sums to 156.2 L; a lot that comes back later is a new batch; a calibration belongs to its batch; the pump scopes the tank; a run changes nothing; and both calibrations land on the number typed in, including on a tank with no pours behind it.
+- **Handbook: the reactor page moves out of Part Two and into Part One as section 09**, marked *In service*, rewritten to describe the mechanism rather than the screen — because the only reason it was ever "optional" is that it did not work without an optional feature. Part Two renumbers to 10 and 11. Figure re-shot: the card says something different now, and a printed document does not update itself.
+- Suite: 924 assertions across ten files, 18 screens rendered, 58 browser checks. 1,000 total.
+
+---
+
 ## 3.13 — Saturday, September 5, 2026
 **Three things reported from the floor, all of them invisible to every test in the suite because they only happen in a browser — and two of them only on a phone**
 

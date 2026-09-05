@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 from database import (
     get_production_logs_df,
+    container_litres,
     get_assigned_runs_df,
     get_all_resin_specs_df,
     get_plant_settings,
@@ -260,8 +261,7 @@ def calculate_liters(df_subset):
     for _, r in df_subset.iterrows():
         b_count = float(r.get("bottles_filled", 0) or 0)
         c_type = str(r.get("cartridge_type", "V2")).upper()
-        vol_mult = 5.0 if "RPS" in c_type else (0.124 if "PIGMENT" in c_type else 1.0)
-        total_l += (b_count * vol_mult)
+        total_l += b_count * container_litres(c_type)
     return total_l
 
 df_s1 = df_today_pour[df_today_pour["shift"] == "Shift 1"] if not df_today_pour.empty else pd.DataFrame()
@@ -442,8 +442,7 @@ with b1:
             for _, r in op_data.iterrows():
                 b_count = float(r.get("bottles_filled", 0) or 0)
                 c_type = str(r.get("cartridge_type", "V2")).upper()
-                vol_mult = 5.0 if "RPS" in c_type else (0.124 if "PIGMENT" in c_type else 1.0)
-                op_liters += (b_count * vol_mult)
+                op_liters += b_count * container_litres(c_type)
 
             # 2. Isolate the operator's specific worked hours
             timestamps = pd.to_datetime(op_data["timestamp"])
