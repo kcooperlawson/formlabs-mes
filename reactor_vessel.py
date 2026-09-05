@@ -5,31 +5,32 @@ capacity-picked corner radius, and called the 5,000 L one a "cone bottom on a
 heavy metal stand". None of that is what is out on the floor. What is out
 there is three genuinely different kinds of vessel:
 
-  bulk_vertical  A tall straight-sided fabricated tank - M-205 and the White
-                 V5 beside it. Bolted top flange, flat bottom on a short
-                 skirt, an agitator drive on top, and litre graduations
-                 running all the way up the side: 200 through 4,400, marked
-                 every 200. Those graduations are how somebody standing at
-                 the tank reads its level, so they are drawn here too, and
-                 the liquid surface lands on the same mark it would land on
-                 out there. That is the whole point of the picture: two
-                 people, one at the screen and one at the vessel, should be
-                 looking at the same thing and be able to say so.
+Every fabricated vessel here is the same shape: bolted top flange, a barrel,
+a dark band at the joint, a cone bottom and a steel frame under it. Only the
+totes are flat-bottomed. So there is one drawing for the fabricated vessels
+with two sets of proportions, rather than two drawings that could drift
+apart.
 
-  cone_mixer     A squat cylinder on a steel frame with a steep cone bottom -
-                 M-101. Bolted top flange, a dark band at the cylinder/cone
-                 joint, ribs down the cone, four angled legs and an outlet at
-                 the tip. Short and wide, where the bulk tank is tall and
-                 narrow, and that difference alone identifies it across a
-                 room. No litre scale: the real one has two hand-written
-                 marks near the rim and nothing more, and a fair share of its
-                 volume is in the cone anyway, where a linear scale would
-                 lie.
+  bulk_vertical  Tall and narrow - M-205 and the White V5 beside it - with
+                 litre graduations running up the barrel: 200 through 4,400,
+                 marked every 200. Those graduations are how somebody
+                 standing at the vessel reads its level, so they are drawn
+                 here too, and the liquid surface lands on the same mark it
+                 would land on out there. That is the whole point of the
+                 picture: two people, one at the screen and one at the
+                 vessel, should be looking at the same thing and be able to
+                 say so.
 
-  ibc_tote       Not a fabricated tank at all: a translucent bottle in a
-                 moulded cage on a pallet, with a ball valve at the front
-                 bottom corner. Roughly 1,000 L. It reads completely
-                 differently from the other two and should.
+  cone_mixer     Short and wide - M-101 - with ribs down the cone and no
+                 painted scale, because the real one has none: two
+                 hand-written marks near the rim and nothing more. The
+                 proportions alone tell it apart from the tall one across a
+                 room.
+
+  ibc_tote       Not a fabricated vessel at all: a translucent bottle in a
+                 moulded cage on a pallet, flat bottomed, with a ball valve
+                 at the front bottom corner. Roughly 1,000 L. It reads
+                 completely differently from the other two and should.
 
 The liquid takes the resin's own colour rather than a fixed blue, for the
 same reason the chips do: on the floor a formulation is recognised by its
@@ -53,15 +54,15 @@ import html
 VESSEL_TYPES = ("bulk_vertical", "cone_mixer", "ibc_tote")
 
 VESSEL_LABELS = {
-    "bulk_vertical": "Bulk vertical tank",
-    "cone_mixer": "Cone-bottom mixer",
+    "bulk_vertical": "Tall bulk reactor",
+    "cone_mixer": "Squat cone mixer",
     "ibc_tote": "IBC tote",
 }
 
 VESSEL_HELP = {
-    "bulk_vertical": "Straight-sided, flat bottom, litre marks up the side (M-205)",
-    "cone_mixer": "Squat, cone bottom, steel frame stand (M-101)",
-    "ibc_tote": "Caged bottle on a pallet with a ball valve (roughly 1,000 L)",
+    "bulk_vertical": "Tall and narrow, cone bottom, litre marks up the barrel (M-205)",
+    "cone_mixer": "Short and wide, cone bottom, ribs, no painted scale (M-101)",
+    "ibc_tote": "Caged bottle on a pallet, flat bottomed, ball valve (around 1,000 L)",
 }
 
 # Where the capacity bands fall when nobody has said what a vessel is. These
@@ -202,16 +203,24 @@ def _tick_step(capacity_l: float):
 
 
 def _graduations(capacity_l: float, x_from: float, x_to: float,
-                 y_top: float, y_bottom: float, numbered_x: float) -> str:
-    """Litre marks up the side of a vessel, bottom to top."""
-    if capacity_l <= 0:
+                 y_top: float, y_bottom: float, numbered_x: float,
+                 from_litres: float = 0.0) -> str:
+    """Litre marks up the barrel of a vessel, bottom to top.
+
+    `from_litres` is what is already below the bottom of the marked section -
+    on a cone-bottomed vessel, everything the cone holds. The marks span the
+    barrel, so the litres they represent start where the barrel does, which
+    is why the lowest mark on the real tank is not zero.
+    """
+    if capacity_l <= from_litres:
         return ""
     step, label_step = _tick_step(capacity_l)
     span = y_bottom - y_top
+    marked = capacity_l - from_litres
     out = []
-    litres = step
+    litres = step * (int(from_litres // step) + 1)
     while litres < capacity_l:
-        y = y_bottom - span * (litres / capacity_l)
+        y = y_bottom - span * ((litres - from_litres) / marked)
         numbered = abs((litres / label_step) - round(litres / label_step)) < 1e-9
         length = (x_to - x_from) * (1.0 if numbered else 0.55)
         w = 2.6 if numbered else 2.0
@@ -281,106 +290,91 @@ def _bay_bollard(x: float, y_top: float, y_bottom: float, marker: str) -> str:
                 for i, ch in enumerate(label)))
 
 
-def _bulk_vertical(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker, idle) -> str:
-    """M-205: straight sides, flat bottom, litre marks, agitator on top."""
-    x, w = 74.0, 110.0
-    y_top, y_bot = 54.0, 344.0
-    body_h = y_bot - y_top
-    fill_h = body_h * (fill_pct / 100.0)
-    fill_y = y_bot - fill_h
+def _fabricated(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker,
+                idle, *, x, w, y_top, barrel_h, cone_h, scale, ribs, legs_out) -> str:
+    """A fabricated reactor: barrel, dark joint band, cone bottom, steel frame.
 
-    return (
-        # agitator drive and the vent stub on the roof
-        f'<rect x="{x + w / 2 - 13:.1f}" y="20" width="26" height="22" rx="3" fill="{_STEEL_DARK}"/>'
-        f'<rect x="{x + w / 2 - 5:.1f}" y="40" width="10" height="12" fill="{_FRAME}"/>'
-        f'<rect x="{x + w - 18:.1f}" y="30" width="9" height="24" rx="4" fill="{_STEEL}" opacity="0.7"/>'
-        # shell
-        f'<rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" height="{body_h:.1f}" rx="10" '
-        f'fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2.4"/>'
-        # liquid, clipped to the shell so it cannot spill past the corners
-        f'<clipPath id="clipbulk{uid}"><rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" '
-        f'height="{body_h:.1f}" rx="10"/></clipPath>'
-        f'<g clip-path="url(#clipbulk{uid})">'
-        f'<rect x="{x:.1f}" y="{fill_y:.1f}" width="{w:.1f}" height="{fill_h + 2:.1f}" '
-        f'fill="url(#lvl{uid})"/>'
-        f'<rect x="{x:.1f}" y="{fill_y:.1f}" width="{w:.1f}" height="2.2" '
-        f'fill="#FFFFFF" opacity="0.55"/>'
-        f'</g>'
-        # the bolted top flange
-        f'<rect x="{x - 5:.1f}" y="{y_top - 9:.1f}" width="{w + 10:.1f}" height="12" rx="3" '
-        f'fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2"/>'
-        + "".join(f'<circle cx="{x - 1 + i * (w + 2) / 7:.1f}" cy="{y_top - 3:.1f}" r="1.8" '
-                  f'fill="{_STEEL_DARK}"/>' for i in range(8))
-        # graduations, inside the shell on the left the way they are painted
-        + _graduations(capacity_l, x + 5, x + 25, y_top + 12, y_bot - 6, x - 5)
-        # skirt it stands on
-        + f'<rect x="{x + 6:.1f}" y="{y_bot:.1f}" width="{w - 12:.1f}" height="22" fill="{_FRAME}"/>'
-          f'<rect x="{x - 2:.1f}" y="{y_bot + 22:.1f}" width="{w + 4:.1f}" height="7" rx="2" '
-          f'fill="{_STEEL_DARK}"/>'
-        + _percent_label(x + w / 2,
-                         (y_top + y_bot) / 2 if idle else
-                         ((fill_y + y_bot) / 2 + 9 if fill_pct > 22 else fill_y - 12),
-                         fill_pct, _INK_LIGHT if (idle or fill_pct <= 22) else ink, idle)
-        + _tag_plate(x + w / 2, y_top + 26, asset_tag)
-        + _bay_bollard(x + w + 22, y_top + 40, y_bot + 20, bay_marker)
-    )
+    Every fabricated vessel on this floor is this shape. What separates M-205
+    from M-101 is not whether it has a cone - they both do - but its
+    proportions and whether litre graduations are painted on it. So there is
+    one drawing here with two sets of numbers, rather than two drawings that
+    could drift apart.
 
-
-def _cone_mixer(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker, idle) -> str:
-    """M-101: squat barrel, dark joint band, cone bottom, four-leg frame."""
-    x, w = 46.0, 148.0
-    y_top, y_joint = 96.0, 258.0
-    cone_h = 74.0
+    The level crosses the cone rather than starting at the joint, and the
+    share of the volume the cone holds is derived from the cone actually
+    drawn, so the picture and the arithmetic cannot disagree: a third of the
+    cone's height, against the barrel's full height.
+    """
+    y_joint = y_top + barrel_h
     y_tip = y_joint + cone_h
+    y_feet = y_tip + legs_out
     cx = x + w / 2
-    barrel_h = y_joint - y_top
+    tip_w = max(7.0, w * 0.06)
 
-    # The cone holds a good share of the volume, so the level has to cross it
-    # rather than starting at the joint - a tank reading 20% on this shape is
-    # liquid in the cone, not a puddle under it.
-    cone_share = 0.26
+    # A cone of the same top radius holds a third of what that height of
+    # barrel would, which is where this fraction comes from.
+    cone_share = (cone_h / 3.0) / (barrel_h + cone_h / 3.0)
+
     frac = fill_pct / 100.0
     if frac <= cone_share:
-        # inside the cone: depth scales with the cube root of the volume
-        depth = cone_h * (frac / cone_share) ** (1 / 3)
+        # Inside the cone the surface rises with the cube root of the volume,
+        # because the cross-section is shrinking underneath it. A linear fill
+        # here would show a nearly-empty vessel as a third full.
+        depth = cone_h * (frac / cone_share) ** (1 / 3) if cone_share > 0 else 0.0
         surface_y = y_tip - depth
     else:
         surface_y = y_joint - barrel_h * ((frac - cone_share) / (1 - cone_share))
 
-    cone = f"M {x:.1f} {y_joint:.1f} L {x + w:.1f} {y_joint:.1f} L {cx + 7:.1f} {y_tip:.1f} L {cx - 7:.1f} {y_tip:.1f} Z"
+    cone = (f"M {x:.1f} {y_joint:.1f} L {x + w:.1f} {y_joint:.1f} "
+            f"L {cx + tip_w / 2:.1f} {y_tip:.1f} L {cx - tip_w / 2:.1f} {y_tip:.1f} Z")
+
+    rib_paths = ""
+    if ribs:
+        rib_paths = (
+            f'<path d="M {x + w * 0.11:.1f} {y_joint + 4:.1f} L {cx - 4:.1f} {y_tip:.1f}" '
+            f'stroke="#111827" stroke-width="4" opacity="0.85"/>'
+            f'<path d="M {x + w * 0.89:.1f} {y_joint + 4:.1f} L {cx + 4:.1f} {y_tip:.1f}" '
+            f'stroke="#111827" stroke-width="4" opacity="0.85"/>'
+            f'<path d="M {cx:.1f} {y_joint + 4:.1f} L {cx:.1f} {y_tip:.1f}" '
+            f'stroke="#111827" stroke-width="4" opacity="0.85"/>')
+
+    # Graduations cover the barrel only, and start at the litres the cone
+    # already holds - which is where the lowest mark sits on the real vessel.
+    scale_svg = ""
+    if scale:
+        scale_svg = _graduations(capacity_l, x + 5, x + 25, y_top + 12, y_joint - 4,
+                                 x - 5, from_litres=capacity_l * cone_share)
+
+    label_y = ((y_top + y_joint) / 2 if idle else
+               ((surface_y + y_joint) / 2 + 9 if fill_pct > 26 else surface_y - 12))
 
     return (
         # frame legs, behind the vessel
-        f'<path d="M {x + 14:.1f} {y_joint - 6:.1f} L {x + 2:.1f} {y_tip + 34:.1f}" '
+        f'<path d="M {x + w * 0.1:.1f} {y_joint - 6:.1f} L {x + 2:.1f} {y_feet:.1f}" '
         f'stroke="{_FRAME}" stroke-width="7" stroke-linecap="round"/>'
-        f'<path d="M {x + w - 14:.1f} {y_joint - 6:.1f} L {x + w - 2:.1f} {y_tip + 34:.1f}" '
+        f'<path d="M {x + w * 0.9:.1f} {y_joint - 6:.1f} L {x + w - 2:.1f} {y_feet:.1f}" '
         f'stroke="{_FRAME}" stroke-width="7" stroke-linecap="round"/>'
-        f'<rect x="{x - 6:.1f}" y="{y_tip + 34:.1f}" width="{w + 12:.1f}" height="7" rx="2" '
+        f'<rect x="{x - 6:.1f}" y="{y_feet:.1f}" width="{w + 12:.1f}" height="7" rx="2" '
         f'fill="{_STEEL_DARK}"/>'
         # cone and barrel
-        f'<path d="{cone}" fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2"/>'
-        f'<rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" height="{barrel_h:.1f}" rx="6" '
-        f'fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2"/>'
+        f'<path d="{cone}" fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2.4"/>'
+        f'<rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" height="{barrel_h:.1f}" rx="8" '
+        f'fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2.4"/>'
         # liquid, clipped to barrel and cone together
-        f'<clipPath id="clipcone{uid}">'
-        f'<rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" height="{barrel_h:.1f}" rx="6"/>'
+        f'<clipPath id="clipfab{uid}">'
+        f'<rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" height="{barrel_h:.1f}" rx="8"/>'
         f'<path d="{cone}"/>'
         f'</clipPath>'
-        f'<g clip-path="url(#clipcone{uid})">'
+        f'<g clip-path="url(#clipfab{uid})">'
         f'<rect x="{x:.1f}" y="{surface_y:.1f}" width="{w:.1f}" '
         f'height="{y_tip - surface_y:.1f}" fill="url(#lvl{uid})"/>'
         f'<rect x="{x:.1f}" y="{surface_y:.1f}" width="{w:.1f}" height="2.2" '
         f'fill="#FFFFFF" opacity="0.55"/>'
         f'</g>'
-        # the dark band at the joint, and the ribs down the cone
-        + f'<rect x="{x - 3:.1f}" y="{y_joint - 7:.1f}" width="{w + 6:.1f}" height="11" '
-          f'fill="#111827"/>'
-        + f'<path d="M {x + 16:.1f} {y_joint + 4:.1f} L {cx - 5:.1f} {y_tip:.1f}" '
-          f'stroke="#111827" stroke-width="4" opacity="0.85"/>'
-          f'<path d="M {x + w - 16:.1f} {y_joint + 4:.1f} L {cx + 5:.1f} {y_tip:.1f}" '
-          f'stroke="#111827" stroke-width="4" opacity="0.85"/>'
-          f'<path d="M {cx:.1f} {y_joint + 4:.1f} L {cx:.1f} {y_tip:.1f}" '
-          f'stroke="#111827" stroke-width="4" opacity="0.85"/>'
+        # the dark band at the joint, then the ribs over the cone
+        f'<rect x="{x - 3:.1f}" y="{y_joint - 7:.1f}" width="{w + 6:.1f}" height="11" '
+        f'fill="#111827"/>'
+        + rib_paths
         # bolted top flange
         + f'<rect x="{x - 5:.1f}" y="{y_top - 9:.1f}" width="{w + 10:.1f}" height="12" rx="3" '
           f'fill="{_SHELL}" stroke="{_SHELL_EDGE}" stroke-width="2"/>'
@@ -389,19 +383,24 @@ def _cone_mixer(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_mark
         # outlet at the tip
         + f'<rect x="{cx - 9:.1f}" y="{y_tip:.1f}" width="18" height="12" rx="2" '
           f'fill="{_STEEL}"/>'
-        # No scale on this one, because there isn't one on the real M-101:
-        # it carries two hand-written marks near the rim and nothing else.
-        # A full graduation here would also have to account for the volume
-        # held in the cone, and inventing a scale that the vessel does not
-        # have in order to solve a problem it does not have is the wrong
-        # way round.
-        + _percent_label(cx,
-                         (y_top + y_joint) / 2 if idle else
-                         ((surface_y + y_joint) / 2 + 9 if fill_pct > 28 else surface_y - 12),
-                         fill_pct, _INK_LIGHT if (idle or fill_pct <= 28) else ink, idle)
-        + _tag_plate(cx, y_top + 20, asset_tag)
-        + _bay_bollard(x + w + 16, y_top + 30, y_tip + 30, bay_marker)
+        + scale_svg
+        + _percent_label(cx, label_y, fill_pct,
+                         _INK_LIGHT if (idle or fill_pct <= 26) else ink, idle)
+        + _tag_plate(cx, y_top + 20, asset_tag, w=min(76.0, w * 0.7))
+        + _bay_bollard(x + w + 16, y_top + 30, y_feet - 4, bay_marker)
     )
+
+
+def _bulk_vertical(uid, *args) -> str:
+    """M-205: tall and narrow, cone bottom, litre marks up the barrel."""
+    return _fabricated(uid, *args, x=76, w=100, y_top=54, barrel_h=222, cone_h=54,
+                       scale=True, ribs=False, legs_out=34)
+
+
+def _cone_mixer(uid, *args) -> str:
+    """M-101: short and wide, cone bottom, ribs, and no scale painted on it."""
+    return _fabricated(uid, *args, x=46, w=148, y_top=96, barrel_h=162, cone_h=74,
+                       scale=False, ribs=True, legs_out=34)
 
 
 def _ibc_tote(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker, idle) -> str:

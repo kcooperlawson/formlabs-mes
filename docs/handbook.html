@@ -232,7 +232,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="grid3" style="margin-bottom:12pt;">
     <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
     <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
-    <div class="stat"><span class="n">1,044</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
+    <div class="stat"><span class="n">1,048</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
@@ -588,9 +588,11 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="sec-head"><div class="hrow"><span class="eyebrow">09 &nbsp;/&nbsp; Vessel levels and the floor display</span><span class="status in">In service</span></div><h2>Reading a vessel off the screen</h2></div>
   <p class="lead">The picture is drawn to be checked against the vessel it describes, because a
   screen that can be checked at a glance gets checked.</p>
-  <p>Each vessel is drawn as the kind of thing it physically is &mdash; a bulk vertical, a
-  cone-bottom mixer, a caged tote &mdash; because on this floor those are three different objects
-  and their capacities do not tell them apart. Each carries its stencilled asset tag and the
+  <p>Each vessel is drawn as the kind of thing it physically is &mdash; a tall bulk reactor, a
+  squat cone mixer, a caged tote &mdash; because on this floor those are three different objects
+  and their capacities do not tell them apart. Every fabricated vessel here has a cone bottom in a
+  steel frame; only the totes are flat, and what separates the two fabricated ones is their
+  proportions and whether litres are painted on them. Each carries its stencilled asset tag and the
   orange bay marker from the bollard beside it, so the vessel on the screen and the vessel in the
   aisle have the same name. And where the real vessel has litre graduations, the drawing has them
   too, with the surface landing on the mark somebody standing there would read it against: a
@@ -601,15 +603,15 @@ td.k{font-weight:600; color:var(--ink);}
   reads <b>IDLE</b> rather than nought percent, which is a different statement and the true one.</p>
   <h3 style="margin-top:13pt;">The three kinds, and what a manager sets</h3>
   <div class="grid3" style="margin-top:9pt; margin-bottom:13pt;">
-    <div class="card"><span class="tag">Bulk vertical</span><h4>Straight-sided tank</h4>
-      <p>Tall, flat-bottomed on a skirt, bolted top flange, drive on the roof, litre marks up the
-      side. Drawn with its scale.</p></div>
-    <div class="card"><span class="tag">Cone-bottom mixer</span><h4>Squat, in a frame</h4>
-      <p>Short and wide, dark band at the joint, ribs down the cone to an outlet at the tip.
-      Drawn without a scale, because it has none.</p></div>
+    <div class="card"><span class="tag">Tall bulk reactor</span><h4>Tall and narrow</h4>
+      <p>Bolted top flange, cone bottom in a steel frame, and litre marks painted up the barrel.
+      Drawn with its scale.</p></div>
+    <div class="card"><span class="tag">Squat cone mixer</span><h4>Short and wide</h4>
+      <p>The same construction in different proportions, with ribs down the cone. Drawn without a
+      scale, because the real one has none.</p></div>
     <div class="card"><span class="tag">IBC tote</span><h4>Caged bottle on a pallet</h4>
-      <p>Not a fabricated vessel. Moulded cage, pallet feet, ball valve at the front. Around
-      1,000&nbsp;L.</p></div>
+      <p>Not a fabricated vessel, and the only flat-bottomed one. Moulded cage, pallet feet, ball
+      valve at the front. Around 1,000&nbsp;L.</p></div>
   </div>
   <p style="margin-bottom:11pt;">Each vessel carries three optional settings under <em>Manage
   Permanent Reactor Fleet</em>: which of the three it is, its asset tag, and its bay marker. The
@@ -969,7 +971,7 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">968</span><span class="l">assertions across eleven suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, vessel drawings, links, boot paths</span></div>
+    <div class="stat"><span class="n">972</span><span class="l">assertions across eleven suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, vessel drawings, links, boot paths</span></div>
     <div class="stat"><span class="n">58</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>

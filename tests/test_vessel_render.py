@@ -48,6 +48,13 @@ def draw(**kw):
     return vessel_svg(**kw)
 
 
+def joint_y(svg):
+    """Where the barrel meets the cone, from the dark band drawn over it."""
+    m = re.search(r'<rect x="[-\d.]+" y="([\d.]+)" width="[\d.]+" height="11" '
+                  r'fill="#111827"/>', svg)
+    return float(m.group(1)) + 7 if m else None
+
+
 def surface_y(svg, uid="t1"):
     """Where the top of the liquid sits, in the drawing's own coordinates."""
     m = re.search(rf'<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" '
@@ -101,10 +108,33 @@ if None in (full, mid, low):
     raise SystemExit(1)
 check("a fuller tank has its surface higher up the vessel", full < mid < low, True)
 
-# Half full is half way, within a pixel of the drawing's own body height.
 top_at_100, top_at_0 = full, surface_y(draw(fill_pct=0))
-half_expected = (top_at_100 + top_at_0) / 2
-check("half full puts the surface half way up", abs(mid - half_expected) < 1.0, True)
+
+# On a cone-bottomed vessel half full is NOT half way up, and a drawing that
+# put it there would be lying about the vessel: the cone takes up height
+# while holding very little, so the surface of half a tank sits above the
+# geometric middle. This is the assertion that would have caught the version
+# of this drawing that gave the tall vessels a flat bottom.
+middle = (top_at_100 + top_at_0) / 2
+check("half full sits above the middle, because the cone holds little for its height",
+      mid < middle - 3, True)
+
+# And below a few percent the liquid is inside the cone, not a film sitting
+# on top of it.
+joint = joint_y(draw(fill_pct=50))
+check("the joint between barrel and cone can be found", joint is not None, True)
+if joint is not None:
+    check("a nearly empty vessel has its liquid down in the cone",
+          surface_y(draw(fill_pct=2)) > joint, True)
+    check("and a mostly full one has it up in the barrel",
+          surface_y(draw(fill_pct=80)) < joint, True)
+
+# A tote is flat bottomed, so on that one half full IS half way - the same
+# code has to get both right.
+tote_mid = surface_y(draw(vessel_type="ibc_tote", fill_pct=50))
+tote_span = (surface_y(draw(vessel_type="ibc_tote", fill_pct=100))
+             + surface_y(draw(vessel_type="ibc_tote", fill_pct=0))) / 2
+check("half a flat-bottomed tote is half way up it", abs(tote_mid - tote_span) < 1.0, True)
 
 check("an over-range level is clamped rather than drawn outside the vessel",
       surface_y(draw(fill_pct=140)), full)
