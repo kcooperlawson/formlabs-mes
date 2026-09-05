@@ -21,6 +21,7 @@ from database import (
     get_production_logs_df,
     get_downtime_logs_df,
     get_plant_settings, do_logout, check_authentication, role_can_administer,
+    set_cookie,
     get_all_users_df, get_all_resin_specs_df,
 )
 from resin_palette import resin_color_map, stored_color_map
@@ -150,7 +151,7 @@ with st.sidebar:
 
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
-                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                set_cookie(cookie_manager, "formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")

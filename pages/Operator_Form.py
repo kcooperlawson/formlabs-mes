@@ -46,6 +46,9 @@ from database import (
     send_floor_message,
     get_plant_settings,
     role_can_administer,
+    set_cookie,
+    flash,
+    draw_flashes,
     add_suggestion,
     do_logout,
     check_authentication,
@@ -263,7 +266,7 @@ with st.sidebar:
 
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
-                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                set_cookie(cookie_manager, "formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")
@@ -387,6 +390,13 @@ elif current_role == "manager":
 
 st.markdown("---")
 
+# Anything the previous run confirmed - a log submitted, a photo audit filed,
+# a checklist cleared. Drawn here, above both the checklist gate and the
+# logging tabs, so it is in the same place whichever state the operator is in
+# and cannot be missed by somebody who has scrolled. See utils.flash: these
+# used to be toasts, which a phone lost entirely.
+draw_flashes()
+
 # ===================== THE HARD GATE: DAILY STARTUP CHECKLIST =====================
 # Only enforce this for Operators and Packers, not Managers in Debug mode
 if current_role in ["operator", "packer"]:
@@ -471,10 +481,10 @@ if current_role in ["operator", "packer"]:
                         from datetime import timedelta
 
                         st.session_state[clean_flag_key] = True
-                        cookie_manager.set(clean_cookie_name, str(date.today()),
+                        set_cookie(cookie_manager, clean_cookie_name, str(date.today()),
                                            expires_at=datetime.now() + timedelta(hours=12))
 
-                        st.toast("✅ Cleanliness Audit successfully recorded!")
+                        flash("Cleanliness audit recorded.", "📸")
                         st.rerun()
                     else:
                         st.warning("⚠️ A photo is required for the pre-shift audit.")
@@ -483,8 +493,26 @@ if current_role in ["operator", "packer"]:
             st.toast("✅ **Step 1: Morning Cleanliness Check — LOGGED & COMPLETED**")
 
         # --- STEP 2: MANUAL CHECKS & FINAL UNLOCK ---
-        with st.form("startup_checklist_form"):
+        # The pump form button belongs HERE, not only above the logging tabs:
+        # the first checkbox below asks the operator to have filled that form
+        # in, and this screen is the locked one - nothing after the st.stop()
+        # at the end of this block renders until it is cleared. The button was
+        # originally placed above the tab strip, which is exactly the part of
+        # the page an operator standing at the checklist could not see, so an
+        # address entered in IT Admin appeared to do nothing.
+        _lock_url, _lock_problem = external_links.normalise(
+            get_plant_settings().get("pump_form_url", ""))
+        if _lock_url:
             st.markdown("#### Step 2: Final Verification")
+            st.link_button(
+                "📱 " + external_links.label_or_default(
+                    get_plant_settings().get("pump_form_label", "")),
+                _lock_url, use_container_width=True,
+                help="Opens the station checksheet in a new tab. Come back here "
+                     "and tick the box once it is submitted.")
+        with st.form("startup_checklist_form"):
+            if not _lock_url:
+                st.markdown("#### Step 2: Final Verification")
 
             # 1. Universal QR Check
             qr_check = st.checkbox("📱 I have scanned the daily station QR Code and submitted the external checksheet.")
@@ -503,7 +531,7 @@ if current_role in ["operator", "packer"]:
                 if qr_check and mat_check:
                     if st.session_state.get(clean_flag_key):
                         submit_daily_checklist(current_user, current_shift, checklist_station)
-                        st.toast("✅ Startup checklist fully recorded! Unlocking systems...")
+                        flash("Startup checklist recorded. Terminal unlocked.", "🔓")
 
                         # Clean up the session state flag
                         del st.session_state[clean_flag_key]
@@ -568,8 +596,15 @@ if current_role != "packer":
 
     # Keep the "remember for next time" cookie in sync whenever the
     # Hourly Pouring station selector changes.
-    if cookie_manager.get(station_cookie_name) != my_station:
-        cookie_manager.set(station_cookie_name, my_station, expires_at=datetime.now() + timedelta(days=90))
+    #
+    # `cookie_manager.cookies` is empty until the manager component has
+    # reported back, which it has not done on the first run of a fresh page
+    # load. Writing then would compare against nothing, decide the cookie is
+    # wrong, and re-write it - costing every operator the settle wait in
+    # set_cookie on a screen they open all shift, for a value that was
+    # already correct.
+    if cookie_manager.cookies and cookie_manager.get(station_cookie_name) != my_station:
+        set_cookie(cookie_manager, station_cookie_name, my_station, expires_at=datetime.now() + timedelta(days=90))
 else:
     # Packing only ever has the one shared station — see the Packing tab
     # further down — so there's nothing to pick.
@@ -1248,7 +1283,7 @@ if tab1 is not None:
                                    "before pouring",
                             photo_filename=save_lot_photo(pending_photo)))
                         gate_mem.pop(station, None)
-                        st.toast("Catch recorded. Nothing was logged as poured.", icon="🛑")
+                        flash("Catch recorded. Nothing was logged as poured.", "🛑")
                         st.rerun()
 
                     reason_kind = st.selectbox(
@@ -1459,25 +1494,25 @@ if tab1 is not None:
                 st.session_state.pop("undo_log", None)
 
             if verification and verification.get("result") in ("mismatch", "expired"):
-                st.toast("Logged and flagged for the manager — the lot did not check out.", icon="⚠️")
+                flash("Logged and flagged for the manager — the lot did not check out.", "⚠️")
             if weight_reading and weight_reading.get("status") in ("over", "under"):
-                st.toast(
+                flash(
                     f"Weight {weight_reading['measured']:.0f} g is outside the band for "
                     f"{resin} — recorded, and it shows on the manager's fill-weight view.",
-                    icon="⚖️")
+                    "⚖️")
             if matched_run:
-                st.toast(f"Recorded {bottles_filled} units of {resin}! Credited to your active run.", icon="🧪")
+                flash(f"Recorded {bottles_filled} units of {resin}. Credited to your active run.", "🧪")
             elif simple_mode:
                 # The log is the product here, not a contribution to a run, so
                 # a successful log is a success. It used to close with a
                 # warning triangle and a note about a progress bar that this
                 # plant does not have - every log, all shift.
-                st.toast(f"Recorded {bottles_filled} units of {resin}.", icon="🧪")
+                flash(f"Recorded {bottles_filled} units of {resin}.", "🧪")
             else:
-                st.toast(
+                flash(
                     f"Recorded {bottles_filled} units of {resin} to Analytics — "
                     f"no active run matched this station/resin/lot, so it won't move a progress bar above.",
-                    icon="⚠️")
+                    "⚠️")
             st.rerun()
 
 # --- PACKING TAB ---
@@ -1541,7 +1576,7 @@ if tab_pack is not None:
                 notes=pack_notes,
                 log_type="Packing Count"
             )
-            st.toast(f"Packing saved! Recorded {units_packed} units.", icon="📦")
+            flash(f"Packing saved. Recorded {units_packed} units.", "📦")
             st.rerun()
 # --- TAB 2: DOWNTIME ---
 if tab2 is not None:
@@ -1566,7 +1601,7 @@ if tab2 is not None:
                 notes=dt_notes
             )
             # --- NEW TOAST INJECTED HERE ---
-            st.toast(f"Recorded {int(dt_duration)} minutes downtime.", icon="⚠️")
+            flash(f"Recorded {int(dt_duration)} minutes downtime.", "⚠️")
             st.rerun()
 
 # --- TAB 3: CLEANLINESS & SPILL PHOTO AUDIT ---
@@ -1613,7 +1648,7 @@ if tab3 is not None:
             )
             
             # --- NEW TOAST INJECTED HERE ---
-            st.toast("Photo Audit successfully recorded!", icon="📸")
+            flash("Photo audit recorded.", "📸")
             st.rerun()
 
 # --- TAB 4: MANAGER COMMS ---

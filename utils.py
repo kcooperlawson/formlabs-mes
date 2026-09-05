@@ -1,6 +1,7 @@
 
 
 import os
+import time
 import glob
 import subprocess
 import shutil
@@ -219,6 +220,61 @@ def restore_database_backup(filename: str) -> bool:
         logger.exception(f"restore_database_backup({filename!r}) failed unexpectedly")
         return False
 
+# How long to let a cookie write reach the browser before the script may
+# rerun. Measured, not guessed: with no wait at all, not one cookie in this
+# application was ever written - verified in a browser by signing in with
+# "Remember this device" ticked and finding no token cookie afterwards. 1.2s
+# was enough on a desktop and on a 390x844 phone profile, and it is paid only
+# on the deliberate actions that write a cookie (signing in, changing theme,
+# toggling glove mode), never on an ordinary interaction.
+COOKIE_SETTLE_SECONDS = 1.2
+
+
+def set_cookie(cookie_manager, name, value, **kwargs):
+    """Write a cookie, and give the browser the time it needs to do it.
+
+    extra_streamlit_components does not write cookies from Python. `set()`
+    renders a Streamlit *component*: the browser has to receive that frame,
+    mount an iframe and run its JavaScript. `st.rerun()` or `st.switch_page()`
+    on the next line tears the frame down before any of that happens, so the
+    cookie is silently never written - and because `set()` also updates the
+    manager's in-memory copy, the same script run can read the value back and
+    look entirely successful.
+
+    Every cookie in this application was set that way, which is why "Remember
+    this device" did nothing, a chosen theme reset on the next visit, and
+    glove mode would not stay with a terminal. Route cookie writes through
+    here rather than calling `set()` directly, so the wait cannot be forgotten
+    at a new call site.
+    """
+    cookie_manager.set(name, value, **kwargs)
+    time.sleep(COOKIE_SETTLE_SECONDS)
+
+
+def flash(message, icon="✅"):
+    """Queue a confirmation for the run AFTER this one, and return.
+
+    st.toast has the milder version of the same problem: the toast belongs to
+    the delta for the current run, and a rerun immediately after can discard
+    it before the browser paints. On a desktop it usually won the race; at
+    390x844 it reliably lost - which is exactly the machine that matters, so
+    an operator submitting a log on a phone at the pump got no confirmation at
+    all and had to open the last submission to check the entry had saved.
+
+    A message queued here survives the rerun and is drawn by draw_flashes() at
+    the top of the next run, as an ordinary success banner. That is also the
+    better answer on a phone: a banner stays until the next action, where a
+    toast vanishes after four seconds whether or not anybody was looking.
+    """
+    st.session_state.setdefault("_flash_queue", []).append((str(message), icon))
+
+
+def draw_flashes():
+    """Render and clear anything flash() queued on a previous run."""
+    for message, icon in st.session_state.pop("_flash_queue", []):
+        st.success(f"{icon} {message}")
+
+
 def do_logout(cookie_manager):
     from crud import delete_session  # local import avoids a circular import with crud.py
 
@@ -227,7 +283,7 @@ def do_logout(cookie_manager):
         old_token = cookie_manager.get(cookie="formlabs_mes_token")
         if old_token:
             delete_session(old_token)
-        cookie_manager.set("formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
+        set_cookie(cookie_manager, "formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
         cookie_manager.delete("formlabs_mes_token")
     except Exception:
         # Session state is cleared below regardless, so a cookie-manager

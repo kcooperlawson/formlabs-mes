@@ -257,6 +257,24 @@ try:
     check("pointing at the address that was configured",
           any(url == "https://forms.example.com/pump-check" for _, url in links), True)
 
+    # The screen that actually needs it. The checklist's first box asks the
+    # operator to have filled the form in, and the checklist is the LOCKED
+    # screen - nothing below its st.stop() renders until it clears. The button
+    # was first placed above the logging tabs, which an operator at the
+    # checklist cannot reach, so a configured address looked like it did
+    # nothing. An operator who has not cleared today's checklist is the case.
+    LOCKED = "Lee " + uuid.uuid4().hex[:6].upper()
+    create_user(LOCKED.split()[1].lower(), f"{LOCKED.split()[1].lower()}@x.com", "5555",
+                LOCKED, "operator")
+    at_lock = run_as(LOCKED)
+    check("the locked checklist screen is the one being tested",
+          "TERMINAL LOCKED" in texts(at_lock), True)
+    lock_links = _links(at_lock)
+    check("the pump form button is on the locked checklist screen",
+          any("Pump check" in lbl for lbl, _ in lock_links), True)
+    check("and points at the configured address there too",
+          any(url == "https://forms.example.com/pump-check" for _, url in lock_links), True)
+
     # An address typed without a scheme is the most common real paste. It must
     # not reach the page scheme-relative, or the browser resolves it against
     # the MES and the button lands on a 404 that looks like the MES is broken.

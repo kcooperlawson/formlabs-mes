@@ -35,7 +35,7 @@ st.logo("assets/formlabs_logo.png")
 
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
 from database import (do_logout, check_authentication, get_plant_settings,
-                      role_can_administer)
+                      role_can_administer, set_cookie)
 
 cookie_manager = stx.CookieManager(key="mgr_cookies")
 try:
@@ -130,7 +130,7 @@ with st.sidebar:
                 from database import update_user_theme
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
-                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                set_cookie(cookie_manager, "formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")

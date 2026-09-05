@@ -6,6 +6,28 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.13 — Saturday, September 5, 2026
+**Three things reported from the floor, all of them invisible to every test in the suite because they only happen in a browser — and two of them only on a phone**
+
+No new features. Three defects reported after a day of real use, and the thing they have in common is worth more than any of them individually: **each was a side effect that needs the browser to receive the current frame, followed immediately by a rerun that throws that frame away.** Python saw success every time. So did every existing test, because none of them opens a browser at 390×844, which is the only machine where two of the three actually fail.
+
+- **"Remember this device" never wrote a cookie. Not once, on any device.** `extra_streamlit_components` does not write cookies from Python: `set()` renders a Streamlit *component*, and the browser has to receive that frame, mount an iframe and run its JavaScript. `st.rerun()` and `st.switch_page()` on the very next line tear the frame down first. And because `set()` also updates the manager's own in-memory dict, the same script run reads the value back and everything looks fine — which is why this survived to now. Verified in a browser before touching anything: sign in with the box ticked, then inspect the cookie jar. Nothing there but Streamlit's own XSRF token.
+- **This was every cookie in the application, not just the login one.** Nine call sites set a cookie and immediately rerun. So a theme chosen from *Account & Preferences* reset on the next visit, glove mode would not stay with a terminal, night dimming would not stick, and the operator's remembered pump station was never actually remembered. All of them looked like they worked, in the session where you set them.
+- Fixed once, in `utils.set_cookie`, which writes the cookie and then waits long enough for the browser to have done it. **1.2 seconds, measured rather than guessed** — at zero, not one cookie is written; at 1.2 all of them are, on a desktop profile and on a 390×844 phone profile. It is paid only on the deliberate actions that write a cookie (signing in, changing theme, toggling glove mode) and never on an ordinary interaction — confirmed by instrumenting the helper and counting: an operator opening the terminal triggers zero cookie writes. Every call site now routes through the helper, so the wait cannot be forgotten at a new one.
+- One guard came out of that counting. The "remember my station" cookie compared against `cookie_manager.get()`, which returns nothing on the first run of a fresh page load because the component has not reported back yet — so it would decide the cookie was wrong and rewrite it, charging every operator the settle wait on the screen they open all shift, for a value that was already correct. It now waits until the manager has actually read the cookies.
+
+- **The confirmation after submitting a log was not appearing.** Same shape, milder: `st.toast` belongs to the current run's delta, and the `st.rerun()` immediately after can discard it before the browser paints. On a desktop it usually won that race. At 390×844 it reliably lost — so the operator on a phone at the pump submitted an hour's count and got nothing back at all, and had to open the last submission to check the entry existed. Every hour. The same for the start-of-shift, end-of-shift and changeover photo audits.
+- Confirmations now go through `utils.flash`, which queues the message in session state so it survives the rerun, and `draw_flashes()` renders it at the top of the next run — above both the checklist gate and the logging tabs, so it is in the same place whichever state the operator is in. Made a banner rather than a toast on purpose: a banner stays until the next action, where a toast vanishes after four seconds whether or not anybody was looking, and looking away is exactly what an operator does between the screen and the pump.
+- Eleven confirmations moved: hourly pouring, packing, downtime, all the photo audits, the cleanliness check, the checklist unlock, the pulled-cartridge catch, the mismatch flag and the out-of-band weight note. Left as toasts: the incidental ones — nobody goes back to the database to check whether their avatar saved.
+
+- **The QR checksheet button was on the wrong side of a wall.** The startup checklist asks the operator to confirm they have scanned the daily station QR code and submitted that checksheet — and the button that opens it sat above the logging tabs, which is behind the `st.stop()` the operator cannot get past until they tick that very box. Entering the address in IT Admin therefore appeared to do nothing. It is now on the checklist screen, directly above the box that asks about it.
+
+- **New `tests/smoke_persistence.py`** — thirteen checks in a real browser, most of them at phone size, for exactly these three. It was verified to fail before it was trusted: with the settle time set back to zero, the six cookie checks fail and the other seven still pass. A test that cannot catch the bug it was written for is worse than no test, and this suite has produced one of those before.
+
+- Suite: 897 assertions across nine files, 18 screens rendered, 58 browser checks. 973 total.
+
+---
+
 ## 3.12 — Friday, September 4, 2026
 **One switch decides what this is: a logging system or an execution system. Everything else followed from admitting the log is the product.**
 

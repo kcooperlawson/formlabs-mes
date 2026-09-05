@@ -25,6 +25,9 @@ from database import (
     get_downtime_logs_df,
     get_plant_settings,
     role_can_administer,
+    set_cookie,
+    flash,
+    draw_flashes,
     get_production_logs_df,
     init_db,
     seed_initial_data,
@@ -205,7 +208,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.12.0"
+APP_VERSION = "PT-V3.13.0"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -379,13 +382,13 @@ if not st.session_state["authenticated"]:
                         if user:
                             # Capture theme from user profile and set theme cookie
                             user_theme = user.get("preferred_theme", "Default Dark")
-                            cookie_manager.set("formlabs_mes_theme", user_theme,
+                            set_cookie(cookie_manager, "formlabs_mes_theme", user_theme,
                                                expires_at=datetime.now() + timedelta(days=30), key="set_theme_cookie")
 
                             # ONLY SET COOKIE IF CHECKBOX IS TICKED
                             if remember_device:
                                 session_token = create_session(user["id"])
-                                cookie_manager.set("formlabs_mes_token", session_token,
+                                set_cookie(cookie_manager, "formlabs_mes_token", session_token,
                                                    expires_at=datetime.now() + timedelta(days=30),
                                                    key="set_token_cookie")
 
@@ -444,7 +447,7 @@ if not st.session_state["authenticated"]:
 
             def update_unauth_theme():
                 new_theme = st.session_state.unauth_theme_selector
-                cookie_manager.set("formlabs_mes_theme", new_theme,
+                set_cookie(cookie_manager, "formlabs_mes_theme", new_theme,
                                    expires_at=datetime.now() + timedelta(days=365),
                                    key="set_theme_unauth")
                 st.session_state["preferred_theme"] = new_theme
@@ -573,7 +576,7 @@ with st.sidebar:
                 from database import update_user_theme
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
-                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                set_cookie(cookie_manager, "formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")

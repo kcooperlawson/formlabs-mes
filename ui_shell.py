@@ -16,7 +16,8 @@ import streamlit as st
 import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 
-from database import do_logout, get_avatar_path, role_can_administer
+from database import (do_logout, get_avatar_path, role_can_administer,
+                      set_cookie, flash, draw_flashes)
 
 try:
     from themes import THEMES
@@ -174,7 +175,7 @@ def render_shell(show_settings: bool = True):
                         from database import update_user_theme
                         update_user_theme(st.session_state["user_id"], chosen_t)
                         st.session_state["preferred_theme"] = chosen_t
-                        cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                        set_cookie(cookie_manager, "formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                         st.rerun()
 
                     st.markdown("---")
@@ -192,7 +193,7 @@ def render_shell(show_settings: bool = True):
                              "Remembered for this terminal, not for your account.")
                     if _glove != _glove_now:
                         st.session_state["glove_mode"] = _glove
-                        cookie_manager.set("formlabs_mes_glove", "1" if _glove else "0",
+                        set_cookie(cookie_manager, "formlabs_mes_glove", "1" if _glove else "0",
                                            expires_at=datetime.now() + timedelta(days=365),
                                            key="glove_cookie_set")
                         st.rerun()
@@ -205,7 +206,7 @@ def render_shell(show_settings: bool = True):
                              "kept intact so the lot check still reads correctly.")
                     if _dim != _dim_now:
                         st.session_state["night_dim"] = _dim
-                        cookie_manager.set("formlabs_mes_dim", "1" if _dim else "0",
+                        set_cookie(cookie_manager, "formlabs_mes_dim", "1" if _dim else "0",
                                            expires_at=datetime.now() + timedelta(days=365),
                                            key="dim_cookie_set")
                         st.rerun()

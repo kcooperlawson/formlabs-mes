@@ -58,7 +58,17 @@ python tests\test_boot_paths.py
 python tests\test_roles.py
 ```
 
-Every test builds a throwaway database and refuses to run against the connection in `.env`, so a test run cannot touch production. `tests\smoke_browser.py` and `tests\smoke_simple_mode.py` drive a real browser through an operator's shift and need the application running on `localhost:8501` first.
+Every test builds a throwaway database and refuses to run against the connection in `.env`, so a test run cannot touch production.
+
+Three more drive a real browser and need the application running on `localhost:8501` first — start it with `run_mes.bat` in another window:
+
+```
+python tests\smoke_browser.py         an operator's shift, desktop and phone
+python tests\smoke_simple_mode.py     the logger-only shape, and who can administer
+python tests\smoke_persistence.py     staying signed in, submit confirmations, the checksheet button
+```
+
+The browser ones matter more than their number suggests. Several defects have reached the floor that every headless test passed cleanly, because they only happen once a real browser is involved — and two of those only happened at phone size, which is the machine operators actually use.
 
 ## Rebuilding the documents
 

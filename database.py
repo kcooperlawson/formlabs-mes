@@ -8,7 +8,7 @@ from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion,
                     LotVerification)
-from utils import esc, UPLOAD_DIR, AVATAR_DIR, LOT_PHOTO_DIR, BACKUP_DIR, create_database_backup, restore_database_backup, do_logout, check_authentication, get_avatar_path, get_avatar_data_uri
+from utils import esc, UPLOAD_DIR, AVATAR_DIR, LOT_PHOTO_DIR, BACKUP_DIR, create_database_backup, restore_database_backup, do_logout, check_authentication, get_avatar_path, get_avatar_data_uri, set_cookie, flash, draw_flashes
 
 # The asterisk (*) imports every function from crud.py so your UI files can still find them!
 from crud import *

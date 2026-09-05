@@ -227,7 +227,10 @@ PAGES.append(page(
            "of the station; otherwise the default note is fine.")
     + step(3, "Confirm the two checks",
            "That you have scanned the daily station QR code and submitted that checksheet, and "
-           "that your bins of empty cartridges and your receiving carts are staged for the run.")
+           "that your bins of empty cartridges and your receiving carts are staged for the run. "
+           "If your plant has set one up, the button that opens the checksheet is right there on "
+           "this screen, above the boxes &mdash; it opens in a new tab and this page waits for "
+           "you.")
     + step(4, "Press <em>Submit Validation &amp; Unlock Terminal</em>",
            "The logging screens open up. You will not see this again today unless you move "
            "stations.")
@@ -334,8 +337,9 @@ PAGES.append(page(
            "<b>Leaving it blank never blocks anything</b> &mdash; a blank is honest, a guess is "
            "worse than nothing.")
     + step(4, "Anything worth noting, then submit",
-           "The screen tells you plainly whether it saved. If it says it did not, nothing was "
-           "recorded &mdash; submit again.")
+           "A green line appears at the top of the screen naming what was recorded, and it stays "
+           "there until you do something else &mdash; so you can look at the pump and back and "
+           "still see it. If it says the entry did not save, nothing was recorded: submit again.")
     + '</div>'
     + shot("figs_op/06_counts.png", "Counts and submit.")
     + '</div>'

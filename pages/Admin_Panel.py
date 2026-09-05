@@ -17,7 +17,7 @@ from database import (
     unlock_user_account,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
     get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
-    check_authentication, get_assigned_runs_df, role_can_administer
+    check_authentication, get_assigned_runs_df, role_can_administer, set_cookie
 )
 from database import esc
 from shifts import picker_options as shift_picker_options
@@ -156,7 +156,7 @@ with st.sidebar:
             if chosen_t != current_t:
                 update_user_theme(st.session_state["user_id"], chosen_t)
                 st.session_state["preferred_theme"] = chosen_t
-                cookie_manager.set("formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
+                set_cookie(cookie_manager, "formlabs_mes_theme", chosen_t, expires_at=datetime.now() + timedelta(days=365))
                 st.rerun()
 
             st.markdown("---")
