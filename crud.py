@@ -18,6 +18,7 @@ from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
                     LotVerification)
+from reactor_vessel import resolve_vessel_type
 from app_logger import logger
 
 # --- DIRECTORY SETUP ---
@@ -698,11 +699,22 @@ def get_all_reactors_df() -> pd.DataFrame:
         session.close()
 
 
-def add_reactor(reactor_name: str, max_capacity_l: int):
+def add_reactor(reactor_name: str, max_capacity_l: int, vessel_type: str = "",
+                asset_tag: str = "", bay_marker: str = ""):
+    """Register a physical vessel.
+
+    The vessel type falls back to the capacity band rather than to nothing, so
+    a tank added in a hurry still draws as something sensible and a manager
+    only has to correct the ones that guessed wrong.
+    """
     session = ScopedSession()
     try:
         if not session.query(Reactor).filter(Reactor.reactor_name == reactor_name.strip()).first():
-            session.add(Reactor(reactor_name=reactor_name.strip(), max_capacity_l=max_capacity_l))
+            session.add(Reactor(
+                reactor_name=reactor_name.strip(), max_capacity_l=max_capacity_l,
+                vessel_type=resolve_vessel_type(vessel_type, max_capacity_l),
+                asset_tag=str(asset_tag or "").strip() or None,
+                bay_marker=str(bay_marker or "").strip().upper() or None))
             session.commit()
     finally:
         session.close()
@@ -727,6 +739,32 @@ def update_reactor_config(reactor_id: int, resin: str, pump: str):
             r.current_resin = resin if resin != "None" else None
             r.assigned_pump = pump if pump != "None" else None
             session.commit()
+    finally:
+        session.close()
+
+
+def update_reactor_identity(reactor_id: int, vessel_type: str = None,
+                            asset_tag: str = None, bay_marker: str = None) -> bool:
+    """What a vessel is and what it is called out on the floor.
+
+    Kept apart from update_reactor_config on purpose: that one changes what a
+    vessel is doing this week, and this one changes what the vessel *is*. They
+    are edited by different people at different times, and a save of one
+    should never quietly overwrite the other.
+    """
+    session = ScopedSession()
+    try:
+        r = session.query(Reactor).filter(Reactor.id == reactor_id).first()
+        if not r:
+            return False
+        if vessel_type is not None:
+            r.vessel_type = resolve_vessel_type(vessel_type, r.max_capacity_l)
+        if asset_tag is not None:
+            r.asset_tag = str(asset_tag).strip()[:30] or None
+        if bay_marker is not None:
+            r.bay_marker = str(bay_marker).strip().upper()[:10] or None
+        session.commit()
+        return True
     finally:
         session.close()
 

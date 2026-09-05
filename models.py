@@ -101,6 +101,13 @@ class Reactor(Base):
     status = Column(String(20), default="Active")
     current_resin = Column(String(100), nullable=True)
     assigned_pump = Column(String(50), nullable=True)
+    # What the vessel physically is, and what it is called out on the floor.
+    # The shape cannot be derived from the capacity - see migration
+    # 0011_vessel_identity - and the tag and the bay marker are the
+    # identifiers people actually use when they talk about these tanks.
+    vessel_type = Column(String(20), nullable=True)
+    asset_tag = Column(String(30), nullable=True)
+    bay_marker = Column(String(10), nullable=True)
     current_resin_id = Column(Integer, ForeignKey("resin_specs.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_pump_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
 

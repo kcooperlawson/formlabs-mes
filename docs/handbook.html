@@ -171,7 +171,7 @@ td.k{font-weight:600; color:var(--ink);}
   the phones they already carry. Part One is what runs today and what comes out of it. Part Two is
   what the same record can be asked to do, each of which is a setting rather than a requirement.</div>
   <div class="meta">
-    <div>Release<b>Version 3.14</b></div>
+    <div>Release<b>Version 3.15</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -193,13 +193,13 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="row"><span class="num">08</span><span class="t">Running it</span><span class="d">Backups, accounts, and keeping the record honest</span><span class="pg">12</span></div>
     <div class="row"><span class="num">09</span><span class="t">Vessel levels and the floor display</span><span class="d">What is left in each vessel, and the wall display</span><span class="pg">14</span></div>
     <div class="toc-band">Part Two &mdash; available if wanted</div>
-    <div class="row"><span class="num">10</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">15</span></div>
-    <div class="row"><span class="num">11</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">16</span></div>
+    <div class="row"><span class="num">10</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">16</span></div>
+    <div class="row"><span class="num">11</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">17</span></div>
     <div class="toc-band">Appendices</div>
-    <div class="row"><span class="num">A</span><span class="t">Guide &mdash; Operator</span><span class="d">Working guides for operator, manager and administrator</span><span class="pg">18</span></div>
-    <div class="row"><span class="num">B</span><span class="t">Reading the screen on the floor</span><span class="d">Gloves, lighting, contrast and colour on the floor</span><span class="pg">24</span></div>
-    <div class="row"><span class="num">C</span><span class="t">How it is tested</span><span class="d">What is checked before a release, and what that has caught</span><span class="pg">25</span></div>
-    <div class="row"><span class="num">D</span><span class="t">Built, not in service</span><span class="d">Built, not in use, and not proposed</span><span class="pg">26</span></div>
+    <div class="row"><span class="num">A</span><span class="t">Guide &mdash; Operator</span><span class="d">Working guides for operator, manager and administrator</span><span class="pg">19</span></div>
+    <div class="row"><span class="num">B</span><span class="t">Reading the screen on the floor</span><span class="d">Gloves, lighting, contrast and colour on the floor</span><span class="pg">25</span></div>
+    <div class="row"><span class="num">C</span><span class="t">How it is tested</span><span class="d">What is checked before a release, and what that has caught</span><span class="pg">26</span></div>
+    <div class="row"><span class="num">D</span><span class="t">Built, not in service</span><span class="d">Built, not in use, and not proposed</span><span class="pg">27</span></div>
   </div>
   <div class="note" style="margin-top:14pt;"><span class="eyebrow">On scope</span><p>This system was built on the floor alongside the job, and it covers more ground than the plant needs today. The marker on each section says which is which: <b>In service</b> runs now; <b>Optional</b> is finished and switched off until somebody wants it; <b>Not in service</b> was built to find out whether an approach works, with nothing depending on it. <b>Part One is what is being proposed</b> &mdash; the rest is here so the capability is known, not because it is being asked for.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>2</span></div>
@@ -232,7 +232,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="grid3" style="margin-bottom:12pt;">
     <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
     <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
-    <div class="stat"><span class="n">1,000</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
+    <div class="stat"><span class="n">1,044</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
@@ -571,13 +571,55 @@ td.k{font-weight:600; color:var(--ink);}
   percentage on the sight glass or by the exact litres. The correction is written into the record
   as a dated, attributed adjustment rather than quietly replacing what was there, so the
   disagreement stays visible and the level goes on being derived from the record afterwards.</p>
-  <figure><img src="figs_print/07_reactors.png" alt="Live reactors">
-    <figcaption><b>Live Reactor Fleet.</b> Each vessel's resin, station, lot and remaining volume,
-    in litres and in kilograms.</figcaption></figure>
-  <figure style="margin-top:8pt;"><img src="figs_print/15_tv.png" alt="TV dashboard" style="max-height:1.7in;">
-    <figcaption><b>Floor display mode.</b> The active shift, or the whole plant day, refreshing
-    itself.</figcaption></figure>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
+  <figure><img class="med" src="figs_print/07_reactors.png" alt="Live reactors">
+    <figcaption><b>Live Reactor Fleet.</b> Each vessel drawn as its own kind, with its asset tag,
+    bay marker, resin, station, lot and remaining volume in litres and in kilograms.</figcaption></figure>
+  <div class="note" style="margin-top:13pt;"><span class="eyebrow">When a vessel sits at empty</span>
+    <p>A vessel that reads empty while pouring continues from it is telling you something specific:
+    more has been drawn on the current lot than the vessel holds, which means it was refilled and
+    the lot on the log did not change with it &mdash; the same drum number read off a second
+    container, or a top-up nobody recorded. The figure is not lost, and nothing needs unpicking:
+    the next lot that does change resets the vessel, and a level calibration corrects it in the
+    meantime. It is worth knowing because it is the one condition where the screen and the vessel
+    can disagree without anybody having made a mistake at the pump.</p></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">09 &nbsp;/&nbsp; Vessel levels and the floor display</span><span class="status in">In service</span></div><h2>Reading a vessel off the screen</h2></div>
+  <p class="lead">The picture is drawn to be checked against the vessel it describes, because a
+  screen that can be checked at a glance gets checked.</p>
+  <p>Each vessel is drawn as the kind of thing it physically is &mdash; a bulk vertical, a
+  cone-bottom mixer, a caged tote &mdash; because on this floor those are three different objects
+  and their capacities do not tell them apart. Each carries its stencilled asset tag and the
+  orange bay marker from the bollard beside it, so the vessel on the screen and the vessel in the
+  aisle have the same name. And where the real vessel has litre graduations, the drawing has them
+  too, with the surface landing on the mark somebody standing there would read it against: a
+  vessel showing 2,193&nbsp;L sits just above its 2,000 line, on the screen and in the aisle.</p>
+  <p>The liquid is drawn in the resin's own colour, on the same reasoning as the coloured labels
+  everywhere else &mdash; from across a room, colour is what identifies a formulation, and this
+  wall of vessels is meant to be read from across a room. A vessel with nothing assigned to it
+  reads <b>IDLE</b> rather than nought percent, which is a different statement and the true one.</p>
+  <h3 style="margin-top:13pt;">The three kinds, and what a manager sets</h3>
+  <div class="grid3" style="margin-top:9pt; margin-bottom:13pt;">
+    <div class="card"><span class="tag">Bulk vertical</span><h4>Straight-sided tank</h4>
+      <p>Tall, flat-bottomed on a skirt, bolted top flange, drive on the roof, litre marks up the
+      side. Drawn with its scale.</p></div>
+    <div class="card"><span class="tag">Cone-bottom mixer</span><h4>Squat, in a frame</h4>
+      <p>Short and wide, dark band at the joint, ribs down the cone to an outlet at the tip.
+      Drawn without a scale, because it has none.</p></div>
+    <div class="card"><span class="tag">IBC tote</span><h4>Caged bottle on a pallet</h4>
+      <p>Not a fabricated vessel. Moulded cage, pallet feet, ball valve at the front. Around
+      1,000&nbsp;L.</p></div>
+  </div>
+  <p style="margin-bottom:11pt;">Each vessel carries three optional settings under <em>Manage
+  Permanent Reactor Fleet</em>: which of the three it is, its asset tag, and its bay marker. The
+  kind starts from the capacity, which is right for most of a fleet and wrong for the interesting
+  ones &mdash; so it is a starting point a manager corrects, not a rule the drawing keeps
+  re-deriving.</p>
+  <figure style="margin-top:4pt;"><img src="figs_print/15_tv.png" alt="TV dashboard" style="max-height:1.85in;">
+    <figcaption><b>Floor display mode.</b> The same record on a wall screen &mdash; the active
+    shift, or the whole plant day, refreshing itself.</figcaption></figure>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
 </section>
 
 <section class="page">
@@ -605,7 +647,7 @@ td.k{font-weight:600; color:var(--ink);}
       <p>A run can be completed on a custom final total when the physical count differs, and the reactor
       it drew from is released.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
 </section>
 
 <section class="page">
@@ -645,7 +687,7 @@ td.k{font-weight:600; color:var(--ink);}
       <p>For the same reason the run card had to stop printing the lot the check was hiding: a field that
       already contains the right-looking answer gets accepted, not measured.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>17</span></div>
 </section>
 
 <section class="page">
@@ -680,7 +722,7 @@ td.k{font-weight:600; color:var(--ink);}
     for exactly these bench scales. If they have a serial output the weight arrives with no operator
     effort at all &mdash; and these manual readings are what that automated capture would have to be
     validated against, since checking it needs known-good numbers to check against.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>17</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>18</span></div>
 </section>
 
 <section class="page">
@@ -717,7 +759,7 @@ td.k{font-weight:600; color:var(--ink);}
       hand your phone to someone else to log their hour. If you lose it, tell your lead and have your PIN
       reset.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>18</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>19</span></div>
 </section>
 
 <section class="page">
@@ -751,7 +793,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step"><span class="n">9</span><div><h4>Typed the wrong number? Take it back</h4>
     <p>Two minutes to undo your own most recent log &mdash; a 2500 that should have been 250 no longer
     needs a manager. Your latest entry only, and never a flagged one.</p></div></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>19</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>20</span></div>
 </section>
 
 <section class="page">
@@ -785,7 +827,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">The one rule</span>
     <p>Log it when it happens. An hour reconstructed at the end of a shift is a guess, and every pace figure,
     yield number and downtime decision downstream is built on what you enter.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>20</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>21</span></div>
 </section>
 
 <section class="page">
@@ -811,7 +853,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Almost always one of three things: the operator's station does not match the run's, the resin or
     container format differs, or the lot on the run does not match what is staged. The verification review
     shows which.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>21</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>22</span></div>
 </section>
 
 <section class="page">
@@ -837,7 +879,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step"><span class="n">5</span><div><h4>Answer the floor</h4>
     <p>The communications page holds every operator's thread. A question left unanswered there gets solved
     badly on the floor instead.</p></div></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>22</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>23</span></div>
 </section>
 
 <section class="page">
@@ -871,7 +913,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Do not edit production rows directly in the database to fix a number. Use log management to remove the
     bad entry &mdash; it re-syncs the affected work order &mdash; or a reconciliation to book a variance. Both
     leave a visible record; a direct edit leaves the totals right and the story wrong.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>23</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>24</span></div>
 </section>
 
 <section class="page">
@@ -919,7 +961,7 @@ td.k{font-weight:600; color:var(--ink);}
     filter and control is identical, so a handbook page describes one screen regardless of how the
     reader has theirs set.</figcaption></figure>
 
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>24</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>25</span></div>
 </section>
 
 <section class="page">
@@ -927,7 +969,7 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">924</span><span class="l">assertions across ten suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, links, boot paths</span></div>
+    <div class="stat"><span class="n">968</span><span class="l">assertions across eleven suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, vessel drawings, links, boot paths</span></div>
     <div class="stat"><span class="n">58</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
@@ -961,6 +1003,11 @@ td.k{font-weight:600; color:var(--ink);}
     after the tests had passed: an indented style block appended after other content is treated as a code
     listing and displayed rather than applied. The twenty-four older themes were never bitten because
     theirs comes first.</li>
+    <li><strong>Every vessel on the wall would have drawn the first vessel's colour.</strong> A
+    gradient is referenced by an identifier, four vessels share one page, and duplicate
+    identifiers all resolve to the first &mdash; so the second tank onwards would have shown the
+    right level in the wrong resin's colour, on a screen whose whole point is being recognised by
+    colour from a distance. Nothing would have looked broken.</li>
     <li><strong>Vessel levels only worked because work orders were switched on.</strong> The level looked
     like a vessel feature and was not one: the work order was quietly supplying both the point the vessel
     was last filled and the size of the containers coming out of it. With work orders off &mdash; which is
@@ -975,7 +1022,7 @@ td.k{font-weight:600; color:var(--ink);}
     two rules that matter most about the check weight, that it never blocks a log and is never pre-filled
     &mdash; and a screenshot comparison catches a card that lost its border or a chart that came back
     empty, neither of which raises an error.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>25</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>26</span></div>
 </section>
 
 <section class="page">
@@ -1010,7 +1057,7 @@ run tracking would need no changes. A registry screen for it is written &mdash; 
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">Read this as</span>
     <p>Neither of these is a roadmap item or a commitment of dates. They are experiments that happen to be
     finished enough to demonstrate, and either could be abandoned without affecting anything in service.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>26</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>27</span></div>
 </section>
 
 </body></html>

@@ -19,6 +19,7 @@ from database import (
     container_litres,
     get_all_reactors_df,
     add_reactor,
+    update_reactor_identity,
     delete_reactor,
     update_reactor_config,
     get_active_pumps,
@@ -28,7 +29,9 @@ from database import (
     role_can_administer,
 )
 from database import esc
-from resin_palette import resin_chip, stored_color_map
+from resin_palette import resin_chip, stored_color_map, resin_color
+from reactor_vessel import (vessel_svg, resolve_vessel_type,
+                            VESSEL_TYPES, VESSEL_LABELS, VESSEL_HELP)
 
 
 def get_base64_image(image_path):
@@ -299,23 +302,61 @@ if st.session_state.get("user_role") in ["manager", "admin"]:
             with st.form("add_reactor_form", clear_on_submit=True):
                 new_name = st.text_input("Reactor Name (e.g. Tank C-5000)")
                 new_cap = st.number_input("Max Capacity (Liters)", value=5000, step=500)
+                new_kind = st.selectbox(
+                    "Vessel Type", VESSEL_TYPES, index=0,
+                    format_func=lambda k: VESSEL_LABELS[k],
+                    help="What the vessel physically is. This is what the fleet "
+                         "wall draws, and capacity cannot tell these apart.")
+                st.caption(VESSEL_HELP[new_kind])
+                nt1, nt2 = st.columns(2)
+                new_tag = nt1.text_input("Asset Tag", placeholder="M-205")
+                new_bay = nt2.text_input("Bay Marker", placeholder="F3", max_chars=3)
                 if st.form_submit_button("Add Permanent Reactor", type="primary", use_container_width=True):
                     if new_name.strip():
-                        add_reactor(new_name, int(new_cap))
+                        add_reactor(new_name, int(new_cap), vessel_type=new_kind,
+                                    asset_tag=new_tag, bay_marker=new_bay)
                         st.rerun()
         with c2:
             st.markdown("**🏭 Permanent Fleet Registration**")
-            st.caption("Reactors are permanent physical tanks. They will automatically fill and empty as you dispatch or complete Work Orders.")
+            # The tags are not decoration. Every vessel out there is stencilled
+            # with an asset tag and stands beside a bollard carrying an orange
+            # bay marker, and those are what people say to each other on the
+            # floor. A tank called "Reactor 2" on screen and "M-205" in the
+            # aisle is one translation step at the exact moment somebody is
+            # trying to check whether the screen is telling the truth.
+            st.caption("Permanent physical vessels. The type decides how each one is drawn on "
+                       "the wall; the tag and bay marker are what it is called on the floor.")
             if not df_reactors.empty:
                 for _, r in df_reactors.iterrows():
                     r_id = r['id']
                     col_r1, col_r2 = st.columns([4, 1])
-                    
-                    col_r1.markdown(f"<div style='margin-top:8px;'><b>🛢️ {esc(r['reactor_name'])}</b> <span style='color:#94A3B8; font-size:0.9rem;'>({r['max_capacity_l']:,} L Capacity)</span></div>", unsafe_allow_html=True)
-                    
+                    col_r1.markdown(
+                        f"<div style='margin-top:8px;'><b>🛢️ {esc(r['reactor_name'])}</b> "
+                        f"<span style='color:#94A3B8; font-size:0.9rem;'>"
+                        f"({r['max_capacity_l']:,} L)</span></div>",
+                        unsafe_allow_html=True)
                     if col_r2.button("🗑️ Remove", key=f"del_{r_id}"):
                         delete_reactor(r_id)
                         st.rerun()
+
+                    kind_now = resolve_vessel_type(r.get("vessel_type"), r["max_capacity_l"])
+                    with st.form(f"vessel_form_{r_id}"):
+                        f1, f2, f3, f4 = st.columns([2.2, 1, 1, 1])
+                        kind = f1.selectbox(
+                            "Vessel type", VESSEL_TYPES,
+                            index=VESSEL_TYPES.index(kind_now),
+                            format_func=lambda k: VESSEL_LABELS[k],
+                            key=f"vk_{r_id}", label_visibility="collapsed")
+                        tag = f2.text_input("Asset tag", value=r.get("asset_tag") or "",
+                                            placeholder="M-205", key=f"vt_{r_id}",
+                                            label_visibility="collapsed")
+                        bay = f3.text_input("Bay", value=r.get("bay_marker") or "",
+                                            placeholder="F3", max_chars=3, key=f"vb_{r_id}",
+                                            label_visibility="collapsed")
+                        if f4.form_submit_button("💾 Save", use_container_width=True):
+                            update_reactor_identity(int(r_id), vessel_type=kind,
+                                                    asset_tag=tag, bay_marker=bay)
+                            st.rerun()
                     st.markdown("<hr style='margin: 5px 0; border-color: #1E2B45;'>", unsafe_allow_html=True)
             else:
                 st.caption("No permanent reactors added yet.")
@@ -361,7 +402,6 @@ if not df_reactors.empty:
                 density = density_by_resin.get(str(r_resin).strip().lower(), DEFAULT_DENSITY_KG_L)
                 remaining_kg = remaining_l * density
 
-                tank_color = "linear-gradient(0deg, #EF4444 0%, #F87171 100%)" if fill_pct < 10 else "linear-gradient(0deg, #3B82F6 0%, #00D2FF 100%)"
                 # The tank's resin as a coloured chip rather than cyan text.
                 # This wall of tanks is read from across the room, and colour
                 # is the only thing legible at that distance.
@@ -384,30 +424,24 @@ if not df_reactors.empty:
                 rem_display = "0 L"
                 remaining_kg = 0
 
-            # --- DYNAMIC VISUAL STYLING BASED ON TANK CAPACITY ---
-            if capacity_l >= 5000:
-                # Tall 30ft cone-bottom on heavy metal stand
-                tank_style = "width: 140px; height: 320px; margin: 0 auto; border: 3px solid #94A3B8; border-radius: 10px 10px 50% 50% / 10px 10px 15% 15%;"
-                # Stand sits slightly behind and overlaps the cone bottom
-                stand_html = '<div style="width: 144px; height: 60px; margin: -20px auto 0 auto; border: 6px solid #475569; border-top: none; position: relative; z-index: 1;"></div><div style="width: 156px; height: 8px; margin: 0 auto; background: #475569; border-radius: 3px;"></div>'
-            elif capacity_l >= 3000:
-                # Medium 15ft cone-bottom on standard metal stand
-                tank_style = "width: 180px; height: 220px; margin: 0 auto; border: 3px solid #94A3B8; border-radius: 10px 10px 50% 50% / 10px 10px 22% 22%;"
-                stand_html = '<div style="width: 184px; height: 50px; margin: -20px auto 0 auto; border: 5px solid #475569; border-top: none; position: relative; z-index: 1;"></div><div style="width: 196px; height: 8px; margin: 0 auto; background: #475569; border-radius: 3px;"></div>'
-            else:
-                # 1000L IBC Tote with Blue Plastic Frame and Pallet Base
-                tank_style = "width: 220px; height: 180px; margin: 0 auto; border: 10px solid #2563EB; border-radius: 12px;"
-                stand_html = '<div style="width: 220px; height: 16px; margin: 4px auto 0 auto; background: #1E3A8A; border-radius: 4px;"></div>'
+            # The vessel is drawn as the kind of thing it physically is - a
+            # bulk vertical, a cone-bottom mixer or a caged tote - from what
+            # a manager recorded against it, because capacity cannot tell
+            # those apart. See reactor_vessel.
+            vessel_kind = resolve_vessel_type(reactor.get("vessel_type"), capacity_l)
+            vessel = vessel_svg(
+                vessel_kind, fill_pct, capacity_l,
+                resin_colour=resin_color(r_resin, _resin_colours.get(str(r_resin))),
+                asset_tag=reactor.get("asset_tag") or "",
+                bay_marker=reactor.get("bay_marker") or "",
+                idle=not (r_resin and r_resin != "None"),
+                key=f"{reactor.get('id', i)}_{j}")
 
             html_card = (
                 f'<div style="width:100%; margin-bottom:24px;">'
-                f'<div style="text-align:center; color:#FFFFFF; font-weight:800; margin-bottom:12px; font-size:1.1rem;">{r_name}</div>'
-                f'<div style="{tank_style} background:#060B14; position:relative; overflow:hidden; box-shadow:inset 0 5px 15px rgba(0,0,0,0.8); z-index: 2;">'
-                f'<div style="position:absolute; bottom:0; width:100%; height:{fill_pct}%; background:{tank_color}; transition:height 1s ease-in-out; opacity:0.85; border-top:2px solid rgba(255,255,255,0.8);"></div>'
-                f'<div style="position:absolute; top:40%; width:100%; text-align:center; font-size:1.5rem; font-weight:900; color:#FFFFFF; text-shadow:2px 2px 6px #000; z-index: 3;">{fill_pct:.1f}%</div>'
-                f'</div>'
-                f'{stand_html}'
-                f'<div style="text-align:center; background:linear-gradient(180deg, #0D1627 0%, #080D1A 100%); border:1px solid #00D2FF; border-radius:8px; padding:8px; margin-top:16px;">'
+                f'<div style="text-align:center; color:#FFFFFF; font-weight:800; margin-bottom:10px; font-size:1.1rem;">{r_name}</div>'
+                f'{vessel}'
+                f'<div style="text-align:center; background:linear-gradient(180deg, #0D1627 0%, #080D1A 100%); border:1px solid #00D2FF; border-radius:8px; padding:8px; margin-top:14px;">'
                 f'<div style="font-size:0.6rem; font-weight:800; color:#94A3B8; letter-spacing:0.1em;">REMAINING IN TANK</div>'
                 f'<div style="font-size:1.05rem; font-weight:900; color:#FFFFFF; margin-top:2px;">{rem_display} <span style="font-size:0.7rem; color:#64748B;">({remaining_kg:,.0f} kg)</span></div>'
                 f'</div>'

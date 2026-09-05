@@ -57,6 +57,7 @@ python tests\test_links.py
 python tests\test_boot_paths.py
 python tests\test_roles.py
 python tests\test_reactor_level.py
+python tests\test_vessel_render.py
 python tests\test_fill_weight.py
 python tests\test_resin_colors.py
 python tests\test_shifts_and_display.py
