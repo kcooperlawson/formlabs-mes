@@ -6,6 +6,20 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.16 — Sunday, September 6, 2026
+**The handbook is for management, and it now says so and behaves like it**
+
+No code. Noticed on reading it back: the handbook carried a three-page operator guide inside Appendix A, and there is a separate operator guide — eleven pages, written to be read at the pump — that covers the same ground better. Two documents saying the same thing in different words is how they end up disagreeing.
+
+- **The three operator pages are gone** — *Your shift, start to finish*, *Logging an hour of pouring*, *The rest of your terminal*. Appendix A is now the manager's and the administrator's working guides and nothing else. The role bands that named all three roles from the operator's side went with them: every remaining page is read by management, and the page should not pretend otherwise.
+- **The cover and the contents say who it is for**, and point at the operator guide by name. Somebody looking for the operator instructions should find out in one line where they actually are, rather than concluding the floor was never written for.
+- **New page: "Questions that had no answer before."** The handbook opened with the problem — counts and lots lived on paper and in people's heads — and then went straight into what the system records, which left the reader to work out for themselves what that is worth. Six questions the plant could not answer and what answers each: which containers came out of a lot, what was poured and when, where the hours went, how the shift is running right now, how much is left in a vessel, and whether the lot check is actually being done. **No savings figures, because none have been measured** — every claim is something the record either holds or does not.
+- It closes on what it costs the floor to get it, since that is the other half of the question a manager is asking: one screen on a phone they already carry, once an hour, no new hardware, and nothing entered by anybody upstream.
+- **A page had lost its number** and nobody noticed, because a missing folio looks like white space. Page numbers are now derived by walking the document in order and the contents is read back off where the sections actually landed, rather than being calculated by hand each time a page moves. That is what caught it.
+- 25 pages, down from 27.
+
+---
+
 ## 3.15 — Saturday, September 5, 2026
 **Photographs from the floor, and the fleet wall redrawn as the vessels that are actually out there**
 

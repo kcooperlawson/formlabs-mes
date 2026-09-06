@@ -165,13 +165,17 @@ td.k{font-weight:600; color:var(--ink);}
 <section class="page cover">
   <img class="logo" src="assets/formlabs_logo.png" alt="Formlabs">
   <h1>Resin Pouring &mdash; Production Logging</h1>
-  <div class="sub">Operations Handbook</div>
+  <div class="sub">Operations Handbook &middot; For management</div>
   <div class="rule"></div>
   <div class="blurb">An hourly production record for the pouring station, kept by the operators on
-  the phones they already carry. Part One is what runs today and what comes out of it. Part Two is
-  what the same record can be asked to do, each of which is a setting rather than a requirement.</div>
+  the phones they already carry. This document is written for whoever decides whether the plant
+  runs it: what it holds, what it answers, what it costs the floor, and what else it could do.
+  Part One is what runs today. Part Two is what the same record can be asked to do, each of which
+  is a setting rather than a requirement. <b>The floor has its own document</b> &mdash; a separate
+  operator guide covering a shift start to finish &mdash; so nothing here is written for an
+  operator to follow.</div>
   <div class="meta">
-    <div>Release<b>Version 3.15</b></div>
+    <div>Release<b>Version 3.16</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -184,24 +188,33 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="toc">
     <div class="toc-band">Part One &mdash; in service</div>
     <div class="row"><span class="num">01</span><span class="t">What it records</span><span class="d">What the record holds, and what it asks of anyone</span><span class="pg">3</span></div>
-    <div class="row"><span class="num">02</span><span class="t">How it fits together</span><span class="d">One database, and every screen a window onto it</span><span class="pg">4</span></div>
-    <div class="row"><span class="num">03</span><span class="t">The operator terminal</span><span class="d">The one screen an operator uses</span><span class="pg">5</span></div>
-    <div class="row"><span class="num">04</span><span class="t">Lot traceability</span><span class="d">Which lot went into which containers</span><span class="pg">6</span></div>
-    <div class="row"><span class="num">05</span><span class="t">What comes out of it</span><span class="d">Scrap, trends and getting the record out</span><span class="pg">7</span></div>
-    <div class="row"><span class="num">06</span><span class="t">The floor as it is now</span><span class="d">The live view of the floor as it stands</span><span class="pg">10</span></div>
-    <div class="row"><span class="num">07</span><span class="t">Who can do what</span><span class="d">Roles, and what each one can reach</span><span class="pg">11</span></div>
-    <div class="row"><span class="num">08</span><span class="t">Running it</span><span class="d">Backups, accounts, and keeping the record honest</span><span class="pg">12</span></div>
-    <div class="row"><span class="num">09</span><span class="t">Vessel levels and the floor display</span><span class="d">What is left in each vessel, and the wall display</span><span class="pg">14</span></div>
+    <div class="row"><span class="num">02</span><span class="t">How it fits together</span><span class="d">One database, and every screen a window onto it</span><span class="pg">5</span></div>
+    <div class="row"><span class="num">03</span><span class="t">The operator terminal</span><span class="d">The one screen an operator uses</span><span class="pg">6</span></div>
+    <div class="row"><span class="num">04</span><span class="t">Lot traceability</span><span class="d">Which lot went into which containers</span><span class="pg">7</span></div>
+    <div class="row"><span class="num">05</span><span class="t">What comes out of it</span><span class="d">Scrap, trends and getting the record out</span><span class="pg">8</span></div>
+    <div class="row"><span class="num">06</span><span class="t">The floor as it is now</span><span class="d">The live view of the floor as it stands</span><span class="pg">11</span></div>
+    <div class="row"><span class="num">07</span><span class="t">Who can do what</span><span class="d">Roles, and what each one can reach</span><span class="pg">12</span></div>
+    <div class="row"><span class="num">08</span><span class="t">Running it</span><span class="d">Backups, accounts, and keeping the record honest</span><span class="pg">13</span></div>
+    <div class="row"><span class="num">09</span><span class="t">Vessel levels and the floor display</span><span class="d">What is left in each vessel, and the wall display</span><span class="pg">15</span></div>
     <div class="toc-band">Part Two &mdash; available if wanted</div>
-    <div class="row"><span class="num">10</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">16</span></div>
-    <div class="row"><span class="num">11</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">17</span></div>
+    <div class="row"><span class="num">10</span><span class="t">Assigning work to stations</span><span class="d">Dispatching runs to stations and tracking them</span><span class="pg">17</span></div>
+    <div class="row"><span class="num">11</span><span class="t">Fill weight and giveaway</span><span class="d">Recording what a container actually weighed</span><span class="pg">18</span></div>
     <div class="toc-band">Appendices</div>
-    <div class="row"><span class="num">A</span><span class="t">Guide &mdash; Operator</span><span class="d">Working guides for operator, manager and administrator</span><span class="pg">19</span></div>
-    <div class="row"><span class="num">B</span><span class="t">Reading the screen on the floor</span><span class="d">Gloves, lighting, contrast and colour on the floor</span><span class="pg">25</span></div>
-    <div class="row"><span class="num">C</span><span class="t">How it is tested</span><span class="d">What is checked before a release, and what that has caught</span><span class="pg">26</span></div>
-    <div class="row"><span class="num">D</span><span class="t">Built, not in service</span><span class="d">Built, not in use, and not proposed</span><span class="pg">27</span></div>
+    <div class="row"><span class="num">A</span><span class="t">Guide &mdash; Manager</span><span class="d">Working guides for the manager and the administrator</span><span class="pg">20</span></div>
+    <div class="row"><span class="num">B</span><span class="t">Reading the screen on the floor</span><span class="d">Gloves, lighting, contrast and colour on the floor</span><span class="pg">23</span></div>
+    <div class="row"><span class="num">C</span><span class="t">How it is tested</span><span class="d">What is checked before a release, and what that has caught</span><span class="pg">24</span></div>
+    <div class="row"><span class="num">D</span><span class="t">Built, not in service</span><span class="d">Built, not in use, and not proposed</span><span class="pg">25</span></div>
   </div>
-  <div class="note" style="margin-top:14pt;"><span class="eyebrow">On scope</span><p>This system was built on the floor alongside the job, and it covers more ground than the plant needs today. The marker on each section says which is which: <b>In service</b> runs now; <b>Optional</b> is finished and switched off until somebody wants it; <b>Not in service</b> was built to find out whether an approach works, with nothing depending on it. <b>Part One is what is being proposed</b> &mdash; the rest is here so the capability is known, not because it is being asked for.</p></div>
+  <div class="note" style="margin-top:13pt;"><span class="eyebrow">Who this is for, and how to read it</span>
+    <p>Management. The working guides in Appendix A are the manager's and the administrator's; the
+    floor has its own document, the <em>Resin Pouring Operator Guide</em>, written to be read at
+    the pump.</p>
+    <p style="margin-top:7pt;">It covers more ground than the plant needs today, and the marker on
+    each section says which is which: <b>In service</b> runs now; <b>Optional</b> is finished and
+    switched off until somebody wants it; <b>Not in service</b> was built to find out whether an
+    approach works, with nothing depending on it. <b>Part One is what is being proposed</b> &mdash;
+    the rest is here so the capability is known, not because it is being asked for.</p>
+  </div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>2</span></div>
 </section>
 
@@ -251,6 +264,45 @@ td.k{font-weight:600; color:var(--ink);}
     committed to.</p>
   </div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>3</span></div>
+</section>
+
+<section class="page">
+  <div class="sec-head"><div class="hrow"><span class="eyebrow">01 &nbsp;/&nbsp; What it records</span><span class="status in">In service</span></div><h2>Questions that had no answer before</h2></div>
+  <p class="lead">A record is only worth keeping if somebody can ask it something. These are the
+  questions resin pouring could not answer, and what answers them now. None of them needs an
+  entry from anybody but the operator at the pump.</p>
+  <div class="grid2" style="margin-top:13pt;">
+    <div class="card"><span class="tag">Quality</span><h4>Which containers came out of this lot?</h4>
+      <p>Every pouring log carries the lot number the operator read off the container in front of
+      them, checked against what was expected, with the operator, the station and the time on it
+      &mdash; including the checks that failed. A complaint six weeks old becomes a query rather
+      than a reconstruction.</p></div>
+    <div class="card"><span class="tag">Output</span><h4>What did we pour, and when?</h4>
+      <p>Hourly, by operator, station, resin and container format, from the day it was switched on.
+      Exportable for anybody who needs the numbers somewhere else, in the shape they are already
+      kept.</p></div>
+    <div class="card"><span class="tag">Lost time</span><h4>Where did the hours go?</h4>
+      <p>Downtime logged against a reason and a duration while it is happening rather than
+      remembered afterwards, and scrap split between empty and filled containers. Both ranked, so
+      the biggest one is visible instead of the loudest one.</p></div>
+    <div class="card"><span class="tag">Pace</span><h4>How is the shift running, right now?</h4>
+      <p>The floor display shows the team its own rate against the expected figure while there is
+      still time to do something about it &mdash; built from the same hourly entries and nothing
+      else.</p></div>
+    <div class="card"><span class="tag">Stock</span><h4>How much is left in that vessel?</h4>
+      <p>Worked out from what has been poured out of it since it was last filled. Nobody dips a
+      tank and nobody keys a number in for this to be right.</p></div>
+    <div class="card"><span class="tag">Discipline</span><h4>Is the lot check actually being done?</h4>
+      <p>Full checks against confirmation taps, per operator and per station. A station showing
+      almost no full checks is taking the fast path every hour, and that shows.</p></div>
+  </div>
+  <div class="note" style="margin-top:13pt;"><span class="eyebrow">What it costs the floor to get this</span>
+    <p>One screen, on the phone the operator already carries, filled in once an hour &mdash; no new
+    hardware, no scanner, no terminal to buy. And <b>nothing entered by anybody upstream</b>: a
+    manager who never opens it still gets the whole record, because the record is the operator's
+    log and there is no second copy of it anywhere.</p>
+  </div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>4</span></div>
 </section>
 
 <section class="page">
@@ -319,7 +371,7 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="step"><span class="n">4</span><div><h4>Everything else follows</h4><p>Display, analytics
       and exports all read those same rows.</p></div></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>4</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>5</span></div>
 </section>
 
 <section class="page">
@@ -347,7 +399,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note" style="margin-top:12pt;"><span class="eyebrow">Always visible</span>
     <p>Units poured, scrap and quality yield for that operator sit at the top of the screen and update as
     they log. It is the same figure management sees; there is no separate scoring.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>5</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>6</span></div>
 </section>
 
 <section class="page">
@@ -383,7 +435,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>A mismatch does not stop the line; it asks for an explanation, because a control that halts
     production is one people learn to work around. Every flag and every pulled container reaches
     the manager's review page.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>6</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>7</span></div>
 </section>
 
 <section class="page">
@@ -404,7 +456,7 @@ td.k{font-weight:600; color:var(--ink);}
       <p>The verification register exports directly, so a quality question or customer audit can be
       answered without a database query.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>7</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>8</span></div>
 </section>
 
 <section class="page">
@@ -415,7 +467,7 @@ td.k{font-weight:600; color:var(--ink);}
   <figure style="margin-top:10pt;"><img class="med" src="figs_print/08_historical.png" alt="Historical trends">
     <figcaption><b>Historical Production Trends.</b> The same data filtered by horizon, resin and individual
     operator, for month-to-date, year-to-date or any range.</figcaption></figure>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>8</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>9</span></div>
 </section>
 
 <section class="page">
@@ -441,7 +493,7 @@ td.k{font-weight:600; color:var(--ink);}
     and shift &mdash; which the report was not, since it filtered by date rather than by shift. The lead
     who arrives before the shift and opens the app was always going to see more than it could tell them,
     and it was the only feature in the application that needed an outside credential to work at all.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>9</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>10</span></div>
 </section>
 
 <section class="page">
@@ -454,7 +506,7 @@ td.k{font-weight:600; color:var(--ink);}
   <figure style="margin-top:10pt;"><img class="med" src="figs_print/01b_scada_lower.png" alt="SCADA lower">
     <figcaption><b>Below the fold.</b> Shift trajectory against pace, a pouring leaderboard, and the
     filtered production stream &mdash; the individual logs behind the figures above.</figcaption></figure>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>10</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>11</span></div>
 </section>
 
 <section class="page">
@@ -499,7 +551,7 @@ td.k{font-weight:600; color:var(--ink);}
   plant: an execution system restricts this console to administrator accounts, so the switch is refused
   while no such account exists, rather than locking everybody out of the screen that would switch it
   back.</p>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>11</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>12</span></div>
 </section>
 
 <section class="page">
@@ -525,7 +577,7 @@ td.k{font-weight:600; color:var(--ink);}
     <figcaption><b>Master Resin Specifications.</b> Target fill weight, tolerance band and shelf life
     &mdash; what every check weight is judged against, and what turns a bottle count into resin mass.
     Each formulation carries its colour from the plant's own master sheet.</figcaption></figure>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>12</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>13</span></div>
 </section>
 
 <section class="page">
@@ -549,7 +601,7 @@ td.k{font-weight:600; color:var(--ink);}
   <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management">
     <figcaption><b>Log Management &amp; Cleanup.</b> Filter production and downtime logs by date, station,
     resin or operator, review, and delete with the work-order re-sync handled automatically.</figcaption></figure>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>13</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
 </section>
 
 <section class="page">
@@ -582,6 +634,7 @@ td.k{font-weight:600; color:var(--ink);}
     the next lot that does change resets the vessel, and a level calibration corrects it in the
     meantime. It is worth knowing because it is the one condition where the screen and the vessel
     can disagree without anybody having made a mistake at the pump.</p></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
 </section>
 
 <section class="page">
@@ -621,7 +674,7 @@ td.k{font-weight:600; color:var(--ink);}
   <figure style="margin-top:4pt;"><img src="figs_print/15_tv.png" alt="TV dashboard" style="max-height:1.85in;">
     <figcaption><b>Floor display mode.</b> The same record on a wall screen &mdash; the active
     shift, or the whole plant day, refreshing itself.</figcaption></figure>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
 </section>
 
 <section class="page">
@@ -649,7 +702,7 @@ td.k{font-weight:600; color:var(--ink);}
       <p>A run can be completed on a custom final total when the physical count differs, and the reactor
       it drew from is released.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>16</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>17</span></div>
 </section>
 
 <section class="page">
@@ -689,7 +742,7 @@ td.k{font-weight:600; color:var(--ink);}
       <p>For the same reason the run card had to stop printing the lot the check was hiding: a field that
       already contains the right-looking answer gets accepted, not measured.</p></div>
   </div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>17</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>18</span></div>
 </section>
 
 <section class="page">
@@ -724,120 +777,16 @@ td.k{font-weight:600; color:var(--ink);}
     for exactly these bench scales. If they have a serial output the weight arrives with no operator
     effort at all &mdash; and these manual readings are what that automated capture would have to be
     validated against, since checking it needs known-good numbers to check against.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>18</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><div class="partband">Appendices</div><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Operator</span></div><h2>Your shift, start to finish</h2></div>
-  <div class="role-band"><div class="me"><b>Operator</b>Pours resin at a pump station</div>
-    <div><b>Manager</b>Dispatches and reviews</div><div><b>Admin</b>Runs the system</div></div>
-  <div class="step"><span class="n">1</span><div><h4>Sign in on your phone</h4>
-    <p>Operators work from their own handsets rather than a shared station terminal. Open the plant address
-    in your browser and sign in with your operator ID and PIN, then add it to your home screen so it is one
-    tap next hour. Tick <em>Remember this device</em> &mdash; on a phone only you carry that is the right
-    answer, and it means you are not typing a PIN every time you log an hour. Five wrong PINs locks the
-    account for fifteen minutes &mdash; ask your lead for a reset rather than guessing.</p></div></div>
-  <div class="step"><span class="n">2</span><div><h4>Clear the startup checklist for your pump</h4>
-    <p>The terminal stays locked until you do. Pick the pump you are starting at, submit the start-of-shift
-    cleanliness photo for that station, then confirm the QC checksheet and that your empties and receiving
-    carts are staged. <strong>Moved to a different pump later? The checklist comes back for that pump</strong>
-    &mdash; it certifies the station you are standing at.</p></div></div>
-  <figure style="margin:10pt 0;"><img class="sml" src="figs_print/19_checklist_lock.png" alt="Terminal locked">
-    <figcaption><b>Terminal locked.</b> Choose your pump here; the answer carries through to your logging
-    tab, so you pick your station once.</figcaption></figure>
-  <div class="step"><span class="n">3</span><div><h4>Check the run, if your plant assigns them</h4>
-    <p>Work orders are optional and off unless the plant turns them on. Where they are in use, a run
-    assigned to your station appears at the top with reactor, container format and live progress, and
-    if nothing is listed you can mention it to your lead afterwards &mdash; your units are recorded
-    either way. Where they are not in use the screen never mentions runs, and there is nothing here
-    to check.</p></div></div>
-  <div class="grid2" style="margin-top:12pt;">
-    <div class="card"><span class="tag">If you are locked out</span><h4>Five attempts, fifteen minutes</h4>
-      <p>The lock releases on its own, but a manager can reset your PIN from the floor roster
-      immediately.</p></div>
-    <div class="card"><span class="tag">Your own phone</span><h4>Nobody else logs under your name</h4>
-      <p>Because it is your handset you can stay signed in between shifts &mdash; there is no next operator
-      picking it up. What matters instead is that every log is attached to whoever is signed in, so do not
-      hand your phone to someone else to log their hour. If you lose it, tell your lead and have your PIN
-      reset.</p></div>
-  </div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>19</span></div>
 </section>
 
-<section class="page">
-  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Operator</span></div><h2>Logging an hour of pouring</h2></div>
-  <div class="step"><span class="n">4</span><div><h4>Set your station and material</h4>
-    <p>Pump station, container format (V2, V1, RPS bulk jug or Pigment) and resin formulation. The target
-    fill weight and tolerance for that resin appear underneath &mdash; check it against your scale.</p></div></div>
-  <div class="step"><span class="n">5</span><div><h4>Verify the lot</h4>
-    <p>Turn the container over and read the <span class="mono">L-</span> code from the lot label on its
-    bottom &mdash; the same label on a cartridge and on a jug. The lot the run expects is hidden on
-    purpose &mdash; <strong>read the container, not the screen.</strong> Spacing, case and the prefix do
-    not matter.</p></div></div>
-  <figure style="margin:10pt 0;"><img class="med" src="figs_print/21_gate_pass.png" alt="Lot verification passing">
-    <figcaption><b>A clean check.</b> Green means the cartridge belongs to this run. On the next log at the
-    same station with nothing changed, this becomes a single confirmation tap &mdash; returning to the full
-    check on any change of run, lot, resin or station, after four hours, and on every tenth log.</figcaption></figure>
-  <div class="step"><span class="n">6</span><div><h4>If it does not match, stop</h4>
-    <p>A red <strong>STOP &mdash; DO NOT POUR</strong> means the cartridge is not from your run's lot. Set it
-    aside, tell your lead, and press <em>Wrong cartridge &mdash; pulled it, nothing poured</em>. That records
-    the catch. If your lead decides the pour goes ahead, choose the reason, add the detail and photograph the
-    lot label &mdash; the log saves with the flag attached.</p></div></div>
-  <div class="step"><span class="n">7</span><div><h4>Enter your counts and submit</h4>
-    <p>Good units filled, plus scrap empty and scrap filled kept separate &mdash; they mean different things
-    to quality. Add anything worth noting, then submit. Your totals and the run's progress both move
-    immediately, and the screen says plainly whether the entry reached the database &mdash; if it did not,
-    nothing was recorded, so submit again rather than wondering.</p></div></div>
-  <div class="step"><span class="n">8</span><div><h4>Weigh one if you have the scale to hand</h4>
-    <p><strong>Optional, every time.</strong> One cartridge, one number, in the <em>Check weight</em> box;
-    it says straight away whether that cartridge is inside its window and how far off target. Leaving it
-    blank never blocks anything &mdash; a blank is honest, a guess is worse than nothing.</p></div></div>
-  <div class="step"><span class="n">9</span><div><h4>Typed the wrong number? Take it back</h4>
-    <p>Two minutes to undo your own most recent log &mdash; a 2500 that should have been 250 no longer
-    needs a manager. Your latest entry only, and never a flagged one.</p></div></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>20</span></div>
-</section>
+
+
 
 <section class="page">
-  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Operator</span></div><h2>The rest of your terminal</h2></div>
-  <div class="grid2">
-    <div class="card"><span class="tag">When the line stops</span><h4>Log the downtime</h4>
-      <p>Reason, minutes, and anything useful. Log it as it happens rather than reconstructing it later:
-      downtime you do not record shows up as poor yield instead of a machine problem, and the ranking
-      management uses to prioritise fixes is built from these entries.</p></div>
-    <div class="card"><span class="tag">Changeovers and spills</span><h4>Photo audits</h4>
-      <p>Start of shift, end of shift, moving a line onto a different resin, or a spill. These are the record
-      that a changeover was done cleanly.</p></div>
-    <div class="card"><span class="tag">Questions</span><h4>Manager comms</h4>
-      <p>A direct thread with the plant lead inside the terminal, so the answer stays attached to your
-      account rather than living in a text message.</p></div>
-    <div class="card"><span class="tag">Your numbers</span><h4>Today's performance</h4>
-      <p>Units poured, scrap and quality yield at the top of your screen, updating as you log.</p></div>
-    <div class="card"><span class="tag">The pump form</span><h4>A button, not a walk to the sticker</h4>
-      <p>If a pump form has been configured, a button at the top of the terminal opens it in a second tab.
-      The MES stays open behind it, so you finish the form, close it, and are back mid-log with nothing
-      retyped &mdash; which scanning the QR sticker cannot do, because that navigates away from the
-      MES.</p></div>
-  </div>
-  <div class="note" style="margin-top:13pt;"><span class="eyebrow">Worth knowing</span>
-    <p><strong>Your logs are attached to you</strong>, and nobody can quietly overwrite one.<br>
-    <strong>Every container format is checked, RPS jugs included.</strong> Jugs carry the same lot label
-    in the same place, so it is the same job &mdash; turn it over, read the code. The screen says jug or
-    cartridge to match the container format you picked.<br>
-    <strong>Nothing you submit is silently discarded.</strong> If a log cannot be matched to an active run you
-    are told on screen, rather than finding out later that a progress bar never moved.</p></div>
-  <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">The one rule</span>
-    <p>Log it when it happens. An hour reconstructed at the end of a shift is a guess, and every pace figure,
-    yield number and downtime decision downstream is built on what you enter.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>21</span></div>
-</section>
-
-<section class="page">
-  <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Manager</span><span class="status opt">Optional</span></div><h2>Dispatching the day</h2></div>
+  <div class="sec-head"><div class="partband">Appendices</div><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Manager</span><span class="status opt">Optional</span></div><h2>Dispatching the day</h2></div>
   <p class="lead" style="margin-bottom:11pt;">This page applies only where work orders are switched on. Where they are not, a manager enters nothing at all &mdash; the next page, reading the floor and closing the day, is the whole of the role.</p>
-  <div class="role-band"><div><b>Operator</b>Pours resin at a pump station</div>
-    <div class="me"><b>Manager</b>Dispatches and reviews</div><div><b>Admin</b>Runs the system</div></div>
-  <figure><img class="sml" src="figs_print/02_cockpit.png" alt="Manager cockpit">
+    <figure><img class="sml" src="figs_print/02_cockpit.png" alt="Manager cockpit">
     <figcaption><b>Manager Cockpit.</b> Each management module on its own screen rather than one page trying
     to do everything.</figcaption></figure>
   <div class="step" style="margin-top:11pt;"><span class="n">1</span><div><h4>Create the work orders</h4>
@@ -855,7 +804,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Almost always one of three things: the operator's station does not match the run's, the resin or
     container format differs, or the lot on the run does not match what is staged. The verification review
     shows which.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>22</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>20</span></div>
 </section>
 
 <section class="page">
@@ -881,14 +830,12 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="step"><span class="n">5</span><div><h4>Answer the floor</h4>
     <p>The communications page holds every operator's thread. A question left unanswered there gets solved
     badly on the floor instead.</p></div></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>23</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>21</span></div>
 </section>
 
 <section class="page">
   <div class="sec-head"><div class="hrow"><span class="eyebrow">Appendix A &nbsp;/&nbsp; Guide &mdash; Administrator</span></div><h2>Keeping it running</h2></div>
-  <div class="role-band"><div><b>Operator</b>Pours resin at a pump station</div>
-    <div><b>Manager</b>Dispatches and reviews</div><div class="me"><b>Admin</b>Runs the system</div></div>
-  <p style="margin-bottom:11pt;">In a plant running this as a logging system this page is the
+    <p style="margin-bottom:11pt;">In a plant running this as a logging system this page is the
   <b>manager's</b> job, not a separate person's &mdash; there is no separate IT role to hold it. The work
   is the same either way; only who does it changes.</p>
   <div class="grid2">
@@ -915,7 +862,7 @@ td.k{font-weight:600; color:var(--ink);}
     <p>Do not edit production rows directly in the database to fix a number. Use log management to remove the
     bad entry &mdash; it re-syncs the affected work order &mdash; or a reconciliation to book a variance. Both
     leave a visible record; a direct edit leaves the totals right and the story wrong.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>24</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>22</span></div>
 </section>
 
 <section class="page">
@@ -963,7 +910,7 @@ td.k{font-weight:600; color:var(--ink);}
     filter and control is identical, so a handbook page describes one screen regardless of how the
     reader has theirs set.</figcaption></figure>
 
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>25</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>23</span></div>
 </section>
 
 <section class="page">
@@ -1024,7 +971,7 @@ td.k{font-weight:600; color:var(--ink);}
     two rules that matter most about the check weight, that it never blocks a log and is never pre-filled
     &mdash; and a screenshot comparison catches a card that lost its border or a chart that came back
     empty, neither of which raises an error.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>26</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>24</span></div>
 </section>
 
 <section class="page">
@@ -1059,7 +1006,7 @@ run tracking would need no changes. A registry screen for it is written &mdash; 
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">Read this as</span>
     <p>Neither of these is a roadmap item or a commitment of dates. They are experiments that happen to be
     finished enough to demonstrate, and either could be abandoned without affecting anything in service.</p></div>
-  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>27</span></div>
+  <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>25</span></div>
 </section>
 
 </body></html>

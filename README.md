@@ -24,7 +24,7 @@ Only the top level runs. Everything else is tooling that never leaves the develo
 | `Move_To_New_PC.bat` | Packages a clean copy of the application — no tests, tooling or document sources — as one zip, with a database backup and optionally the Python packages for an offline install. |
 | `tests/` | The release checks. Not shipped. |
 | `dev/` | Screenshot, figure and document build scripts. Not shipped. |
-| `docs/` | The handbook, one-page summary and operator guide — HTML sources, figures, and the finished PDFs. Not shipped; print from here. |
+| `docs/` | The three documents — the handbook (for management), the operator guide (for the floor) and the one-page summary — as HTML sources, figures and finished PDFs. Not shipped; print from here. |
 
 ## First-time setup on a work PC
 

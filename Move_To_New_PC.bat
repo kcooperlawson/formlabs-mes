@@ -122,6 +122,7 @@ echo.
 echo     %ZIPNAME%
 echo.
 echo  On the work PC: unzip it anywhere, then run
-echo  Setup_On_New_PC.bat from inside that folder.
+echo  START_HERE.bat from inside that folder and choose 1
+echo  ^(MES / Logger^) or 2 ^(Device Gateway^).
 echo ===================================================
 pause
