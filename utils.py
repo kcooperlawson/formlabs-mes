@@ -178,6 +178,9 @@ def create_database_backup() -> str:
              "--clean", "--if-exists", "--no-owner", "--no-privileges",
              "-f", os.path.join(BACKUP_DIR, filename)],
             env=env, check=True, capture_output=True, text=True)
+        # Beside the dump, what was in the database when it was taken - so a
+        # restore on another machine can be checked rather than assumed.
+        write_backup_manifest(filename)
         return filename
     except subprocess.CalledProcessError as e:
         # capture_output=True above means e.stderr actually has pg_dump's real
@@ -188,6 +191,89 @@ def create_database_backup() -> str:
     except Exception:
         logger.exception("create_database_backup() failed unexpectedly")
         return None
+
+MANIFEST_SUFFIX = ".manifest.json"
+
+# What gets counted into a manifest. Deliberately the tables somebody would
+# ask about after a move - "did the logs come across, are my people there" -
+# rather than every table, because a wall of numbers is not reassurance.
+MANIFEST_TABLES = (
+    ("production_logs", "ProductionLog"),
+    ("downtime_logs", "DowntimeLog"),
+    ("lot_verifications", "LotVerification"),
+    ("daily_checklists", "DailyChecklist"),
+    ("cleanliness_audits", "CleanlinessAudit"),
+    ("assigned_runs", "AssignedRun"),
+    ("users", "User"),
+    ("pump_stations", "PumpStation"),
+    ("reactors", "Reactor"),
+    ("resin_specs", "ResinSpec"),
+)
+
+
+def database_manifest() -> dict:
+    """Row counts and the newest log, as they stand right now.
+
+    Written beside every backup and compared after every restore. "Database
+    restored successfully" is pg_dump's opinion of its own exit code; this is
+    the thing that actually answers the question somebody moving a plant to a
+    new machine is asking, which is whether their data is there.
+    """
+    from datetime import datetime
+    import models
+    from db_core import ScopedSession
+    from sqlalchemy import func
+
+    session = ScopedSession()
+    try:
+        counts = {}
+        for label, model_name in MANIFEST_TABLES:
+            model = getattr(models, model_name, None)
+            if model is None:
+                continue
+            try:
+                counts[label] = int(session.query(func.count(model.id)).scalar() or 0)
+            except Exception:
+                logger.exception(f"database_manifest() could not count {label}")
+        newest = None
+        try:
+            value = session.query(func.max(models.ProductionLog.timestamp)).scalar()
+            newest = value.isoformat() if value else None
+        except Exception:
+            pass
+        return {"taken_at": datetime.now().isoformat(timespec="seconds"),
+                "counts": counts, "newest_log": newest}
+    finally:
+        session.close()
+
+
+def write_backup_manifest(dump_filename: str) -> str:
+    """Record what was in the database at the moment this dump was taken."""
+    import json
+    try:
+        manifest = database_manifest()
+        manifest["backup"] = dump_filename
+        path = os.path.join(BACKUP_DIR, dump_filename + MANIFEST_SUFFIX)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2)
+        return path
+    except Exception:
+        # A manifest is a convenience; a backup without one is still a backup,
+        # and failing the dump over this would be the wrong trade entirely.
+        logger.exception("write_backup_manifest() failed")
+        return ""
+
+
+def read_backup_manifest(dump_filename: str) -> dict:
+    """The manifest beside a dump, or an empty dict if it has none."""
+    import json
+    path = os.path.join(BACKUP_DIR, dump_filename + MANIFEST_SUFFIX)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
 
 def list_backup_files() -> list:
     """Every filename in the backup folder, ours or not."""
@@ -213,6 +299,11 @@ def prune_old_backups(keep: int = None) -> int:
             removed += 1
         except OSError:
             logger.exception(f"prune_old_backups() could not delete {name!r}")
+        # The manifest belongs to that dump and is meaningless without it.
+        try:
+            os.remove(os.path.join(BACKUP_DIR, name + MANIFEST_SUFFIX))
+        except OSError:
+            pass
     return removed
 
 

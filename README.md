@@ -21,6 +21,7 @@ Only the top level runs. Everything else is tooling that never leaves the develo
 | `CHANGELOG.md` | What changed and why, newest first. IT Admin shows it in the sidebar. |
 | `Setup_On_New_PC.bat` | First-time setup on a machine: virtual environment, dependencies, database, launch. |
 | `run_mes.bat` | Day-to-day launch on a machine that has been set up. |
+| `Check_This_PC.bat` | Is this PC ready to run the plant? Checks Python, the packages, Postgres, the schema, the backup tools, disk, the port and the firewall — takes a real backup to prove backups work — and prints the address to give the phones. Run it before carrying a machine to the floor and again after a move. |
 | `Move_To_New_PC.bat` | Packages a clean copy of the application — no tests, tooling or document sources — as one zip, with a database backup and optionally the Python packages for an offline install. |
 | `tests/` | The release checks. Not shipped. |
 | `dev/` | Screenshot, figure and document build scripts. Not shipped. |
@@ -34,14 +35,23 @@ The PC needs **Python 3.11 or newer** (tick *Add python.exe to PATH* during inst
 2. Copy the zip to the work PC and unzip it anywhere.
 3. Open `.env` in Notepad and set `DB_URL` to that PC's Postgres login — the line looks like `postgresql://postgres:PASSWORD@localhost:5432/formlabs_mes`.
 4. Run `Setup_On_New_PC.bat`. It builds the virtual environment, installs dependencies, checks the Postgres tools are present, creates the database, and asks one question if a backup is included: **restore it, or start clean**.
+5. Run `Check_This_PC.bat`. One page saying whether this machine is ready, and if not, exactly what to type. It also prints the address to give the phones.
 
 **Starting clean** is the default and the right choice for a plant that has not used this before. The application builds its own schema and seeds one administrator account, three placeholder pump stations and the downtime reason list. Sign in as **manager** with PIN **admin**, then from IT Admin: change that PIN, replace the placeholder pumps with the real ones, and add the operators. That is the whole setup.
 
 **Restoring the backup** brings across everything from the PC the backup was taken on — every log, account and setting. Choose it when moving an established database between machines, not for a first install.
 
+**Restoring is checked, not assumed.** Every backup carries a manifest of what was in the database when it was taken, and setup compares it against the restored database row by row before letting you go on. If anything came across short it stops and says so — the machine the backup came from still has the data, so nothing is lost as long as nothing new is written on the new PC first.
+
 ## Day to day
 
 `run_mes.bat` starts the application. It prints the address to open — `http://<this PC's name or IP>:8501` — which operators bookmark on their phones. Close the window to stop it.
+
+**Give the phones the machine name, not the IP address.** `Check_This_PC.bat` prints both. On a laptop the number changes when it rejoins the network, and every bookmark made from it stops working — which looks exactly like the application breaking. The name normally survives.
+
+**If the phones cannot reach the PC at all**, it is almost always Windows Firewall blocking inbound port 8501. Nothing in the application can tell you this, because a blocked request never arrives. `Check_This_PC.bat` looks for the rule and prints the one-line `netsh` command to add it from an Administrator prompt.
+
+**On a laptop, set the power plan to never sleep on AC.** A closed lid stops the application, and with it the record. The main screen and the floor display will say so after about three hours during a shift, but not sleeping in the first place is better.
 
 The Streamlit configuration in `.streamlit/config.toml` is committed on purpose: it is how the application is meant to run, and every launcher picks it up.
 
@@ -59,6 +69,7 @@ python tests\test_roles.py
 python tests\test_reactor_level.py
 python tests\test_vessel_render.py
 python tests\test_health.py
+python tests\test_preflight.py
 python tests\test_fill_weight.py
 python tests\test_resin_colors.py
 python tests\test_shifts_and_display.py

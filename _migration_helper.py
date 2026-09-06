@@ -15,6 +15,7 @@ Called by Move_To_New_PC.bat (on the OLD pc) and Setup_On_New_PC.bat
     python _migration_helper.py restore <filename_in_backups_folder>
     python _migration_helper.py db_host
     python _migration_helper.py check_dump_compat <filename_in_backups_folder>
+    python _migration_helper.py verify_restore <filename_in_backups_folder>
 """
 import sys
 
@@ -163,6 +164,59 @@ def cmd_db_host():
     print(params["host"] if params else "UNKNOWN")
 
 
+def cmd_verify_restore(filename: str):
+    """Compare what is in this database against what the dump said it held.
+
+    "Database restored successfully" is psql's opinion of its own exit code.
+    It is true right up until the moment it is not - a dump that was truncated
+    while copying, a restore that ran against the wrong database, a table that
+    failed while the rest went through. None of those announce themselves, and
+    the first sign is a month with a hole in it.
+
+    So every backup carries a manifest of what it held, and this reads it back
+    and counts the same tables here. It is the difference between believing
+    the move worked and knowing it did.
+    """
+    from utils import database_manifest, read_backup_manifest
+
+    expected = read_backup_manifest(filename)
+    if not expected or not expected.get("counts"):
+        # Dumps taken before manifests existed have none, and that is not a
+        # failure - it just means this particular reassurance is unavailable.
+        print("VERIFY_SKIPPED: that backup was taken before manifests existed,")
+        print("                so there is nothing to compare against.")
+        return 0
+
+    actual = database_manifest()
+    exp_counts, act_counts = expected["counts"], actual["counts"]
+
+    width = max(len(k) for k in exp_counts) + 2
+    print(f"    {'':<{width}}{'in the backup':>15}{'in this database':>19}")
+    short = []
+    for table in sorted(exp_counts):
+        want = exp_counts[table]
+        got = act_counts.get(table, 0)
+        flag = "" if got >= want else "   <-- MISSING ROWS"
+        if got < want:
+            short.append(table)
+        print(f"    {table:<{width}}{want:>15,}{got:>19,}{flag}")
+
+    if expected.get("newest_log"):
+        print()
+        print(f"    newest log in the backup:  {expected['newest_log']}")
+        print(f"    newest log in this database: {actual.get('newest_log') or 'none'}")
+
+    print()
+    if short:
+        print(f"VERIFY_FAILED: {len(short)} table(s) came across short: "
+              f"{', '.join(short)}.")
+        print("               Do not start logging on this PC until this is")
+        print("               understood - the old machine still has the data.")
+        return 1
+    print("VERIFY_OK: every table is at least as full as the backup said.")
+    return 0
+
+
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else ""
     if command == "backup":
@@ -179,6 +233,11 @@ if __name__ == "__main__":
         sys.exit(0)
     elif command == "check_pg_cli":
         sys.exit(cmd_check_pg_cli())
+    elif command == "verify_restore":
+        if len(sys.argv) < 3:
+            print("VERIFY_SKIPPED: no filename given")
+            sys.exit(0)
+        sys.exit(cmd_verify_restore(sys.argv[2]))
     elif command == "check_dump_compat":
         if len(sys.argv) < 3:
             print("DUMP_COMPAT_UNKNOWN: no filename given")

@@ -118,7 +118,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.17.0"
+APP_VERSION = "PT-V3.18.0"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 

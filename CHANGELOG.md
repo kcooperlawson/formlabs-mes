@@ -6,6 +6,30 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.18 — Sunday, September 6, 2026
+**Getting ready to be carried onto a floor, and moved twice**
+
+Testing starts next week — on a laptop on the floor first, then onto a permanent PC afterwards. That is two migrations, and the second one carries real production data. Nothing here touches the running application; it is all about the moments either side of it.
+
+**New `Check_This_PC.bat`.** One page that answers whether this machine is ready to run the plant, and when the answer is no, prints exactly what to type. The venv's Python and every package the app imports; Postgres reachable on this PC's own credentials; the schema at the version this copy expects; disk space; port 8501 free. **And it takes a real backup while it is there**, because a backup nobody has ever taken is a hypothesis, and the day it turns out pg_dump was never on the PATH is not the day to find out.
+- **The Postgres version trap is checked explicitly.** A `pg_dump` older than the server it is pointed at cannot read it, and the failure arrives partway through a restore as a message about an "invalid command" that mentions no versions at all. Both versions are compared and named.
+- Every check that can fail carries its own remedy. A check that reports a problem and leaves somebody searching for the fix has done the easy half of the job.
+
+**The firewall, which is the most likely reason the phones will not work.** Streamlit prints a confident network address and the handsets simply time out. **Nothing in the application can detect this** — a blocked request never arrives, so there is nothing to log and nothing to show. Windows usually prompts once, the first time Python opens a listening socket, but that prompt is routinely suppressed by policy on a work laptop or appears behind the console window and gets dismissed. The check looks for the rule and prints the one-line `netsh` command to add it.
+
+**Give the phones the machine's name, not its number.** A laptop's address changes when it rejoins the network, and every bookmark made from the old one dies — which looks exactly like the application breaking. Both are printed, with the name marked as the one to write on the card, and the reason underneath.
+
+**A restore is now checked rather than believed.** "Database restored successfully" is psql's opinion of its own exit code. It is true right up until it is not: a dump truncated while copying, a restore pointed at the wrong database, one table failing while the rest go through — none of those announce themselves, and the first sign is a month with a hole in it. So **every backup now writes a manifest of what the database held when it was taken**, and setup compares it against the restored database table by table and prints both columns. If anything came across short it stops, and says not to start logging on the new PC yet — because the old machine still has the data, and nothing is lost as long as nothing new is written first.
+- A dump taken before manifests existed is skipped rather than failed, and says why.
+- More rows than the backup is not a fault: the plant may simply have carried on working since it was taken.
+- The manifest is pruned with its own dump, so the backups folder does not accumulate orphans.
+
+- **New `tests/test_preflight.py`** — 59 assertions, no machine required. The judgements were written as functions of plain values precisely so the situations that matter could be checked without arranging them: a Postgres newer than its own pg_dump, a schema left behind by an older dump, a machine with no network, a firewall rule nobody added, and a restore that ran and came up short. The property under all of them: **a PC with a real problem must never be reported ready**, and a warning must never hold up a plant that is fine.
+- Also in the README: set a laptop's power plan to never sleep on AC, and run `Move_To_New_PC.bat` on the **laptop** when moving to the permanent machine — not on the development PC, or the demo database ships instead of the floor's real one.
+- Suite: 1,073 assertions across thirteen files, 18 screens rendered, 58 browser checks. 1,149 total.
+
+---
+
 ## 3.17 — Sunday, September 6, 2026
 **Three refinements, all of them about the system failing where nobody is looking**
 
