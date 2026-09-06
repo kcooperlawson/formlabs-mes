@@ -10,9 +10,10 @@ import streamlit as st
 import extra_streamlit_components as stx
 from dotenv import load_dotenv
 
-from crud import delete_session, create_session, get_user_by_session_token
-from db_core import ScopedSession
-from models import Reactor
+from crud import delete_session, create_session, get_user_by_session_token, last_log_at
+from shift_clock import PLANT_TZ, compute_shift_status
+from utils import run_scheduled_backup
+from record_health import record_state
 from app_logger import logger
 
 load_dotenv()
@@ -46,98 +47,6 @@ try:
 except ImportError:
     THEMES = {
         "Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
-
-
-# ===================== SHIFT STATUS ENGINE =====================
-# Single source of truth for "what shift is running right now." Used both
-# by the "Live Today" data filter above and the Live Shift Trajectory card
-# further down the page — previously each had its own, slightly different
-# copy of this logic, and they could (and did) disagree.
-#
-# Two bugs fixed here at once:
-#   1. Timezone: this used datetime.now(), the server's raw system clock,
-#      which is not necessarily the plant's own local time. Logged
-#      timestamps elsewhere on this page are explicitly tz_convert()'d to
-#      America/New_York for the same reason — this calculation just never
-#      got the same treatment, so "is a shift active" could be wrong by
-#      however many hours the server is offset from the floor.
-#   2. Midnight rollover: it only ever checked "did this shift start
-#      earlier TODAY," so a shift that's still running from a start time
-#      the previous calendar day (or one that already ended hours ago but
-#      whose start time still looks like "later today") could report the
-#      wrong answer well into the night. This checks both today's and
-#      yesterday's start time for each shift.
-PLANT_TZ = ZoneInfo("America/New_York")
-
-
-def _shift_window(base_date, start_h, start_m, gross_hours):
-    start = datetime.combine(base_date, dtime(start_h, start_m), tzinfo=PLANT_TZ)
-    end = start + timedelta(hours=gross_hours)
-    return start, end
-
-
-def compute_shift_status(settings):
-    now = datetime.now(PLANT_TZ)
-    today = now.date()
-    yesterday = today - timedelta(days=1)
-    tomorrow = today + timedelta(days=1)
-
-    s1_h, s1_m = map(int, settings["shift_1_start"].split(":"))
-    s2_h, s2_m = map(int, settings["shift_2_start"].split(":"))
-    s1_gross = float(settings["shift_1_hours"])
-    s2_gross = float(settings["shift_2_hours"])
-    s1_break = float(settings.get("shift_1_break_mins", 60.0)) / 60.0
-    s2_break = float(settings.get("shift_2_break_mins", 60.0)) / 60.0
-    s1_net = max(0.1, s1_gross - s1_break)
-    s2_net = max(0.1, s2_gross - s2_break)
-
-    shifts = [
-        ("Shift 1", s1_h, s1_m, s1_gross, s1_net),
-        ("Shift 2", s2_h, s2_m, s2_gross, s2_net),
-    ]
-
-    # Check "started yesterday" first so a still-running overnight shift
-    # takes priority over anything that merely "starts today" but hasn't
-    # happened yet.
-    for base_date in (yesterday, today):
-        for name, h, m, gross, net in shifts:
-            start, end = _shift_window(base_date, h, m, gross)
-            if start <= now < end:
-                elapsed_gross = (now - start).total_seconds() / 3600.0
-                elapsed_net = elapsed_gross * (net / gross) if gross > 0 else 0.0
-                return {
-                    "is_active": True,
-                    "shift_name": name,
-                    "elapsed_net": elapsed_net,
-                    "shift_net_hours": net,
-                    "remaining_hours": max(0.0, net - elapsed_net),
-                    "shift_pct": min(100.0, max(0.0, (elapsed_net / net) * 100.0)) if net > 0 else 0.0,
-                    "next_shift_label": "",
-                }
-
-    # No shift running — find the next one so the idle state can say
-    # something useful instead of just "nothing's active."
-    upcoming = []
-    for base_date in (today, tomorrow):
-        for name, h, m, gross, net in shifts:
-            start, _ = _shift_window(base_date, h, m, gross)
-            if start > now:
-                upcoming.append((start, name))
-    upcoming.sort(key=lambda x: x[0])
-    next_shift_label = ""
-    if upcoming:
-        next_start, next_name = upcoming[0]
-        next_shift_label = f"{next_name} at {next_start.strftime('%I:%M %p').lstrip('0')}"
-
-    return {
-        "is_active": False,
-        "shift_name": "Off-Shift",
-        "elapsed_net": 0.0,
-        "shift_net_hours": s1_net,
-        "remaining_hours": 0.0,
-        "shift_pct": 0.0,
-        "next_shift_label": next_shift_label,
-    }
 
 
 @st.fragment(run_every="10s")
@@ -209,7 +118,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.16.0"
+APP_VERSION = "PT-V3.17.0"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -287,6 +196,26 @@ def _run_fk_backfill_once():
 
 
 _run_fk_backfill_once()
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _daily_backup_check(_hour_bucket):
+    """Take a backup if the newest one is a day old.
+
+    There is no scheduler on a plant PC, and adding one is a second thing to
+    install, configure and forget - so the check rides on the application
+    being opened, which on a working day it is. The hour bucket is the cache
+    key rather than a value anybody uses: it makes this run at most once an
+    hour per server process instead of on every rerun of a page that
+    refreshes itself every ten seconds.
+
+    backup_policy decides whether one is actually due; almost every call
+    here does nothing but read a directory listing.
+    """
+    return run_scheduled_backup()
+
+
+_daily_backup_check(datetime.now().strftime("%Y%m%d%H"))
 
 # --- BLOCK ZOMBIE COOKIES & HANDLE LOGOUT ---
 if st.query_params.get("logged_out") == "true":
@@ -642,6 +571,22 @@ else:
     df_logs["date_obj"] = []
     df_logs["date_str"] = []
     all_dates = []
+
+# --- is the record still being fed? ---------------------------------------
+# Above the header, before the filters, before every figure on the page -
+# because every one of those figures is computed from the log and every one
+# of them looks entirely normal when the log has stopped arriving. Yesterday's
+# numbers under today's date is the most convincing wrong answer this
+# application can give, and this line is the only thing on the screen that
+# can tell a quiet plant from a system nobody is reaching. See record_health
+# for why silence off-shift is deliberately not a fault.
+_shift_now = compute_shift_status(get_plant_settings())
+_health = record_state(last_log_at(), _shift_now["is_active"],
+                       shift_started_at=_shift_now.get("started_at"))
+if _health["is_alarm"]:
+    st.error(f"🔴 **The record has stopped.** {_health['message']}")
+elif _health["state"] == "quiet":
+    st.warning(f"🟠 {_health['message']}")
 
 st.markdown(
     f"""
@@ -1190,32 +1135,6 @@ if not sorted_df.empty:
 else:
     st.info("No records match the current filter selection.")
 
-
-def add_reactor(reactor_name: str, max_capacity_l: float) -> bool:
-    session = ScopedSession()
-    try:
-        # Assuming your SQLAlchemy model is named Reactor
-        session.add(Reactor(reactor_name=reactor_name.strip(), max_capacity_l=max_capacity_l))
-        session.commit()
-        return True
-    except Exception:
-        session.rollback()
-        logger.exception(f"add_reactor() failed for reactor_name={reactor_name!r}")
-        return False
-    finally:
-        session.close()
-
-def delete_reactor(reactor_id: int) -> bool:
-    session = ScopedSession()
-    try:
-        r = session.query(Reactor).filter(Reactor.id == reactor_id).first()
-        if r:
-            session.delete(r)
-            session.commit()
-            return True
-        return False
-    finally:
-        session.close()
 
 
 

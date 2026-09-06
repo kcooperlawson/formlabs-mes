@@ -12,6 +12,7 @@ from datetime import datetime, date, timedelta
 from database import (
     get_production_logs_df,
     container_litres,
+    last_log_at,
     get_assigned_runs_df,
     get_all_resin_specs_df,
     get_plant_settings,
@@ -24,6 +25,8 @@ from database import (
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map
+from record_health import record_state
+from shift_clock import compute_shift_status
 import base64
 
 def get_base64_image(image_path):
@@ -342,6 +345,33 @@ else:
 blended_rate = current_run_rate if elapsed_hours > 0.5 else target_lph
 projected_total = current_output + (blended_rate * remaining_hrs)
 expected_now = target_lph * elapsed_hours
+
+# --- the record, and whether anything is still reaching it ----------------
+# Every figure below is computed from the log. When the log stops arriving -
+# the PC rebooted, Postgres did not come back, the phones cannot reach the
+# address - all of them keep showing the last good hour and look completely
+# normal doing it. This band is the only thing on the wall that can say
+# otherwise, so it goes at the top and it is the size of the wall.
+# The same shift clock Home uses, not a second opinion: this page names an
+# "active shift" even at three in the morning, because it always has one to
+# show, and that must not be mistaken for anyone being at a pump.
+_shift = compute_shift_status(settings)
+_health = record_state(last_log_at(), _shift["is_active"],
+                       shift_started_at=_shift.get("started_at"))
+if _health["is_alarm"]:
+    st.markdown(
+        f"<div style='background:#7F1D1D; border:3px solid #EF4444; border-radius:10px;"
+        f" padding:14px 20px; margin-bottom:16px; text-align:center;'>"
+        f"<div style='font-size:2rem; font-weight:900; color:#FFFFFF;"
+        f" letter-spacing:0.04em;'>⚠ NOTHING IS BEING LOGGED</div>"
+        f"<div style='font-size:1.1rem; color:#FECACA; margin-top:4px;'>"
+        f"{_health['message']}</div></div>", unsafe_allow_html=True)
+elif _health["state"] == "quiet":
+    st.markdown(
+        f"<div style='background:#78350F; border:2px solid #F59E0B; border-radius:10px;"
+        f" padding:10px 18px; margin-bottom:14px; text-align:center;"
+        f" font-size:1.3rem; font-weight:800; color:#FDE68A;'>"
+        f"{_health['message']}</div>", unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class='tv-header'>

@@ -175,7 +175,7 @@ td.k{font-weight:600; color:var(--ink);}
   operator guide covering a shift start to finish &mdash; so nothing here is written for an
   operator to follow.</div>
   <div class="meta">
-    <div>Release<b>Version 3.16</b></div>
+    <div>Release<b>Version 3.17</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -245,7 +245,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="grid3" style="margin-bottom:12pt;">
     <div class="stat"><span class="n">2</span><span class="l">shifts, a plant setting rather than an assumption in the code</span></div>
     <div class="stat"><span class="n">18</span><span class="l">database tables of production, quality and configuration</span></div>
-    <div class="stat"><span class="n">1,048</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
+    <div class="stat"><span class="n">1,090</span><span class="l">automated checks run before a release, including a browser driven through a shift</span></div>
   </div>
 
   <h3>What it records</h3>
@@ -571,7 +571,10 @@ td.k{font-weight:600; color:var(--ink);}
       <p>Pump stations, the reactor fleet and capacities, and the downtime reason list, so the vocabulary
       stays the plant's own.</p></div>
     <div class="card"><span class="tag">Recovery</span><h4>Backup and restore</h4>
-      <p>Full database snapshots on demand or on schedule, and a restore path from any snapshot.</p></div>
+      <p>A full snapshot is taken automatically once the newest one is a day old, the last fortnight
+      is kept, and IT Admin says in one line how old the newest is &mdash; so a backup that has
+      quietly stopped is visible rather than assumed. On demand and restore-from-any-snapshot as
+      well.</p></div>
   </div>
   <figure style="margin-top:10pt;"><img class="sml" src="figs_print/18_resins.png" alt="Resin specs">
     <figcaption><b>Master Resin Specifications.</b> Target fill weight, tolerance band and shelf life
@@ -601,6 +604,14 @@ td.k{font-weight:600; color:var(--ink);}
   <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management">
     <figcaption><b>Log Management &amp; Cleanup.</b> Filter production and downtime logs by date, station,
     resin or operator, review, and delete with the work-order re-sync handled automatically.</figcaption></figure>
+  <div class="note" style="margin-top:11pt;"><span class="eyebrow">When nothing is arriving at all</span>
+    <p>The failure worth planning for is not corruption, it is silence. If this machine reboots and
+    the database does not come back, or the application is closed and nobody reopens it, every
+    figure on every screen carries on looking entirely normal &mdash; because every figure is
+    computed from the log, and the last good hour is still the last good hour. So the system watches
+    its own intake: after roughly three hours with nothing logged <em>during a running shift</em>,
+    the main screen and the floor display both say so plainly. Quiet outside a shift is not treated
+    as a fault, because a warning that shouts all night is one people stop reading.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
 </section>
 
@@ -918,7 +929,7 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">972</span><span class="l">assertions across eleven suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, vessel drawings, links, boot paths</span></div>
+    <div class="stat"><span class="n">1,014</span><span class="l">assertions across twelve suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, vessel drawings, backups and the stopped record, links, boot paths</span></div>
     <div class="stat"><span class="n">58</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>

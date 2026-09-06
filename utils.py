@@ -189,6 +189,67 @@ def create_database_backup() -> str:
         logger.exception("create_database_backup() failed unexpectedly")
         return None
 
+def list_backup_files() -> list:
+    """Every filename in the backup folder, ours or not."""
+    try:
+        return sorted(os.listdir(BACKUP_DIR))
+    except OSError:
+        logger.exception("list_backup_files() could not read the backup folder")
+        return []
+
+
+def prune_old_backups(keep: int = None) -> int:
+    """Delete all but the most recent few of our own dumps.
+
+    Only files matching this application's own naming are ever considered -
+    backup_policy decides which, and anything else in that folder is somebody
+    else's and is left alone. Returns how many were removed.
+    """
+    from backup_policy import KEEP_BACKUPS, backups_to_prune
+    removed = 0
+    for name in backups_to_prune(list_backup_files(), KEEP_BACKUPS if keep is None else keep):
+        try:
+            os.remove(os.path.join(BACKUP_DIR, name))
+            removed += 1
+        except OSError:
+            logger.exception(f"prune_old_backups() could not delete {name!r}")
+    return removed
+
+
+def run_scheduled_backup(force: bool = False) -> str:
+    """Take a backup if one is due, prune the old ones, and say what happened.
+
+    Called on an ordinary page load rather than from a scheduler, because
+    there is no scheduler on a plant PC and adding one is a second thing to
+    install and forget. The application is open all day; asking "is the
+    newest backup a day old" each time somebody opens a screen gets a daily
+    backup out of a machine that is used daily, and no backups out of a
+    machine nobody has switched on - which is the correct answer in both
+    cases.
+
+    Returns the filename if one was taken, otherwise None. Never raises: a
+    failed backup must not be able to stop an operator logging an hour.
+    """
+    from backup_policy import is_backup_due
+    try:
+        if not force and not is_backup_due(list_backup_files()):
+            return None
+        filename = create_database_backup()
+        if filename:
+            pruned = prune_old_backups()
+            logger.info(f"scheduled backup taken: {filename}"
+                        + (f"; {pruned} older removed" if pruned else ""))
+        else:
+            # Worth a line in the log even though the caller carries on: a
+            # backup that silently never happens is the whole failure this
+            # was built to end.
+            logger.error("scheduled backup was due but create_database_backup() failed")
+        return filename
+    except Exception:
+        logger.exception("run_scheduled_backup() failed unexpectedly")
+        return None
+
+
 def restore_database_backup(filename: str) -> bool:
     params = _get_db_connection_params()
     if not params or not params["dbname"]:

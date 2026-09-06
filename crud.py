@@ -1920,6 +1920,21 @@ tuple[bool, str]:
     finally:
         session.close()
 
+def last_log_at():
+    """When the record was last fed, or None if it never has been.
+
+    One indexed max() over the production log. This is the only question that
+    can tell the difference between a quiet plant and a system that stopped
+    receiving anything hours ago, and the two look identical on every other
+    screen.
+    """
+    session = ScopedSession()
+    try:
+        return session.query(func.max(ProductionLog.timestamp)).scalar()
+    finally:
+        session.close()
+
+
 def get_plant_settings() -> dict:
     session = ScopedSession()
     try:

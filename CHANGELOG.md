@@ -6,6 +6,28 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.17 — Sunday, September 6, 2026
+**Three refinements, all of them about the system failing where nobody is looking**
+
+Asked what else was worth doing and picked the three that were about silent failure rather than features. Two of them turned up bugs on the way.
+
+**Backups happen on their own now.** `create_database_backup()` has always worked and nothing has ever called it on a schedule, so the plant's protection against a dead disk was whoever last remembered to press the button. There is no scheduler on a floor PC and adding one is a second thing to install and forget, so the check rides on the application being opened, which on a working day it is: **is the newest backup more than twenty hours old, and if so take one.** A machine used daily gets a daily backup; one nobody switches on gets none, which is the right answer in both cases. The last fortnight is kept and older ones deleted, because a disk with no room left is the same outage the backups were there to survive.
+- **IT Admin now says what state it is in** — green with the age of the newest, orange when it is days old, red when there has never been one. A backup section that only offers a button tells a manager nothing about whether the plant is actually protected, and "no news" is precisely what a stalled backup looks like.
+- The pruning only ever touches files matching this application's own naming. There is an assertion that a payroll spreadsheet sitting in that folder is never returned for deletion, because this code deletes files on somebody's plant PC and that is not a thing to be casual about.
+
+**The record now notices its own absence.** This is the characteristic failure of a system like this and it is not corruption: the PC reboots and Postgres does not come back, or the app is closed and nobody reopens it, and every figure on every screen carries on looking completely normal, because every figure is computed from the log and the last good hour is still the last good hour. The floor finds out when somebody tries to log. Management finds out weeks later, when a month is queried and there is a hole in it. After roughly three hours with nothing logged **during a running shift**, the SCADA page says so above everything else on it and the wall display carries a band the size of the wall.
+- **Silence off-shift is deliberately not a fault**, and a shift that has only just started is not blamed for last night's gap. Both rules exist for the same reason: a warning that fires when nothing is wrong is a warning people stop reading, which is the same as not having one.
+
+**Dead code deleted.** `Home.py` still carried its own `add_reactor()` and `delete_reactor()` — unused duplicates of the crud versions that did not know about `vessel_type`, `asset_tag` or `bay_marker`. Anyone wiring them up would have created half-configured vessels. Gone, along with the two imports that only existed for them.
+
+**And the shift clock moved out of Home.py.** The wall display needed to know whether a shift was actually running — it names an "active shift" even at three in the morning, because it always has one to show — and the only correct answer lived inside a page. Rather than a second copy, `shift_clock.py`. This application already learned that lesson once, when the "Live Today" filter and the trajectory card each had their own version and disagreed.
+
+- **New `tests/test_health.py`** — 42 assertions, no database and no browser. Both of these are things whose only real test is waiting for the day they matter: nobody is switching the plant PC off for four days to see the backup notice turn red, and nobody is stopping production for three hours to see whether the wall says so. So both were written as functions of a clock and a list, and the cases live in the test instead.
+- **It caught two before they shipped.** A future-dated backup was being clamped to an age of zero, which read as "backed up just now" and would have **suppressed every real backup until the clock caught up** — the exact outcome the module exists to prevent; a dump dated tomorrow is now not counted at all. And the freshness check compared a **naive UTC** log timestamp against an **aware plant-local** shift start, which raised outright and took the whole home page down. Getting that wrong in the other direction would have been worse than the crash: the arithmetic would have succeeded and every log would have read four hours old, so the alarm would have fired all day.
+- Suite: 1,014 assertions across twelve files, 18 screens rendered, 58 browser checks. 1,090 total.
+
+---
+
 ## 3.16 — Sunday, September 6, 2026
 **The handbook is for management, and it now says so and behaves like it**
 

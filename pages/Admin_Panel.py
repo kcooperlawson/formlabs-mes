@@ -16,9 +16,11 @@ from database import (
     get_all_users_df, create_user, update_user_role_and_shift, update_user_pin, delete_user_by_username,
     unlock_user_account,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
+    list_backup_files, prune_old_backups,
     get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
     check_authentication, get_assigned_runs_df, role_can_administer, set_cookie
 )
+from backup_policy import backup_state, DUE_AFTER_HOURS, KEEP_BACKUPS
 from database import esc
 from shifts import picker_options as shift_picker_options
 import external_links
@@ -362,12 +364,31 @@ with tab_db:
             st.success("Floor WIP is already balanced at 0.")
 
     st.markdown("#### 🛡️ Database Disaster Recovery")
+
+    # The state of the automatic backup, said out loud. A backup section that
+    # only offers a button tells a manager nothing about whether the plant is
+    # actually protected, and "no news" is exactly what a stalled backup looks
+    # like. See backup_policy.
+    _state = backup_state(list_backup_files())
+    if _state["state"] == "ok":
+        st.success(f"🟢 Automatic backup is running. {_state['message']}")
+    elif _state["state"] == "stale":
+        st.warning(f"🟠 {_state['message']} Take one now, and check there is "
+                   f"disk space and that pg_dump is still on this machine.")
+    else:
+        st.error(f"🔴 {_state['message']} Take one now.")
+    st.caption(f"One is taken automatically when the newest is more than "
+               f"{int(DUE_AFTER_HOURS)} hours old and somebody opens the app; "
+               f"the {KEEP_BACKUPS} most recent are kept and older ones removed.")
+
     b_col1, b_col2 = st.columns(2)
     with b_col1:
         if st.button("📦 Generate Database Backup", type="primary", use_container_width=True):
             filename = create_database_backup()
             if filename:
+                prune_old_backups()
                 st.success(f"✅ Backup created: `{filename}`")
+                st.rerun()
             else:
                 st.error("❌ Backup failed. Check pg_dump path.")
     with b_col2:
