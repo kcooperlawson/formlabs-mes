@@ -225,7 +225,7 @@ col4, col5, col6 = st.columns(3, gap="medium")
 with col4:
     st.page_link("pages/Mgr_Roster.py", label="👥 Floor Staff Roster", use_container_width=True)
 with col5:
-    st.page_link("pages/Mgr_Floor_Comms.py", label="💬 Floor Communications", use_container_width=True)
+    st.page_link("pages/Mgr_Floor_Comms.py", label="📋 Notes from the Floor", use_container_width=True)
 with col6:
     st.page_link("pages/Tv_Dashboard.py", label="📺 Floor Display (TV Mode)", use_container_width=True)
 

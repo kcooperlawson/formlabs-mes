@@ -6,6 +6,28 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.24 — Monday, September 7, 2026
+**Stop the messaging tab promising something nobody can deliver**
+
+Checked the live data before touching this. The plant's newest backup holds **four floor messages in total** — two on 25 August, two on 29 August, all from one account, and the message bodies are `test`, `Test Test!`, `test`, `test`. It has never carried a real sentence.
+
+And the mechanism is worse than "a manager has to be at the computer". **There is no unread indicator anywhere in the application** — not on the home screen, not in the sidebar, not on the manager's cockpit, not on the wall display. The only way a message is seen is if somebody navigates to the comms page and clicks into that specific operator's thread on purpose. A manager sitting at the PC all day would never know one had arrived.
+
+Which made the old version worse than nothing, for one reason: it was called **"Direct Manager Communications"**, captioned *send and receive messages directly with the Plant Lead*, rendered as a chat with bubbles and a message box, and sat on the operator's own screen. Every signal said somebody was on the other end. **An operator typing "pump 2 is leaking" into that box and going back to work believing it had been reported was the application absorbing an urgent message and silently dropping it.**
+
+The words were the dangerous part and they were the cheap part to fix. Nothing about how it works has changed — no schema, no logic, no data.
+
+- The tab is **"Note to Management"**, described as a written note kept against your name and the time. Above the box, before anything is typed: **nobody is watching this in real time — use the radio or find a lead in person for anything urgent or unsafe.** Then what it *is* good for, which a radio is bad at: running low on a material, a machine that needs looking at, something that keeps costing time.
+- The manager's page is **"Notes from the Floor"**, and says plainly that it alerts nobody and is read when you open it.
+- That page listed every operator on the floor, so the ones who had written something were indistinguishable from the ones who had not and finding them meant clicking every name. They are marked and sorted to the top now. A dot costs nothing and is the difference between reading the page and giving up on it.
+- The operator guide described it as "a direct thread with the plant lead", which was the same promise. Rewritten and rebuilt.
+
+**Nothing has been deleted.** Not the pages, not the tab, not the table. Whether this feature earns a proper investment — an unread badge where managers already look, and a band on the wall display, which is the one screen that is always on and always glanced at — should be decided by whether anybody uses it during the floor test, not guessed at now. If nobody does, it comes out afterwards.
+
+- Suite: 1,296 assertions across seventeen files, 18 screens rendered, 8 round trips, 58 browser checks. 1,380 total.
+
+---
+
 ## 3.23 — Monday, September 7, 2026
 **"It says it sent the payload and nothing is in my sheet"**
 

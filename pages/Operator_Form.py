@@ -1060,7 +1060,7 @@ elif _pump_problem and current_role in ("manager", "admin"):
 
 if current_role == "packer":
     if packing_enabled:
-        tab_pack, tab_chat = st.tabs(["📦 Log Packing", "💬 Manager Comms"])
+        tab_pack, tab_chat = st.tabs(["📦 Log Packing", "📋 Note to Management"])
         tab1 = tab2 = tab3 = None
     else:
         st.error("Packing module is disabled by management.")
@@ -1070,7 +1070,7 @@ elif current_role == "operator":
         "⚡ Log Hourly Pouring",
         "⚠️ Log Station Downtime",
         "📸 Cleanliness & Photo Audit",
-        "💬 Manager Comms"
+        "📋 Note to Management"
     ))
     tab_pack = None
 else:
@@ -1080,14 +1080,14 @@ else:
             "📦 Log Packing",
             "⚠️ Log Station Downtime",
             "📸 Cleanliness & Photo Audit",
-            "💬 Manager Comms"
+            "📋 Note to Management"
         ))
     else:
         tab1, tab2, tab3, tab_chat = st.tabs((
             "⚡ Log Hourly Pouring",
             "⚠️ Log Station Downtime",
             "📸 Cleanliness & Photo Audit",
-            "💬 Manager Comms"
+            "📋 Note to Management"
         ))
         tab_pack = None
 
@@ -1752,8 +1752,28 @@ if tab3 is not None:
 # --- TAB 4: MANAGER COMMS ---
 if tab_chat is not None:
     with tab_chat:
-        st.subheader("💬 Direct Manager Communications")
-        st.caption("Send and receive messages directly with the Plant Lead.")
+        # This used to be called "Direct Manager Communications" and was
+        # captioned as messaging the Plant Lead directly. It renders as a chat,
+        # sits on the operator's own screen, and every signal it gave said
+        # somebody was on the other end of it - but nothing in this
+        # application tells a manager a message has arrived. Not on their home
+        # screen, not in the sidebar, not on the wall display. A manager sat at
+        # the PC all day would never know.
+        #
+        # So an operator typing "pump 2 is leaking" here and going back to work
+        # believing it had been reported was the application absorbing an
+        # urgent message and silently dropping it. The words are the dangerous
+        # part, and they are the cheap part to fix: this is a written note that
+        # gets read when somebody next looks, and it now says so before
+        # anything is typed rather than after nobody answers.
+        st.subheader("📋 Note to Management")
+        st.caption("A written note for the plant lead — it stays on the record with "
+                   "your name and the time on it.")
+        st.warning("**Nobody is watching this in real time.** Use the radio or find a "
+                   "lead in person for anything urgent, or anything unsafe. This is for "
+                   "the things that would otherwise be forgotten by the end of shift — "
+                   "running low on a material, a machine that needs looking at, "
+                   "something that keeps costing time.")
 
         chat_df = get_chat_history_df(current_user)
 
@@ -1775,9 +1795,10 @@ if tab_chat is not None:
                             unsafe_allow_html=True)
                         st.write(row['message'])
             else:
-                st.info("No messages yet. Send a message to start a conversation with management.")
+                st.info("Nothing noted yet. Anything you write here is kept with your "
+                        "name and the time, and stays on the record.")
 
         # The input box pinned to the bottom
-        if prompt := st.chat_input("Send a message to management...", key="op_chat_input"):
+        if prompt := st.chat_input("Write a note for management…", key="op_chat_input"):
             send_floor_message(operator_name=current_user, sender_name=current_user, message=prompt, is_manager=False)
             st.rerun()
