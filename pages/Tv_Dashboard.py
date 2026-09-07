@@ -12,6 +12,7 @@ from datetime import datetime, date, timedelta
 from database import (
     get_production_logs_df,
     container_litres,
+    log_litres,
     last_log_at,
     get_assigned_runs_df,
     get_all_resin_specs_df,
@@ -266,7 +267,7 @@ def calculate_liters(df_subset):
     for _, r in df_subset.iterrows():
         b_count = float(r.get("bottles_filled", 0) or 0)
         c_type = str(r.get("cartridge_type", "V2")).upper()
-        total_l += b_count * container_litres(c_type)
+        total_l += log_litres(b_count, c_type, r.get("litres_poured"))
     return total_l
 
 df_s1 = df_today_pour[df_today_pour["shift"] == "Shift 1"] if not df_today_pour.empty else pd.DataFrame()
@@ -496,7 +497,7 @@ with b1:
             for _, r in op_data.iterrows():
                 b_count = float(r.get("bottles_filled", 0) or 0)
                 c_type = str(r.get("cartridge_type", "V2")).upper()
-                op_liters += b_count * container_litres(c_type)
+                op_liters += log_litres(b_count, c_type, r.get("litres_poured"))
 
             # 2. Isolate the operator's specific worked hours
             timestamps = pd.to_datetime(op_data["timestamp"])

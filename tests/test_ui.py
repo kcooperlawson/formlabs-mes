@@ -342,6 +342,82 @@ try:
 finally:
     _db.update_plant_settings({"simple_mode": False})
 
+# --- H. a pour that is an amount rather than a count ---------------------
+# The arithmetic has its own file. What is asserted here is the part only the
+# real page can answer: that the option is absent until the plant switches it
+# on, that switching it on does not disturb the formats that were already
+# there, and that an amount which cannot be true actually stops the submit
+# rather than merely printing something red above an enabled button.
+try:
+    _db.update_plant_settings({"enable_bulk_pour": False})
+    at_off = run_as(OP, h_pump=STATION)
+    _opts_off = list(at_off.selectbox(key="h_cart").options)
+    check("a plant that has not switched it on sees no bulk option",
+          any("Drum" in o for o in _opts_off), False)
+    check("and sees the four formats it always saw", len(_opts_off), 4)
+
+    _db.update_plant_settings({"enable_bulk_pour": True})
+    at_on = run_as(OP, h_pump=STATION)
+    _opts_on = list(at_on.selectbox(key="h_cart").options)
+    check("switching it on adds the option", any("Drum" in o for o in _opts_on), True)
+    check("and moves none of the ones already there", _opts_on[:4], _opts_off)
+
+    # The trap this section exists for: "RPS (5L Bulk Jug)" contains the word
+    # "Bulk". A format picked by substring turned every 5-litre jug into a
+    # measured pour the moment a bulk option was added, and the only visible
+    # symptom was a lot check that quietly stopped applying to jugs.
+    at_on.selectbox(key="h_cart").set_value("RPS (5L Bulk Jug)").run()
+    check("a jug is still a jug once a bulk option exists",
+          "Jug Lot Verification" in texts(at_on), True)
+    check("and still asks for its lot", "Turn the jug over" in texts(at_on), True)
+
+    _tank = _db.get_all_reactors_df()
+    if not _tank.empty:
+        _row = _tank.iloc[0]
+        _resin, _pump = str(_row["current_resin"]), str(_row["assigned_pump"])
+        _cap = float(_row["max_capacity_l"])
+        submit_daily_checklist(OP, "Shift 1", _pump)
+
+        at_b = run_as(OP, h_pump=_pump)
+        at_b.selectbox(key="h_cart").set_value("Drum / Tote (measured amount)").run()
+        at_b.selectbox(key="h_resin").set_value(_resin).run()
+
+        # The count field is replaced by an amount field, not added to.
+        check("a bulk pour asks for an amount",
+              any(n.key == "h_bulk_each" for n in at_b.number_input), True)
+        check("and stops asking for a container count in the big field",
+              any(n.key == "h_filled" for n in at_b.number_input), False)
+
+        at_b.number_input(key="h_bulk_each").set_value(180.0).run()
+        _sub = [b for b in at_b.button if "SUBMIT POURING LOG" in b.label][0]
+        check("an ordinary amount can be submitted", _sub.disabled, False)
+        check("and the litres are stated before the submit",
+              any("off this vessel" in str(m.value) for m in at_b.markdown), True)
+
+        # 1800 typed instead of 180 is the failure this catches. It looks
+        # entirely ordinary in a number box and shows up an hour later as an
+        # empty vessel on the wall display.
+        # Just over this tank's capacity, deliberately - far enough over to be
+        # impossible, close enough that it does not trip the "larger than any
+        # vessel on the floor" rule instead and pass for the wrong reason.
+        at_b.number_input(key="h_bulk_each").set_value(_cap + 400).run()
+        _sub = [b for b in at_b.button if "SUBMIT POURING LOG" in b.label][0]
+        check("more than the vessel holds cannot be submitted", _sub.disabled, True)
+        check("and the page says why rather than just greying the button",
+              any("more than this vessel holds" in str(e.value) for e in at_b.error), True)
+        check("naming the vessel's capacity, so it is clear which number is wrong",
+              any(f"{_cap:,.0f} L" in str(e.value) for e in at_b.error), True)
+
+        at_b.number_input(key="h_bulk_each").set_value(50000.0).run()
+        _sub = [b for b in at_b.button if "SUBMIT POURING LOG" in b.label][0]
+        check("and an amount larger than anything on the floor is stopped too",
+              _sub.disabled, True)
+        print(f"  bulk pours OK ({_resin} / {_pump}, {_cap:,.0f} L vessel)")
+    else:
+        check(False, "no reactor on file to check a bulk pour against")
+finally:
+    _db.update_plant_settings({"enable_bulk_pour": False})
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} UI checks FAILED:\n" + "\n".join(FAILS))

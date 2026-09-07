@@ -21,6 +21,7 @@ load_dotenv()
 from database import (
     authenticate_user,
     container_litres,
+    log_litres,
     create_user,
     get_all_resin_specs_df,
     get_all_users_df,
@@ -120,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.19.0"
+APP_VERSION = "PT-V3.20.0"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -764,9 +765,10 @@ if not pour_df.empty:
         elif "PIGMENT" not in c_type.upper():
             v2_cart_count += int(b_count)
 
-        # One definition of how much a container holds, in crud.container_litres,
-        # so the tanks and the totals can never disagree about it.
-        liters_output += b_count * container_litres(c_type)
+        # One definition of how much a row is worth, in crud.log_litres, so the
+        # tanks and the totals can never disagree about it - including on a
+        # bulk pour, where the volume is measured rather than counted.
+        liters_output += log_litres(b_count, c_type, r.get("litres_poured"))
         lookup_key = f"{c_type.lower()}_{r_name.lower()}"
         unit_g = spec_dict.get(
             lookup_key, 5500.0 if "RPS" in c_type.upper() else 1110.0
@@ -994,7 +996,7 @@ if show_pouring:
                 for _, r in op_data.iterrows():
                     b_count = float(r.get("bottles_filled", 0) or 0)
                     c_type = str(r.get("cartridge_type", "V2"))
-                    op_liters += b_count * container_litres(c_type)
+                    op_liters += log_litres(b_count, c_type, r.get("litres_poured"))
 
                 timestamps = pd.to_datetime(op_data["timestamp"])
                 time_span_hours = (timestamps.max() - timestamps.min()).total_seconds() / 3600.0

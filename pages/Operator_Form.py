@@ -25,6 +25,8 @@ from database import (
     lots_match,
     normalize_lot,
     GATED_FORMATS,
+    format_choices,
+    format_code,
     container_words,
     add_downtime_log,
     add_cleanliness_audit,
@@ -32,6 +34,8 @@ from database import (
     update_assigned_run_progress,
     update_run_status,
     get_all_resin_specs_df,
+    container_litres,
+    reactor_draw_litres,
     get_active_pumps,
     get_downtime_reasons,
     get_active_operators,
@@ -60,6 +64,8 @@ from resin_palette import resin_chip, resin_colors, stored_color_map, style_resi
 from shifts import picker_options as shift_picker_options
 import external_links
 import fill_weight
+from bulk_pour import (UNITS as BULK_UNITS, density_map, resin_density,
+                       pour_litres, check_pour, describe_pour)
 import base64
 
 import extra_streamlit_components as stx
@@ -566,6 +572,44 @@ dt_reasons = get_downtime_reasons()
 # carries the same colour it carries on every other screen.
 resin_colour_map = stored_color_map(get_all_resin_specs_df("ALL"))
 
+# --- pours that are an amount rather than a count ----------------------------
+# Off unless the plant has switched it on, and when it is off nothing below
+# this line runs and the form is byte for byte the form it has always been.
+bulk_pour_enabled = bool(get_plant_settings().get("enable_bulk_pour", False))
+bulk_densities = (density_map(get_all_resin_specs_df("ALL").to_dict("records"),
+                              container_litres)
+                  if bulk_pour_enabled else {})
+
+
+def bulk_vessel_state(resin_name, pump_name):
+    """Capacity and litres left for the tank feeding this station.
+
+    Only so an amount that cannot be true can be caught at the keyboard: 1800
+    typed instead of 180 looks perfectly ordinary in a number box and shows up
+    an hour later as an empty vessel on the wall display. Returns (None, None)
+    when no reactor is configured for this resin - an unknown tank is a reason
+    to accept the number, not to refuse it.
+    """
+    try:
+        fleet = get_all_reactors_df()
+        if fleet.empty:
+            return None, None
+        target = str(resin_name or "").strip().lower()
+        for _, row in fleet.iterrows():
+            if str(row.get("current_resin") or "").strip().lower() != target:
+                continue
+            assigned = str(row.get("assigned_pump") or "").strip()
+            if assigned and assigned != "None" and assigned.lower() != str(pump_name or "").strip().lower():
+                continue
+            capacity = float(row.get("max_capacity_l") or 0.0)
+            drawn, _ = reactor_draw_litres(resin_name, assigned if assigned != "None" else "")
+            return capacity, max(0.0, capacity - drawn)
+    except Exception:
+        # A check that cannot run must never be the reason a pour goes
+        # unlogged. The record is the point; this is a courtesy on top of it.
+        return None, None
+    return None, None
+
 # ===================== MY STATION (multi-pourer support) =====================
 # Which station's runs show in Section 1 below. Deliberately independent
 # of AssignedRun.assigned_operator: any number of operators can point at
@@ -1060,11 +1104,16 @@ if tab1 is not None:
         # what updates Section 1's active-run list on the next rerun.
         station = st.selectbox("Pump Station", active_pumps, key="h_pump")
 
+        # "Bulk / Drum" only appears when the plant has switched it on. A floor
+        # that never decants should not have to scroll past an option it will
+        # never pick, and until somebody turns it on this dropdown holds
+        # exactly the four entries it has always held.
+        # The label-to-code mapping is a table in crud, not a chain of
+        # substring tests here. See crud.CONTAINER_FORMATS for why.
         cartridge = st.selectbox("Container Format",
-                                 ("V2 (1L Cartridge)", "V1 (1L Cartridge)", "RPS (5L Bulk Jug)", "Pigment"),
-                                 key="h_cart")
-        cart_code = "RPS" if "RPS" in cartridge else (
-            "V1" if "V1" in cartridge else ("Pigment" if "Pigment" in cartridge else "V2"))
+                                 format_choices(bulk_pour_enabled), key="h_cart")
+        cart_code = format_code(cartridge)
+        is_bulk = cart_code == "Bulk"
 
         # The Resin Formulation list must always show every resin on file,
         # never just the ones whose master spec happens to be registered
@@ -1360,9 +1409,50 @@ if tab1 is not None:
 
         st.markdown("#### 📊 3. Production Output")
 
-        # Give the Good Units its own massive full-width input
-        bottles_filled = st.number_input("✅ Good Units / Containers Filled", min_value=0, value=250, step=10,
-                                         key="h_filled")
+        # A bulk pour is an amount, not a count, so the big field asks for the
+        # amount instead. The container count stays - three identical drums off
+        # the same tank is one thing that happened, and making somebody write
+        # it three times is how the third one gets forgotten - but it is the
+        # small field here, because it is almost always 1.
+        bulk_litres = None
+        bulk_note = ""
+        bulk_verdict = {"blocked": False, "message": ""}
+
+        if is_bulk:
+            bk1, bk2, bk3 = st.columns([1.4, 1, 1])
+            with bk1:
+                bulk_each = st.number_input("Amount in each container", min_value=0.0,
+                                            value=0.0, step=1.0, format="%.2f", key="h_bulk_each")
+            with bk2:
+                bulk_unit = st.radio("Unit", BULK_UNITS, horizontal=True, key="h_bulk_unit")
+            with bk3:
+                bottles_filled = st.number_input("Containers", min_value=1, max_value=99,
+                                                 value=1, step=1, key="h_bulk_count")
+
+            bulk_note = st.text_input("Poured into", placeholder="55 gal drum, blue tote, pail",
+                                      max_chars=60, key="h_bulk_what")
+
+            _dens = resin_density(resin, bulk_densities)
+            bulk_litres = pour_litres(bottles_filled, bulk_each, bulk_unit, _dens)
+
+            # The tank this came out of, so an amount that cannot be true gets
+            # caught here rather than showing up as an empty vessel on the wall
+            # display an hour later. 1800 typed instead of 180 looks perfectly
+            # ordinary in a number box.
+            _cap, _left = bulk_vessel_state(resin, station)
+            bulk_verdict = check_pour(bulk_litres, capacity_l=_cap, remaining_l=_left)
+
+            # The conversion stated out loud before the submit. The operator
+            # knows they poured 200 kg; that it is 180 litres is the
+            # application's claim, not theirs.
+            if bulk_litres > 0:
+                st.markdown(f"**{describe_pour(bottles_filled, bulk_each, bulk_unit, _dens, bulk_note)}**")
+            if bulk_verdict["message"]:
+                (st.error if bulk_verdict["blocked"] else st.warning)(bulk_verdict["message"])
+        else:
+            # Give the Good Units its own massive full-width input
+            bottles_filled = st.number_input("✅ Good Units / Containers Filled", min_value=0, value=250, step=10,
+                                             key="h_filled")
 
         # Scrap can share a row since they are smaller numbers
         p_col1, p_col2 = st.columns(2)
@@ -1413,10 +1503,16 @@ if tab1 is not None:
                              key="h_notes")
 
         st.markdown("<br>", unsafe_allow_html=True)
+        # A bulk amount that cannot be true blocks the submit through the same
+        # door the lot check uses, so there is one place on this screen that
+        # says why the button is grey.
+        if is_bulk and bulk_verdict["blocked"]:
+            gate_blockers.append("enter an amount this vessel could actually have given out")
+        _can_submit = gate_ok and not (is_bulk and bulk_verdict["blocked"])
         if gate_blockers:
             st.caption("Before you can submit: " + "; ".join(gate_blockers) + ".")
         if st.button("🚀 SUBMIT POURING LOG", type="primary", use_container_width=True,
-                     disabled=not gate_ok):
+                     disabled=not _can_submit):
             # Written to disk here rather than on every rerun while they type.
             if verification is not None and pending_photo is not None:
                 verification["photo_filename"] = save_lot_photo(pending_photo)
@@ -1448,6 +1544,8 @@ if tab1 is not None:
                     log_type="Hourly Bottle Count",
                     verification=verification,
                     weight=weight_reading,
+                    litres_poured=bulk_litres,
+                    pour_note=bulk_note,
                 )
             except Exception as _e:
                 _save_ok, _save_err = False, str(_e)[:160]

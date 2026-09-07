@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
-from database import get_production_logs_df, do_logout, container_litres
+from database import get_production_logs_df, do_logout, container_litres, log_litres
 
 st.set_page_config(page_title="Google Cloud Sync | Formlabs MES", page_icon="☁️", layout="wide")
 
@@ -57,7 +57,7 @@ if export_mode == "📊 Aggregated Calculated Metrics (KPI Summary)":
         def get_row_liters(r):
             b_count = float(r.get("bottles_filled", 0) or 0)
             c_type = str(r.get("cartridge_type", "V2")).strip().upper()
-            return b_count * container_litres(c_type)
+            return log_litres(b_count, c_type, r.get("litres_poured"))
 
         calc_df["liters_calc"] = calc_df.apply(get_row_liters, axis=1)
         calc_df["total_scrap"] = calc_df["scrap_empty"].fillna(0) + calc_df["scrap_filled"].fillna(0)

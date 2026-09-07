@@ -445,6 +445,18 @@ with tab_settings:
             st.markdown("<br>", unsafe_allow_html=True)
             en_pack = st.checkbox("📦 Enable Packing Module globally",
                                   value=current_settings.get("enable_packing", True), key="en_pack_input")
+            # Off unless a plant actually decants. When it is off the operator's
+            # Container Format list holds exactly the four entries it always
+            # has, which is the point of it being a setting rather than a
+            # feature everybody has to scroll past.
+            en_bulk = st.checkbox("🛢️ Allow bulk pours (drum, tote, pail)",
+                                  value=current_settings.get("enable_bulk_pour", False),
+                                  key="en_bulk_input",
+                                  help="Adds a 'Bulk / Drum' container format that takes a "
+                                       "measured amount in litres or kilograms instead of a "
+                                       "container count, on the operator's form and on the "
+                                       "reactor page. Leave off if everything here is poured "
+                                       "into cartridges and jugs.")
 
         # ------------------ HOW MUCH OF THE APP THIS PLANT USES ------------------
         # The application grew work orders and a separate IT role first, so
@@ -531,6 +543,7 @@ with tab_settings:
                 "shift_2_start": s2_start, "shift_2_hours": s2_hrs, "shift_2_break_mins": s2_brk,
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
+                "enable_bulk_pour": en_bulk,
                 # Stored as the negative of the picker: the column is named for
                 # the smaller configuration, so the default value of a row
                 # nobody has touched is the smaller one.

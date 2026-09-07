@@ -6,6 +6,29 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.20 — Monday, September 7, 2026
+**Not everything that leaves a tank is a cartridge**
+
+The record could only say how many containers were filled, and worked the volume out by multiplying: a V2 is one litre, an RPS jug is five. That is true of everything that goes down a line and exactly wrong for the pours that do not — a specific amount decanted into a drum, a tote, a pail. **There was no way to write "we put 180 litres into a drum" down**, so it went in as a wrong number of cartridges or it did not go in at all, and either way the tank it came out of was wrong from that moment on.
+
+**A new Container Format, "Drum / Tote", that takes a measured amount.** Picking it swaps the container count for an amount and a unit — **litres or kilograms**, because resin is bought and reported by weight and a tank holds litres. The count stays, as a small field defaulting to 1: three identical drums off the same tank is one thing that happened, and making somebody write it three times is how the third one gets forgotten.
+- The kilogram conversion needs a density, and the density was already in the spec table without being called that: a spec of 1,110 g in a 1 L cartridge and 5,550 g in a 5 L jug are the same 1.11 kg per litre. That derivation used to live inline on the reactor page and now lives in `bulk_pour`, because two screens needed it and **two copies of a conversion is how a tank and a form come to disagree about the same pour**.
+- The conversion is stated before the submit, not after. The operator knows they poured 200 kg; that it is 180 litres is the application's claim, and it should have to make it out loud.
+
+**An amount is checked against the vessel it came out of.** A container count is self-checking — nobody types 2,500 cartridges and believes it. **1800 typed instead of 180 is invisible**: it looks entirely ordinary in a number box and the first sign of it is a vessel reading empty on the wall display an hour later. More than the tank holds is blocked outright. More than the record says is *left* in it is only a warning, because a tank topped up without the new lot being logged genuinely does give out more than the record thinks — and refusing that pour would mean the record is wrong and the operator cannot fix it.
+
+**Managers get the same thing on the reactor page**, next to the vessel it draws from, showing what the record says is left before anything is typed. That is where a bulk pour's effect is visible, and it covers the times nobody with a manager login is on the floor.
+
+**It is off by default.** A new plant setting under IT Admin, off on every existing install and every new one. Until somebody switches it on the operator's Container Format list holds exactly the four entries it has always held, and the form is unchanged.
+
+- **Migration 0012** adds two nullable columns to the log — the measured volume and what it was poured into — and the setting. NULL on every row that exists today and on every ordinary cartridge log after this, so **nothing already recorded changes meaning** and every existing query keeps returning what it returned before.
+- **One definition of what a log row is worth**, `crud.log_litres`, now read by the tank levels, the shift totals, the wall display, the operator leaderboards and the Sheets export. A measured amount wins outright where there is one; everything else is the old arithmetic untouched. A bulk pour counted by one screen and not another is two plausible-looking numbers and no way to tell which is wrong.
+- **A bug this found, which had not shipped yet but would have been ugly.** The form picked its format code with a chain of substring tests, and **"RPS (5L Bulk Jug)" contains the word "Bulk"** — so adding a bulk option silently reclassified every 5-litre jug as a measured pour and stopped lot-checking them. Caught by the interface tests, not by any of the new arithmetic tests, which all passed. The mapping is now a table in `crud.CONTAINER_FORMATS` and there are assertions on it.
+- **New `bulk_pour.py`** and **`tests/test_bulk_pour.py`** — 69 assertions, plus 14 more on the real operator page. The ones that matter: a kilogram is fewer litres than a litre and not more (getting that backwards is a 23% error that looks plausible everywhere); a row with no measured amount reads exactly as it always did, including when the column arrives as NaN out of a dataframe; and an amount larger than the vessel actually stops the submit rather than printing something red above a live button.
+- Suite: 1,177 assertions across fifteen files, 18 screens rendered, 58 browser checks. 1,253 total.
+
+---
+
 ## 3.19 — Monday, September 7, 2026
 **A shift, drawn as a print job**
 

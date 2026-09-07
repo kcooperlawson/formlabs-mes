@@ -13,6 +13,7 @@ import pandas as pd
 import bcrypt
 from sqlalchemy import desc, text, func, or_
 
+import bulk_pour as _bulk
 from db_core import engine, ScopedSession, Base
 from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
@@ -305,6 +306,20 @@ def container_litres(cartridge_type) -> float:
     return CARTRIDGE_LITRES
 
 
+def log_litres(bottles_filled, cartridge_type, litres_poured=None) -> float:
+    """How many litres one log row represents.
+
+    The single definition, used by the tank levels, the shift totals, the wall
+    display and the exports. A measured amount wins outright when a row has
+    one; everything else is the old count-times-format, unchanged. Everywhere
+    that used to multiply inline now calls this, because a bulk pour counted
+    by one screen and not another is two plausible-looking numbers and no way
+    to tell which is wrong.
+    """
+    return _bulk.log_litres(bottles_filled, cartridge_type, litres_poured,
+                            container_litres)
+
+
 # Lot values that are not a real lot: the app's own placeholders and the
 # marker the level calibrations write when there is no run to borrow one from.
 _NON_LOTS = {"", "n/a", "none", "null", "recon-adj"}
@@ -370,7 +385,8 @@ def reactor_draw_litres(resin_name: str, pump_station: str = "") -> tuple[float,
                 break
             batch.append(row)
 
-        drawn = sum(int(r.bottles_filled or 0) * container_litres(r.cartridge_type)
+        drawn = sum(log_litres(r.bottles_filled, r.cartridge_type,
+                               getattr(r, "litres_poured", None))
                     for r in batch)
         return float(drawn), current_lot
     finally:
@@ -1098,6 +1114,39 @@ def lots_match(expected, entered) -> bool:
 # possible on that format.
 GATED_FORMATS = ("V1", "V2", "Pigment", "RPS")
 
+# What the operator picks, and what it is stored as. A table rather than a
+# chain of substring tests, because the chain that used to do this read "Bulk"
+# out of "RPS (5L Bulk Jug)" the moment a bulk option was added and silently
+# turned every 5-litre jug into a measured pour. It was correct for years and
+# wrong the day a new option shared a word with an old one, which is the whole
+# argument for spelling the mapping out.
+CONTAINER_FORMATS = {
+    "V2 (1L Cartridge)": "V2",
+    "V1 (1L Cartridge)": "V1",
+    "RPS (5L Bulk Jug)": "RPS",
+    "Pigment": "Pigment",
+    "Drum / Tote (measured amount)": "Bulk",
+}
+BULK_FORMAT_LABEL = "Drum / Tote (measured amount)"
+
+
+def format_choices(bulk_enabled: bool = False) -> tuple:
+    """The Container Format options for this plant, in order.
+
+    The measured-amount option is absent unless the plant has switched it on,
+    so a floor that only ever fills cartridges and jugs sees exactly the four
+    entries it has always seen.
+    """
+    labels = [k for k in CONTAINER_FORMATS if k != BULK_FORMAT_LABEL]
+    if bulk_enabled:
+        labels.append(BULK_FORMAT_LABEL)
+    return tuple(labels)
+
+
+def format_code(label) -> str:
+    """The stored code for a Container Format label."""
+    return CONTAINER_FORMATS.get(str(label or "").strip(), "V2")
+
 
 def can_administer(role, simple_mode) -> bool:
     """Whether this role reaches the administration console.
@@ -1282,7 +1331,8 @@ def add_hourly_log(
         operator_name: str, pump_station: str, shift: str, cartridge_type: str,
         resin_type: str, lot_number: str, bottles: int, scrap_empty: int,
         scrap_filled: int, notes: str = "", log_type: str = "Hourly Bottle Count",
-        verification: dict = None, weight: dict = None
+        verification: dict = None, weight: dict = None,
+        litres_poured: float = None, pour_note: str = ""
 ) -> bool:
     """Returns True if this log was matched to (and credited toward) an
     active AssignedRun's live progress tracker, False otherwise — the
@@ -1306,6 +1356,15 @@ def add_hourly_log(
     every existing caller - the Admin Panel, reconciliation, and the
     Device Gateway writer - keeps working untouched.
 
+    `litres_poured` is a measured volume, for the pours that are an amount
+    rather than a count of containers - so many litres decanted into a drum.
+    It is None on an ordinary cartridge log, which is the common case, and
+    when it is set it is what every total reads instead of multiplying the
+    container count by the format size. `pour_note` is what it went into, in
+    the operator's words, and nothing parses it. Both are optional so that
+    every existing caller - the Admin Panel, reconciliation, and the Device
+    Gateway writer - keeps working untouched.
+
     `weight` is the fill-weight reading for this log, as returned by
     fill_weight.judge(), or None when the operator did not take one - which
     is the common case and is fine. Unlike the lot check it is purely a
@@ -1328,6 +1387,14 @@ def add_hourly_log(
             check_weight_g=(weight or {}).get("measured"),
             weight_deviation_g=(weight or {}).get("deviation"),
             weight_status=(weight or {}).get("status"),
+            # Only ever a positive number or nothing. A zero stored here would
+            # read as "this pour was measured at nothing" and beat the count,
+            # which is the one way this column could lose data that was
+            # recorded correctly.
+            litres_poured=(float(litres_poured)
+                           if litres_poured is not None and float(litres_poured) > 0
+                           else None),
+            pour_note=(str(pour_note).strip()[:120] or None) if pour_note else None,
         )
         session.add(log_row)
 
@@ -1960,6 +2027,10 @@ def get_plant_settings() -> dict:
                 # and should look like one rather than like a half-finished
                 # copy of something bigger.
                 "simple_mode": bool(getattr(settings, 'simple_mode', 1)),
+                # Off on a row written before this column existed, and off on
+                # a new one. A floor that never decants into drums should not
+                # have to look at a control for it.
+                "enable_bulk_pour": bool(getattr(settings, 'enable_bulk_pour', 0)),
                 # shift_count was stored and saved but never read back out of
                 # here, so every caller fell through to shifts.py's default of
                 # two. That is the right answer for this plant today, which is
@@ -1975,7 +2046,7 @@ def get_plant_settings() -> dict:
             "yield_target_pct": 99.0, "packing_yield_target_pct": 99.5, "shift_1_break_mins": 60.0,
             "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "enable_packing": True,
             "shift_count": 2, "pump_form_url": "", "pump_form_label": "",
-            "simple_mode": True
+            "simple_mode": True, "enable_bulk_pour": False
         }
     finally:
         session.close()
@@ -2009,7 +2080,7 @@ def update_plant_settings(values: dict) -> bool:
         # here rather than at each call site, because the next checkbox added
         # to that form would hit this again and the failure names a column
         # rather than the pattern.
-        int_flags = {"enable_packing", "simple_mode"}
+        int_flags = {"enable_packing", "simple_mode", "enable_bulk_pour"}
         for key, value in (values or {}).items():
             if hasattr(settings, key) and key not in ("id",):
                 if key in int_flags and isinstance(value, bool):

@@ -42,6 +42,14 @@ class ProductionLog(Base):
     resin_type = Column(String(100), nullable=True)
     lot_number = Column(String(50), nullable=True)
     bottles_filled = Column(Integer, default=0)
+    # A measured volume, for pours that are an amount rather than a count of
+    # containers - a drum, a tote, a pail. NULL on an ordinary cartridge log
+    # and on every row written before migration 0012, which is what keeps the
+    # count-times-format arithmetic meaning exactly what it always meant.
+    # bulk_pour.log_litres decides which of the two a row is read by.
+    litres_poured = Column(Float, nullable=True)
+    # What it was poured into, in the operator's own words. Never parsed.
+    pour_note = Column(String(120), nullable=True)
     scrap_empty = Column(Integer, default=0)
     scrap_filled = Column(Integer, default=0)
     notes = Column(Text, nullable=True)
@@ -218,6 +226,9 @@ class PlantSettings(Base):
     # set this up yet" and "this plant does not work that way" look identical
     # to the app otherwise, and it guesses the first.
     simple_mode = Column(Integer, default=1)  # 1 = True, 0 = False
+    # Off by default: a floor that never decants into drums should not
+    # have to look at a control for it.
+    enable_bulk_pour = Column(Integer, default=0)  # 1 = True, 0 = False
     # An external form the plant links out to - today the pump form behind the
     # QR sticker on the pump. Held here rather than in source because this
     # application does not own that form and whoever does can move it. Empty

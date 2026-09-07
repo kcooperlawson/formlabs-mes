@@ -17,6 +17,8 @@ from database import (
     get_all_resin_specs_df,
     reactor_draw_litres,
     container_litres,
+    add_hourly_log,
+    get_plant_settings,
     get_all_reactors_df,
     add_reactor,
     update_reactor_identity,
@@ -30,6 +32,8 @@ from database import (
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map, resin_color
+from bulk_pour import (DEFAULT_DENSITY_KG_L, UNITS, density_map, resin_density,
+                       pour_litres, check_pour, describe_pour)
 from reactor_vessel import (vessel_svg, resolve_vessel_type,
                             VESSEL_TYPES, VESSEL_LABELS, VESSEL_HELP)
 
@@ -280,16 +284,13 @@ specs_df = get_all_resin_specs_df("ALL")
 # the spec happens to be written against. That is the whole reason this is a
 # density map and not the old container lookup - the tank no longer knows, or
 # needs to know, which format is being poured out of it right now.
-DEFAULT_DENSITY_KG_L = 1.11
-density_by_resin = {}
-if not specs_df.empty:
-    for _, r in specs_df.iterrows():
-        litres = container_litres(r["cartridge_type"])
-        if litres > 0:
-            density_by_resin.setdefault(
-                str(r["resin_name"]).strip().lower(),
-                (float(r["actual_spec_g"]) / 1000.0) / litres)
+# The derivation itself now lives in bulk_pour, because the bulk-pour panel
+# below needs the same numbers to turn kilograms into litres and two copies of
+# a conversion is how a tank and a form come to disagree about the same pour.
+density_by_resin = density_map(
+    (specs_df.to_dict("records") if not specs_df.empty else []), container_litres)
 
+_bulk_enabled = bool(get_plant_settings().get("enable_bulk_pour", False))
 _resin_colours = stored_color_map(specs_df)
 all_resins = ["None"] + sorted(specs_df["resin_name"].unique().tolist()) if not specs_df.empty else ["None"]
 all_pumps = ["None"] + get_active_pumps()
@@ -360,6 +361,83 @@ if st.session_state.get("user_role") in ["manager", "admin"]:
                     st.markdown("<hr style='margin: 5px 0; border-color: #1E2B45;'>", unsafe_allow_html=True)
             else:
                 st.caption("No permanent reactors added yet.")
+
+# --- a pour that is an amount, not a count ----------------------------------
+# Most of what leaves these tanks goes into a cartridge and is counted. Some of
+# it is decanted: a specific amount into a drum, a tote, a pail. There was no
+# way to write that down, so it went in as a wrong number of cartridges or it
+# did not go in at all, and either way the tank above was wrong from that
+# moment on.
+#
+# It sits on this page rather than a settings screen because a bulk pour's
+# whole effect is the tank level, and this is where you can see it land. The
+# operator's form carries the same thing behind the same switch, for the times
+# nobody with a manager login is on the floor.
+if _bulk_enabled and st.session_state.get("user_role") in ["manager", "admin"]:
+    with st.expander("🛢️ Log a bulk pour (drum, tote, pail)", expanded=False):
+        _live = df_reactors[df_reactors["current_resin"].notna()] if not df_reactors.empty else df_reactors
+        _live = _live[_live["current_resin"] != "None"] if not _live.empty else _live
+
+        if _live.empty:
+            st.info("No reactor has a resin assigned yet. Set one above and this will "
+                    "know which tank the pour came out of.")
+        else:
+            _labels = {}
+            for _, _r in _live.iterrows():
+                _tag = str(_r.get("asset_tag") or "").strip()
+                _labels[f"{_tag + ' — ' if _tag else ''}{_r['reactor_name']} · {_r['current_resin']}"] = _r
+
+            _pick = st.selectbox("Which vessel did it come out of?", list(_labels.keys()),
+                                 key="bp_vessel")
+            _r = _labels[_pick]
+            _cap = float(_r["max_capacity_l"])
+            _resin = str(_r["current_resin"])
+            _pump = _r.get("assigned_pump") if _r.get("assigned_pump") not in (None, "None") else ""
+            _drawn, _lot = reactor_draw_litres(_resin, _pump)
+            _left = max(0.0, _cap - _drawn)
+            _dens = resin_density(_resin, density_by_resin)
+
+            st.caption(f"Record says **{_left:,.0f} L** left of {_cap:,.0f} L"
+                       + (f" · lot {esc(_lot)}" if _lot else "")
+                       + f" · {_dens:.3f} kg per litre")
+
+            bp1, bp2, bp3 = st.columns([1, 1.4, 1])
+            with bp1:
+                _count = st.number_input("Containers", min_value=1, max_value=99, value=1,
+                                         step=1, key="bp_count")
+            with bp2:
+                _each = st.number_input("Amount in each", min_value=0.0, value=0.0,
+                                        step=1.0, format="%.2f", key="bp_each")
+            with bp3:
+                _unit = st.radio("Unit", UNITS, horizontal=True, key="bp_unit")
+
+            _what = st.text_input("Poured into", placeholder="55 gal drum, blue tote, pail",
+                                  max_chars=60, key="bp_what")
+            _litres = pour_litres(_count, _each, _unit, _dens)
+            _verdict = check_pour(_litres, capacity_l=_cap, remaining_l=_left)
+
+            # The conversion is stated before the submit, not after. An
+            # operator knows they poured 200 kg; whether that is 180 litres is
+            # the application's claim, and it should have to make it out loud.
+            if _litres > 0:
+                st.markdown(f"**{describe_pour(_count, _each, _unit, _dens, _what)}**")
+            if _verdict["message"]:
+                (st.error if _verdict["blocked"] else st.warning)(_verdict["message"])
+
+            if st.button("💾 Record this pour", type="primary", disabled=_verdict["blocked"],
+                         use_container_width=True, key="bp_save"):
+                add_hourly_log(
+                    operator_name=st.session_state.get("user_name", "Manager"),
+                    pump_station=_pump or str(_r["reactor_name"]),
+                    shift=st.session_state.get("user_shift", "Shift 1"),
+                    cartridge_type="Bulk", resin_type=_resin,
+                    lot_number=_lot or "", bottles=int(_count),
+                    scrap_empty=0, scrap_filled=0,
+                    notes=f"Bulk pour logged from the reactor page.",
+                    litres_poured=_litres, pour_note=_what,
+                )
+                st.success(f"Recorded {_litres:,.1f} L off {_r['reactor_name']}.")
+                st.rerun()
 
 st.markdown("---")
 
