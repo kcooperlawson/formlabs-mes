@@ -171,6 +171,50 @@ check("it says it failed", "failed" in fail, True)
 check("and carries what went wrong", "HTTP 401" in fail, True)
 print("  destination health OK")
 
+# --- what a reply actually means ---------------------------------------------
+# Google answers a great many things with 200 and only one of them is success.
+# Both the connection test and the export itself used to look at the status
+# code alone, which meant a web app that was not published for anyone to reach
+# reported a healthy destination and then reported dispatching several hundred
+# records - into a sign-in form. Nothing was written to any sheet either time.
+check("the script's own reply is the only thing that counts as success",
+      ss.diagnose_response(200, "formlabs-mes-ok")["ok"], True)
+check("and it is recognised inside a longer reply",
+      ss.diagnose_response(200, "formlabs-mes-ok: 412 rows")["ok"], True)
+
+signin = ss.diagnose_response(200, "<html><title>Sign in</title>"
+                                   "<a href='https://accounts.google.com/ServiceLogin'>x</a></html>")
+check("a sign-in page is not a successful send", signin["ok"], False)
+check("it is named for what it is", signin["level"], "signin")
+check("and it names the setting that causes it",
+      "Who has access" in signin["message"], True)
+check("distinguishing the two options that look alike",
+      "not 'Anyone with Google account'" in signin["message"], True)
+
+denied = ss.diagnose_response(200, "Sorry, you need permission to access this")
+check("a permission refusal is not a send", denied["ok"], False)
+check("and it points at Execute as", "Execute as" in denied["message"], True)
+
+# The one this conversation was actually about: a 200, this plant's own sheet,
+# the right script pasted - and no token, because saving the editor does not
+# publish the change to the live address.
+stale = ss.diagnose_response(200, "<html>some older output</html>")
+check("an answer without the token is not a send", stale["ok"], False)
+check("and the first thing it says is the likeliest cause",
+      "does not publish" in stale["message"], True)
+check("with the exact menu path to fix it",
+      "Manage deployments" in stale["message"], True)
+check("and it shows what did come back, rather than guessing",
+      "some older output" in stale["message"], True)
+
+check("a non-200 is reported with its code",
+      "403" in ss.diagnose_response(403, "nope")["message"], True)
+check("and a 500 is not mistaken for a send",
+      ss.diagnose_response(500, "")["ok"], False)
+check("an empty reply is not a send", ss.diagnose_response(200, "")["ok"], False)
+check("nor is a missing one", ss.diagnose_response(200, None)["ok"], False)
+print("  reading a reply OK")
+
 # --- the script handed to the user -------------------------------------------
 # It is quoted in the interface as the thing to paste, so it has to be the
 # thing that works with what the page actually sends.
@@ -182,8 +226,26 @@ check("it creates the tab if the sheet has not got one",
 # sheet. A test that changes the thing it is testing is not a test.
 check("and it answers a plain request, so testing writes nothing",
       "function doGet" in ss.APPS_SCRIPT, True)
-check("with the token the Test button looks for",
-      "formlabs-mes-ok" in ss.APPS_SCRIPT, True)
+check("with the token every reply is signed with",
+      ss.OK_TOKEN in ss.APPS_SCRIPT, True)
+
+# The test posts, because the export posts. A ping has to be answered before
+# the script reaches the spreadsheet at all.
+check("a ping is answered by doPost, not only by doGet",
+      "body.ping" in ss.APPS_SCRIPT, True)
+_ping_at = ss.APPS_SCRIPT.index("body.ping")
+check("and it returns before anything opens the spreadsheet",
+      _ping_at < ss.APPS_SCRIPT.index("SpreadsheetApp"), True)
+
+# The bug in the first version of this script: it cleared the tab and THEN
+# checked whether there was anything to write, so an empty payload wiped a
+# manager's sheet and reported success.
+check("the empty case returns before the tab is cleared",
+      ss.APPS_SCRIPT.index("rows.length") < ss.APPS_SCRIPT.index("sh.clear()"), True)
+check("every reply carries the token, not just the successful ones",
+      ss.APPS_SCRIPT.count(ss.OK_TOKEN) >= 3, True)
+check("and the script says that editing it is not the same as publishing it",
+      "does not update the live address" in ss.APPS_SCRIPT, True)
 check("the setup steps end on the address to paste",
       "/exec" in ss.SETUP_STEPS[-1], True)
 check("and there are four of them", len(ss.SETUP_STEPS), 4)

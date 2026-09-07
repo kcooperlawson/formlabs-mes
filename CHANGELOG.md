@@ -6,6 +6,24 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.21.1 — Monday, September 7, 2026
+**A 200 from Google is not evidence that anything arrived**
+
+Same evening, straight off the first real test of 3.21: the connection check answered "something answered, but not the MES script" against a sheet with the correct script on it. Chasing that turned up three faults, and the middle one is the serious one.
+
+**The test was knocking on the wrong door.** It sent a GET, and the export sends a POST. Those reach different functions in the Apps Script, so a destination could pass the test and fail the export, or — as here — fail the test while being perfectly able to take an export. It posts now, because that is what the thing being tested actually does.
+
+**A status code was being read as proof of delivery.** This is the one worth reading twice. A web app whose access is not published for anyone to reach does not refuse an unauthenticated request — Google answers it with a **sign-in page and status 200**. Both the test and the export looked only at the status code, so the export would have reported "✅ Dispatched 412 records" after posting them into a login form, and the destination's health line would have said it last sent successfully. Nothing would have been in the sheet, and nothing on any screen would have said so. **Every reply from the script is signed now**, and only that signature counts as delivered.
+
+**And when it does fail, it says what to actually do.** A reply is read rather than merely counted: a sign-in page names the access setting and the two options that look alike; a permission refusal names *Execute as*; anything else leads with the likeliest cause by a distance — **saving the Apps Script editor does not publish the change to the live address**, which needs Deploy → Manage deployments → pencil → Version: New version. The reply that did come back is quoted underneath rather than guessed at.
+
+**A bug in the script I shipped yesterday.** It cleared the target tab *before* checking whether there was anything to write, so an empty payload would have wiped a manager's sheet and returned success. The empty case now returns before anything opens the spreadsheet, and so does the connection ping — a test that changes the thing it is testing is not a test. **If you already pasted the script, paste this version over it and publish a new version.**
+
+- 21 more assertions in `tests/test_sheet_sync.py`, including that the ping and the empty case both return before `SpreadsheetApp` is reached, and that a sign-in page is never read as a successful send.
+- Suite: 1,250 assertions across sixteen files, 18 screens rendered, 58 browser checks. 1,326 total.
+
+---
+
 ## 3.21 — Monday, September 7, 2026
 **Everyone gets their own spreadsheet**
 

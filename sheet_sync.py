@@ -190,21 +190,31 @@ def _utcnow():
 # that changes the thing it is testing is not a test.
 APPS_SCRIPT = '''/**
  * Formlabs MES -> this spreadsheet.
- * Paste into Extensions > Apps Script, then Deploy > New deployment >
+ * Paste into Extensions > Apps Script and save. Then Deploy > New deployment >
  * Web app, Execute as "Me", Access "Anyone". Copy the /exec URL it gives you.
+ *
+ * If you EDIT this script later you must also publish the change:
+ * Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+ * Saving the editor alone does not update the live address.
  */
 function doPost(e) {
   var body = JSON.parse(e.postData.contents);
-  var tab  = body.sheet_name || 'MES Export';
-  var rows = body.data || [];
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(tab) || ss.insertSheet(tab);
-  sh.clear();
-
-  if (!rows.length) {
-    return ContentService.createTextOutput('ok: 0 rows');
+  // The MES checking the address. Answered before anything touches the
+  // spreadsheet, so a connection test never changes what it is testing.
+  if (body.ping) {
+    return ContentService.createTextOutput('formlabs-mes-ok');
   }
+
+  var rows = body.data || [];
+  if (!rows.length) {
+    return ContentService.createTextOutput('formlabs-mes-ok: 0 rows');
+  }
+
+  var tab = body.sheet_name || 'MES Export';
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var sh  = ss.getSheetByName(tab) || ss.insertSheet(tab);
+  sh.clear();
 
   var headers = Object.keys(rows[0]);
   var out = [headers];
@@ -218,7 +228,7 @@ function doPost(e) {
   sh.setFrozenRows(1);
   sh.autoResizeColumns(1, headers.length);
 
-  return ContentService.createTextOutput('ok: ' + rows.length + ' rows');
+  return ContentService.createTextOutput('formlabs-mes-ok: ' + rows.length + ' rows');
 }
 
 /** Lets the MES check the address without writing anything to the sheet. */
@@ -226,6 +236,72 @@ function doGet() {
   return ContentService.createTextOutput('formlabs-mes-ok');
 }
 '''
+
+# What the script answers with. Every reply carries it, so a response that does
+# not is a response from something other than this script - which is the whole
+# point: a 200 from Google is not evidence that the export worked.
+OK_TOKEN = "formlabs-mes-ok"
+
+
+def diagnose_response(status, text, url="") -> dict:
+    """What a reply from a destination actually means.
+
+    Google answers a great many things with 200, and only one of them is
+    success. A web app whose access is not set to "Anyone" answers an
+    unauthenticated request with a sign-in PAGE and status 200 - so a check
+    that only looks at the status code reports a healthy destination, and an
+    export that only looks at the status code reports that it dispatched
+    records into a sign-in form. Both were true here until this existed.
+
+    Returns {ok, level, message}. level is a short slug for the tests.
+    """
+    body = str(text or "")
+    low = body.lower()
+
+    if OK_TOKEN in body:
+        return {"ok": True, "level": "ok", "message": ""}
+
+    if int(status or 0) != 200:
+        return {"ok": False, "level": "http",
+                "message": (f"The address answered {status}. If it is 401, 403 or a "
+                            "redirect to a sign-in page, the deployment's access is not "
+                            "set to Anyone. Deploy > Manage deployments > pencil icon, "
+                            "set Who has access to Anyone, and Deploy again.")}
+
+    # A sign-in page. This is the common one and it looks like success.
+    if any(k in low for k in ("accounts.google.com", "servicelogin", "signin/v2",
+                              "sign in to continue", "choose an account")):
+        return {"ok": False, "level": "signin",
+                "message": ("Google answered with a sign-in page, which means this web "
+                            "app is not published for anyone to reach. Deploy > Manage "
+                            "deployments > pencil icon, set **Who has access** to "
+                            "**Anyone** (not 'Anyone with Google account'), and Deploy.")}
+
+    if any(k in low for k in ("access denied", "you need permission",
+                              "request access", "permission denied")):
+        return {"ok": False, "level": "denied",
+                "message": ("Google refused the request. Set **Execute as: Me** and "
+                            "**Who has access: Anyone** on the deployment, redeploy, and "
+                            "approve the permissions prompt when it appears.")}
+
+    if "script function not found" in low or "requested entity was not found" in low:
+        return {"ok": False, "level": "missing",
+                "message": ("Google could not find the function to run. Paste the script "
+                            "below into the editor, save, then Deploy > Manage "
+                            "deployments > pencil icon > Version: **New version**.")}
+
+    # Answered, in this script's own voice or not, but without the token. Far
+    # and away the most likely cause is a deployment still serving the code
+    # from before the script was pasted - saving the editor does not publish.
+    snippet = " ".join(body.split())[:120]
+    return {"ok": False, "level": "stale",
+            "message": ("Something answered, but not with this script's reply. Nearly "
+                        "always this means the deployment is still serving the older "
+                        "code: **saving the editor does not publish it.** Go to Deploy > "
+                        "Manage deployments, click the pencil, set Version to "
+                        "**New version**, and Deploy. Then test again."
+                        + (f"\n\nWhat came back: `{snippet}`" if snippet else ""))}
+
 
 SETUP_STEPS = (
     "Open your Google Sheet and choose **Extensions → Apps Script**.",

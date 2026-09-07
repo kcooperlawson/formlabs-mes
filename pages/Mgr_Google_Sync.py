@@ -70,20 +70,24 @@ else:
         # indistinguishable from a healthy one until somebody needs the
         # numbers. This asks it, without writing anything to the sheet.
         if st.button("🔌 Test", use_container_width=True, key="gs_test"):
+            # A POST, because a POST is what the export does. Testing with a
+            # GET checks a different door: a script whose doGet is stale, or
+            # missing entirely, can still take an export perfectly well, and
+            # the reverse is just as possible. The ping flag is answered
+            # before the script touches the spreadsheet, so this writes
+            # nothing - a test that changes the thing it is testing is not a
+            # test.
             try:
                 import requests
-                r = requests.get(target["webhook_url"], timeout=20)
-                if r.status_code == 200 and "formlabs-mes-ok" in r.text:
-                    st.success("Answered. This sheet is reachable.")
-                elif r.status_code == 200:
-                    st.warning("Something answered, but not the MES script. "
-                               "Check the script is the one below and redeploy.")
+                r = requests.post(target["webhook_url"], json={"ping": True}, timeout=30)
+                verdict = sheet_sync.diagnose_response(r.status_code, r.text,
+                                                       target["webhook_url"])
+                if verdict["ok"]:
+                    st.success("Answered. This sheet is reachable and the script is live.")
                 else:
-                    st.error(f"No good answer ({r.status_code}). "
-                             "The deployment may have been revoked — redeploy and paste "
-                             "the new /exec address.")
+                    st.error(verdict["message"])
             except Exception as exc:
-                st.error(f"Could not reach it: {str(exc)[:160]}")
+                st.error(f"Could not reach it: {str(exc)[:200]}")
 
 with st.expander("➕ Link a spreadsheet of your own", expanded=not _mine):
     # Everybody pastes the spreadsheet link first, because that is the link
@@ -248,14 +252,22 @@ if st.button("🚀 Execute Google Sheets Transmission", type="primary",
                 payload = final_df.to_dict(orient="records")
                 target_tab = "KPI Summary" if "Aggregated" in export_mode else "Raw Audit Logs"
                 wrapped_payload = {"sheet_name": target_tab, "data": payload}
-                response = requests.post(target["webhook_url"], json=wrapped_payload, timeout=60)
-                if response.status_code == 200:
+                response = requests.post(target["webhook_url"], json=wrapped_payload, timeout=120)
+                # The status code alone is not evidence. A web app that is not
+                # published for anyone to reach answers with a sign-in PAGE and
+                # status 200, so a check on the code alone reports that it
+                # dispatched several hundred records into a login form. The
+                # script signs every reply; nothing else counts as delivered.
+                verdict = sheet_sync.diagnose_response(response.status_code, response.text,
+                                                       target["webhook_url"])
+                if verdict["ok"]:
                     record_sheet_sync(target["id"], "ok", len(final_df))
                     st.success(f"✅ Dispatched {len(final_df)} records to tab '{target_tab}' "
                                f"in {esc(target['name'])}.")
                 else:
-                    record_sheet_sync(target["id"], f"HTTP {response.status_code}", 0)
-                    st.error(f"❌ Transmission Failed ({response.status_code}): {response.text[:200]}")
+                    record_sheet_sync(target["id"], f"{verdict['level']} (HTTP {response.status_code})", 0)
+                    st.error("❌ Nothing was written to the sheet.")
+                    st.markdown(verdict["message"])
             except Exception as e:
                 record_sheet_sync(target["id"], str(e)[:180], 0)
                 st.error(f"❌ Transmission Error: {str(e)[:200]}")
