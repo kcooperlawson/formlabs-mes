@@ -428,24 +428,58 @@ def draw_flashes():
 
 
 def do_logout(cookie_manager):
+    """Sign out, in an order that survives being interrupted half way through.
+
+    The order is the whole fix. Writing a cookie renders a Streamlit
+    *component*: the browser mounts an iframe, runs its JavaScript and sends a
+    value back, and that returning value reruns the script. So the cookie call
+    does not return to the next line - it ends the run. Everything that used to
+    sit after it here never executed, and what sat after it was
+    `st.session_state.clear()`.
+
+    The visible symptom was that "Log Out & Clear Device" appeared to do
+    nothing. It was doing most of its job: the server-side session really was
+    revoked and the cookie really was removed. But `authenticated` was still
+    True in session state, so the rerun drew the signed-in screen again, and
+    only a manual refresh - which starts a fresh session with no state -
+    reached the sign-in page. An operator handing a phone to the next shift had
+    no way to know the account had actually been signed out.
+
+    So the state is torn down FIRST and the cookie touched LAST. If the cookie
+    component ends the run, it ends a run that has already forgotten who was
+    signed in, and the rerun lands on the sign-in screen the way it should.
+    Home reads `explicitly_logged_out` and clears the cookie again on that run
+    regardless, so nothing depends on this function reaching its final line.
+    """
     from crud import delete_session  # local import avoids a circular import with crud.py
 
     saved_theme = st.session_state.get("preferred_theme", "Default Dark")
+
+    # Read the token before the state goes, and revoke it server-side: this is
+    # the part that must happen whatever else does, because it is what stops
+    # the token working from another device.
+    old_token = None
     try:
         old_token = cookie_manager.get(cookie="formlabs_mes_token")
         if old_token:
             delete_session(old_token)
-        set_cookie(cookie_manager, "formlabs_mes_token", "", expires_at=datetime.now() - timedelta(days=1))
-        cookie_manager.delete("formlabs_mes_token")
     except Exception:
-        # Session state is cleared below regardless, so a cookie-manager
-        # hiccup here doesn't block the user from logging out — but it's
-        # still worth a record in case tokens are failing to revoke server-side.
-        logger.exception("do_logout() cookie cleanup failed (user was logged out locally regardless)")
+        logger.exception("do_logout() could not revoke the session token server-side")
 
+    # Now forget who was here. Nothing below this line is allowed to be
+    # load-bearing, because the cookie call may end the run.
     st.session_state.clear()
     st.session_state["preferred_theme"] = saved_theme
     st.session_state["explicitly_logged_out"] = True
+
+    try:
+        set_cookie(cookie_manager, "formlabs_mes_token", "",
+                   expires_at=datetime.now() - timedelta(days=1))
+        cookie_manager.delete("formlabs_mes_token")
+    except Exception:
+        # The session is revoked and the state is gone either way; this only
+        # decides whether the browser keeps a token that no longer works.
+        logger.exception("do_logout() cookie cleanup failed (signed out regardless)")
 
 
 def check_authentication(cookie_manager):

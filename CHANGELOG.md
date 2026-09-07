@@ -6,6 +6,23 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.24.1 — Monday, September 7, 2026
+**Log Out & Clear Device looked like it did nothing**
+
+It was doing most of its job. The session really was revoked server-side and the device cookie really was removed — I watched both happen in a browser. **But the signed-in screen stayed on display until somebody pressed refresh**, which meant an operator handing a phone to the next shift had no way to know the account had been signed out, and every reason to believe it had not. On a shared handset that is the wrong way round.
+
+**The cause was the order of two lines.** Writing a cookie renders a Streamlit *component*: the browser mounts an iframe, runs its JavaScript, and sends a value back — and that returning value reruns the script. So the cookie call never returns to the next line; **it ends the run.** What sat after it in `do_logout` was `st.session_state.clear()`, which therefore never executed. `authenticated` stayed `True`, the rerun drew the signed-in screen again, and only a manual refresh — a fresh session with no state — reached the sign-in page.
+
+Instrumented and confirmed rather than guessed: the trace shows `do_logout` entering, and the very next line in the log is the script starting again from the top with `authenticated = True`. It never reached its own second half.
+
+- **The state is torn down first and the cookie touched last.** If the component ends the run, it now ends a run that has already forgotten who was signed in. Nothing after that line is load-bearing — Home clears the cookie again on the next run regardless — and the token is still revoked server-side before anything else happens, because that is the part that must survive whatever else does.
+- **Every logout button had `st.rerun()` after `st.switch_page()`**, which never ran: `switch_page` raises to navigate. Nine call sites, all dead code, all removed. On Home the switch target was Home itself, so that page had nothing left to repaint it at all.
+
+- **A regression test in `tests/smoke_persistence.py`**, from both starting points, since Home reruns in place and every other page switches to Home — two different paths that both failed. Put the old code back and it fails four checks; the fix makes it pass. It also asserts the half that always worked — the token really is cleared — so that cannot quietly break while the visible half is being fixed. None of this is visible from Python: `do_logout` reads as if it runs top to bottom, and in a script test it does. It needs a browser.
+- Suite: 1,296 assertions across seventeen files, 18 screens rendered, 8 round trips, 66 browser checks. 1,388 total.
+
+---
+
 ## 3.24 — Monday, September 7, 2026
 **Stop the messaging tab promising something nobody can deliver**
 

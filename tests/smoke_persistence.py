@@ -160,6 +160,68 @@ async def main():
             await pg.screenshot(
                 path="/root/mes/tests/smoke_shots/checklist_qr_button.png", full_page=True)
             await ctx.close()
+
+            # --- 4. logging out actually shows the sign-in screen ------------
+            # It did not. "Log Out & Clear Device" revoked the session
+            # server-side and removed the cookie, then left the signed-in
+            # screen on display until somebody pressed refresh - so an
+            # operator handing a phone to the next shift had no way to know
+            # the account had been signed out, and every reason to think it
+            # had not.
+            #
+            # The cause was ordering. Writing a cookie renders a component;
+            # the browser mounts it, runs its JavaScript and sends a value
+            # back, and that returning value reruns the script - so the cookie
+            # call never returns to the next line. What sat after it was
+            # st.session_state.clear(), which therefore never ran, leaving
+            # `authenticated` True for the rerun to draw again.
+            #
+            # None of that is visible from Python: do_logout looks like it
+            # runs top to bottom, and in a script test it does. It needs a
+            # browser, which is why it is here.
+            # Desktop only, and from two starting points. Not phone: the
+            # cause and the fix are both server-side ordering inside
+            # do_logout, identical whatever the screen, and reaching the
+            # button on a handset means driving Streamlit's collapsed-sidebar
+            # chrome - which is a test of Streamlit, not of this. The phone
+            # sidebar has its own coverage in the checks above.
+            #
+            # Two starting points, because they took different paths and only
+            # one of them was ever going to work: Home reruns in place, every
+            # other page switches to Home. Both used to leave the signed-in
+            # screen up.
+            for label, profile, start in (("from Home", DESKTOP, None),
+                                          ("from another page", DESKTOP, "Operator")):
+                ctx = await b.new_context(**profile)
+                pg = await ctx.new_page()
+                await sign_in(pg, ADMIN, remember=True)
+                check(f"signed in first ({label})",
+                      "LOG OUT & CLEAR DEVICE" in (await pg.inner_text("body")).upper())
+
+                if start:
+                    await pg.get_by_role("link", name=start).first.click()
+                    await pg.wait_for_timeout(14000)
+
+                # On a phone the sidebar is an overlay and starts collapsed -
+                # which is deliberate, and means the logout button has to be
+                # opened to before it can be pressed. Exactly what an operator
+                # does, and the reason this is checked at handset size at all.
+                await pg.get_by_text("LOG OUT & CLEAR DEVICE", exact=False).first.click()
+                await pg.wait_for_timeout(9000)          # no refresh, on purpose
+
+                body = await pg.inner_text("body")
+                check(f"the sign-in screen appears without a refresh ({label})",
+                      "INITIALIZE SESSION" in body)
+                check(f"and the signed-in screen is gone ({label})",
+                      "LOG OUT & CLEAR DEVICE" not in body.upper())
+                # The half that always worked, asserted so it cannot regress
+                # while the visible half is being fixed.
+                check(f"the device token is cleared ({label})",
+                      not [c for c in await ctx.cookies()
+                           if c["name"] == "formlabs_mes_token" and c["value"]])
+                await ctx.close()
+            print("  logout OK (sign-in screen, no refresh, token cleared)")
+
             await b.close()
     finally:
         db.update_plant_settings({

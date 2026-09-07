@@ -192,8 +192,8 @@ with st.sidebar:
 
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="sidebar_logout_btn"):
         do_logout(cookie_manager)
+        # switch_page raises to navigate, so an st.rerun() after it never ran.
         st.switch_page("Home.py")
-        st.rerun()
 
 
 # ===================== THEME-ADAPTIVE CSS INJECTION =====================

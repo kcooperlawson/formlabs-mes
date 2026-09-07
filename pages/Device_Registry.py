@@ -72,7 +72,10 @@ with st.sidebar:
     st.markdown("---")
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="dr_logout_btn"):
         do_logout(cookie_manager)
-        st.rerun()
+        # Every other page sends you back to the sign-in screen; this one used
+        # to rerun in place, which on a page that requires a login is a guard
+        # bouncing you somewhere anyway - just less predictably.
+        st.switch_page("Home.py")
 
 
 def _time_ago(dt) -> str:
