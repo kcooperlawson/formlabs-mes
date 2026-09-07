@@ -177,10 +177,64 @@ print("  destination health OK")
 # code alone, which meant a web app that was not published for anyone to reach
 # reported a healthy destination and then reported dispatching several hundred
 # records - into a sign-in form. Nothing was written to any sheet either time.
-check("the script's own reply is the only thing that counts as success",
-      ss.diagnose_response(200, "formlabs-mes-ok")["ok"], True)
-check("and it is recognised inside a longer reply",
-      ss.diagnose_response(200, "formlabs-mes-ok: 412 rows")["ok"], True)
+import json as _json  # noqa: E402
+
+
+def said(**kw):
+    """A reply in the script's own voice."""
+    body = {"token": ss.OK_TOKEN, "version": ss.SCRIPT_VERSION, "ok": True, "rows": 0}
+    body.update(kw)
+    return _json.dumps(body)
+
+
+# The fault that produced "it says it sent the payload but nothing is in my
+# sheet": the page reported how many rows it SENT, which is a different claim
+# from how many arrived. A payload that reached the script empty came back
+# signed and cheerful, and the page announced several hundred records into a
+# sheet that never changed. The script reports what it actually wrote now,
+# read back off the tab, and that is what is checked.
+good = ss.diagnose_response(200, said(rows=412, tab="KPI Summary", sheet="Weekly",
+                                      url="https://docs.google.com/x"), expect_rows=412)
+check("a reply that matches what was sent is a delivery", good["ok"], True)
+check("and it carries the count the sheet actually holds", good["rows"], 412)
+check("the tab it landed in", good["tab"], "KPI Summary")
+check("the spreadsheet's own name, from the spreadsheet", good["sheet"], "Weekly")
+check("and its address, so rows in the wrong sheet are visible",
+      good["url"], "https://docs.google.com/x")
+
+# The exact shape of the reported bug.
+empty = ss.diagnose_response(200, said(ok=False, rows=0,
+                                       error="The payload arrived with no rows in it."),
+                             expect_rows=412)
+check("a script that wrote nothing is not a delivery", empty["ok"], False)
+check("and it repeats the script's own reason rather than inventing one",
+      "no rows in it" in empty["message"], True)
+
+short = ss.diagnose_response(200, said(rows=3), expect_rows=412)
+check("fewer rows than were sent is a failure, not a footnote", short["ok"], False)
+check("and both numbers are named", "3 rows" in short["message"] and "412" in short["message"], True)
+check("a run nobody should trust is said to be one",
+      "should be trusted" in short["message"], True)
+check("sending nothing and writing nothing agree with each other",
+      ss.diagnose_response(200, said(rows=0), expect_rows=0)["ok"], True)
+
+# Nothing to compare against - the connection test - still passes.
+check("a ping needs no row count to succeed",
+      ss.diagnose_response(200, said(ping=True, sheet="Weekly"))["ok"], True)
+
+# The deployment nobody republished. This is the failure mode of the whole
+# feature: saving the editor publishes nothing and Google never says so.
+old_v = ss.diagnose_response(200, said(version=ss.SCRIPT_VERSION - 1, rows=5), expect_rows=5)
+check("an out-of-date deployment still works", old_v["ok"], True)
+check("but says which version it is running", str(ss.SCRIPT_VERSION - 1) in old_v["message"], True)
+check("and that publishing a new version is the fix",
+      "new version" in old_v["message"], True)
+
+# Script version 2 signed its replies but could not report a count.
+legacy = ss.diagnose_response(200, "formlabs-mes-ok: 412 rows", expect_rows=412)
+check("the older plain-text script is still recognised as reachable", legacy["ok"], True)
+check("and named as the reason no count is shown", legacy["level"], "legacy")
+check("with no count invented for it", legacy["rows"], None)
 
 signin = ss.diagnose_response(200, "<html><title>Sign in</title>"
                                    "<a href='https://accounts.google.com/ServiceLogin'>x</a></html>")
@@ -299,17 +353,37 @@ check("with the token every reply is signed with",
 # the script reaches the spreadsheet at all.
 check("a ping is answered by doPost, not only by doGet",
       "body.ping" in ss.APPS_SCRIPT, True)
+# The ping reads the spreadsheet's NAME, so that the test can say which sheet
+# answered - but it must return before anything is written to it.
 _ping_at = ss.APPS_SCRIPT.index("body.ping")
-check("and it returns before anything opens the spreadsheet",
-      _ping_at < ss.APPS_SCRIPT.index("SpreadsheetApp"), True)
+check("and it returns before a single cell is touched",
+      _ping_at < ss.APPS_SCRIPT.index("sh.clear()"), True)
+check("and before a tab is created",
+      _ping_at < ss.APPS_SCRIPT.index("insertSheet"), True)
 
 # The bug in the first version of this script: it cleared the tab and THEN
 # checked whether there was anything to write, so an empty payload wiped a
 # manager's sheet and reported success.
 check("the empty case returns before the tab is cleared",
       ss.APPS_SCRIPT.index("rows.length") < ss.APPS_SCRIPT.index("sh.clear()"), True)
-check("every reply carries the token, not just the successful ones",
-      ss.APPS_SCRIPT.count(ss.OK_TOKEN) >= 3, True)
+check("every reply is signed in one place, so none can be left unsigned",
+      ss.APPS_SCRIPT.count(ss.OK_TOKEN), 1)
+check("and that place stamps the version too",
+      "MES_SCRIPT_VERSION" in ss.APPS_SCRIPT, True)
+check("the version in the script matches the one the app expects",
+      f"var MES_SCRIPT_VERSION = {ss.SCRIPT_VERSION};" in ss.APPS_SCRIPT, True)
+# The count is read back off the sheet rather than taken from the payload,
+# which is the only version of it that could have caught the reported bug.
+check("the count is read back off the tab, not counted from the payload",
+      "getLastRow()" in ss.APPS_SCRIPT, True)
+check("after the write is flushed, so the count is not of a pending write",
+      ss.APPS_SCRIPT.index("SpreadsheetApp.flush()") < ss.APPS_SCRIPT.index("getLastRow()"), True)
+# A standalone script project has no spreadsheet, and the failure is otherwise
+# an unreadable null-reference.
+check("a script attached to nothing says so in words",
+      "not attached to a spreadsheet" in ss.APPS_SCRIPT, True)
+check("and the setup note says to open it from inside the sheet",
+      "from inside it" in ss.APPS_SCRIPT, True)
 check("and the script says that editing it is not the same as publishing it",
       "does not update the live address" in ss.APPS_SCRIPT, True)
 check("the setup steps end on the address to paste",

@@ -6,6 +6,27 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.23 — Monday, September 7, 2026
+**"It says it sent the payload and nothing is in my sheet"**
+
+Because the page was reporting **how many rows it sent, not how many arrived**. Those are different claims and I had been printing the wrong one. A payload that reaches the script and produces nothing still comes back signed and cheerful, so the screen announced several hundred records into a spreadsheet that never changed — and the destination's health line agreed with it. **A success message that cannot be wrong is not a success message.**
+
+**The script reports what it actually wrote, and the page repeats that.** Not the count from the payload — the count read back off the tab after the write is flushed. Every reply is now JSON carrying the row count, the tab, the spreadsheet's own name and its URL, and:
+- If the script wrote a different number from the one sent, that is a **failure** with both numbers named, not a footnote.
+- If it wrote nothing, the page says so and repeats the script's own reason rather than inventing one.
+- Success now names the spreadsheet the script answered from and links to it. **If rows are landing in the wrong sheet, that link is what shows it** — which no amount of careful wording could.
+
+**The script says which version it is.** This whole feature's characteristic failure is a deployment still serving last week's code, because saving the Apps Script editor publishes nothing and Google never mentions it. The script stamps its version on every reply and the application knows what it expects, so an out-of-date deployment now says so by number instead of being diagnosed by guesswork. It still works — it just tells you.
+
+**And a script attached to no spreadsheet says so in words.** Creating a standalone Apps Script project instead of opening one from inside the sheet is an easy mistake, and the failure was otherwise an unreadable null reference.
+
+- **New `tests/test_sync_roundtrip.py`**, and a stand-in for the Apps Script under `tests/fixtures/`. Google cannot be reached from a test run, and none of the cases that matter can be produced on demand against the real thing anyway — a payload arriving empty, a stale deployment, an unbound script, a sign-in page. All eight are exercised end to end over real HTTP, and every one of them had previously looked like success from the application's side.
+- Suite: 1,296 assertions across seventeen files, 18 screens rendered, 8 round trips, 58 browser checks. 1,380 total.
+
+**You will need to paste the script again and publish a new version** — this one is script version 3, and your sheet is running an older one. The page will tell you so by number from now on.
+
+---
+
 ## 3.22.1 — Monday, September 7, 2026
 **A library nobody installed took a whole page down**
 

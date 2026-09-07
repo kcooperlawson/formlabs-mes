@@ -188,58 +188,101 @@ def _utcnow():
 # doGet is in it for the sake of the Test button: testing by POSTing real rows
 # would mean the only way to check a destination is to write to it, and a test
 # that changes the thing it is testing is not a test.
-APPS_SCRIPT = '''/**
- * Formlabs MES -> this spreadsheet.
- * Paste into Extensions > Apps Script and save. Then Deploy > New deployment >
- * Web app, Execute as "Me", Access "Anyone". Copy the /exec URL it gives you.
- *
- * If you EDIT this script later you must also publish the change:
- * Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
- * Saving the editor alone does not update the live address.
- */
-function doPost(e) {
-  var body = JSON.parse(e.postData.contents);
+# The script's own version. It reports this back on every reply, so the
+# application can tell a deployment running last week's code from one running
+# this week's - which is the single most common way this goes wrong, because
+# saving the editor does not publish anything and nothing on Google's side
+# says so. Bump it whenever APPS_SCRIPT changes in a way that matters.
+SCRIPT_VERSION = 3
 
-  // The MES checking the address. Answered before anything touches the
-  // spreadsheet, so a connection test never changes what it is testing.
+APPS_SCRIPT = '''/**
+ * Formlabs MES -> this spreadsheet.   (script version 3)
+ *
+ * SETUP: open the sheet and use Extensions > Apps Script from inside it.
+ * A standalone project has no spreadsheet to write to. Paste this, save,
+ * then Deploy > New deployment > Web app, Execute as "Me", Access "Anyone".
+ *
+ * IF YOU EDIT IT LATER you must publish the change as well:
+ * Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+ * Saving the editor does not update the live address.
+ */
+var MES_SCRIPT_VERSION = 3;
+
+function reply(obj) {
+  obj.token   = 'formlabs-mes-ok';
+  obj.version = MES_SCRIPT_VERSION;
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var body = {};
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return reply({ ok: false, rows: 0, error: 'Could not read the payload: ' + err });
+  }
+
+  // Bound to a spreadsheet? A standalone script project has none, and the
+  // failure is otherwise a null-reference nobody can read.
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    return reply({ ok: false, rows: 0,
+      error: 'This script is not attached to a spreadsheet. Open your sheet and ' +
+             'use Extensions > Apps Script there, rather than making a new project.' });
+  }
+
+  // The application checking the address. Answered before anything is
+  // written, so a connection test never changes what it is testing.
   if (body.ping) {
-    return ContentService.createTextOutput('formlabs-mes-ok');
+    return reply({ ok: true, rows: 0, ping: true,
+                   sheet: ss.getName(), url: ss.getUrl() });
   }
 
   var rows = body.data || [];
+  var tab  = body.sheet_name || 'MES Export';
+
   if (!rows.length) {
-    return ContentService.createTextOutput('formlabs-mes-ok: 0 rows');
+    return reply({ ok: false, rows: 0, tab: tab, sheet: ss.getName(), url: ss.getUrl(),
+                   error: 'The payload arrived with no rows in it.' });
   }
 
-  var tab = body.sheet_name || 'MES Export';
-  var ss  = SpreadsheetApp.getActiveSpreadsheet();
-  var sh  = ss.getSheetByName(tab) || ss.insertSheet(tab);
-  sh.clear();
+  try {
+    var sh = ss.getSheetByName(tab) || ss.insertSheet(tab);
+    sh.clear();
 
-  var headers = Object.keys(rows[0]);
-  var out = [headers];
-  rows.forEach(function (r) {
-    out.push(headers.map(function (h) { return r[h]; }));
-  });
+    var headers = Object.keys(rows[0]);
+    var out = [headers];
+    rows.forEach(function (r) {
+      out.push(headers.map(function (h) { return r[h]; }));
+    });
 
-  sh.getRange(1, 1, out.length, headers.length).setValues(out);
-  sh.getRange(1, 1, 1, headers.length)
-    .setFontWeight('bold').setBackground('#0B1220').setFontColor('#FFFFFF');
-  sh.setFrozenRows(1);
-  sh.autoResizeColumns(1, headers.length);
+    sh.getRange(1, 1, out.length, headers.length).setValues(out);
+    sh.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold').setBackground('#0B1220').setFontColor('#FFFFFF');
+    sh.setFrozenRows(1);
+    sh.autoResizeColumns(1, headers.length);
+    SpreadsheetApp.flush();
 
-  return ContentService.createTextOutput('formlabs-mes-ok: ' + rows.length + ' rows');
+    // The count is read back off the sheet, not taken from the payload: what
+    // is actually in the tab is the only number worth reporting.
+    return reply({ ok: true, rows: sh.getLastRow() - 1, tab: tab,
+                   sheet: ss.getName(), url: ss.getUrl() });
+  } catch (err) {
+    return reply({ ok: false, rows: 0, tab: tab, sheet: ss.getName(),
+                   error: String(err) });
+  }
 }
 
 /** Lets the MES check the address without writing anything to the sheet. */
 function doGet() {
-  return ContentService.createTextOutput('formlabs-mes-ok');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  return reply({ ok: true, rows: 0, get: true,
+                 sheet: ss ? ss.getName() : null });
 }
 '''
 
-# What the script answers with. Every reply carries it, so a response that does
-# not is a response from something other than this script - which is the whole
-# point: a 200 from Google is not evidence that the export worked.
 OK_TOKEN = "formlabs-mes-ok"
 
 
@@ -312,23 +355,74 @@ def workbook_bytes(df, sheet_name="MES Export") -> bytes:
     return buffer.getvalue()
 
 
-def diagnose_response(status, text, url="") -> dict:
+def diagnose_response(status, text, url="", expect_rows=None) -> dict:
     """What a reply from a destination actually means.
 
     Google answers a great many things with 200, and only one of them is
     success. A web app whose access is not set to "Anyone" answers an
-    unauthenticated request with a sign-in PAGE and status 200 - so a check
-    that only looks at the status code reports a healthy destination, and an
-    export that only looks at the status code reports that it dispatched
-    records into a sign-in form. Both were true here until this existed.
+    unauthenticated request with a sign-in PAGE and status 200, so a check on
+    the status code alone reports a healthy destination and an export reports
+    dispatching records into a sign-in form.
 
-    Returns {ok, level, message}. level is a short slug for the tests.
+    And beyond reachability, the COUNT matters. The page used to report how
+    many rows it sent, which is a different claim from how many arrived: a
+    payload that reached the script empty came back signed and cheerful, and
+    the page announced several hundred records into a sheet that never
+    changed. So the script reports what it actually wrote - read back off the
+    tab rather than counted from the payload - and that is the number reported
+    here. `expect_rows` is what was sent; a mismatch is a failure, not a
+    footnote.
+
+    Returns {ok, level, message, rows, tab, sheet, url, version}.
     """
     body = str(text or "")
     low = body.lower()
+    base = {"rows": None, "tab": None, "sheet": None, "url": None, "version": None}
 
     if OK_TOKEN in body:
-        return {"ok": True, "level": "ok", "message": ""}
+        # A reply in the script's own voice. Read it, rather than being
+        # satisfied that it arrived at all.
+        import json
+        try:
+            said = json.loads(body)
+        except Exception:
+            said = None
+
+        if not isinstance(said, dict):
+            # Script version 2 or earlier: signed, but it only ever said "ok"
+            # and cannot report what it wrote. Reachable, and flagged, because
+            # the count is the whole point.
+            return dict(base, ok=True, level="legacy",
+                        message=("This sheet is running an older version of the script, "
+                                 "which cannot say how many rows it wrote. Paste the "
+                                 "current script and publish a **new version** to get "
+                                 "that back."))
+
+        got = dict(base, rows=said.get("rows"), tab=said.get("tab"),
+                   sheet=said.get("sheet"), url=said.get("url"),
+                   version=said.get("version"))
+
+        if not said.get("ok"):
+            return dict(got, ok=False, level="script",
+                        message=("The sheet's script refused it: "
+                                 f"**{said.get('error') or 'no reason given'}**"))
+
+        if int(said.get("version") or 0) < SCRIPT_VERSION:
+            return dict(got, ok=True, level="outdated",
+                        message=(f"This sheet is running script version "
+                                 f"{said.get('version')}; the current one is "
+                                 f"{SCRIPT_VERSION}. Paste the script below and publish "
+                                 "a **new version** to bring it up to date."))
+
+        # The claim that used to be taken on trust.
+        if expect_rows is not None and said.get("rows") is not None:
+            if int(said["rows"]) != int(expect_rows):
+                return dict(got, ok=False, level="short",
+                            message=(f"The script reports **{said['rows']} rows** in the "
+                                     f"sheet but **{expect_rows}** were sent. Nothing from "
+                                     "this run should be trusted until that is explained."))
+
+        return dict(got, ok=True, level="ok", message="")
 
     code = int(status or 0)
 
@@ -338,8 +432,8 @@ def diagnose_response(status, text, url="") -> dict:
     # whose administrator forbids publishing a web app to "Anyone", and no
     # amount of correct configuration gets past that.
     if code in (401, 403):
-        return {"ok": False, "level": "auth",
-                "message": (f"Google refused the request ({code}). Two things cause this:\n\n"
+        return dict(base, ok=False, level="auth",
+                message=(f"Google refused the request ({code}). Two things cause this:\n\n"
                             "**1. Execute as.** On the deployment it must be **Me**, not "
                             "*User accessing the web app*. Deploy > Manage deployments > "
                             "pencil icon. This is the one worth checking first.\n\n"
@@ -351,49 +445,49 @@ def diagnose_response(status, text, url="") -> dict:
                             "**Use the download buttons below instead** — they produce the "
                             "same rows with no Google account involved. Or own the sheet "
                             "and script from a personal Gmail account, which has no such "
-                            "policy, and share it with whoever needs it.")}
+                            "policy, and share it with whoever needs it."))
 
     if code != 200:
-        return {"ok": False, "level": "http",
-                "message": (f"The address answered {code}. If it is a redirect to a "
+        return dict(base, ok=False, level="http",
+                message=(f"The address answered {code}. If it is a redirect to a "
                             "sign-in page the deployment is not published for anyone to "
                             "reach; otherwise the deployment may have been deleted. "
                             "Deploy > Manage deployments, check it is still there, and "
-                            "redeploy. The download buttons below always work.")}
+                            "redeploy. The download buttons below always work."))
 
     # A sign-in page. This is the common one and it looks like success.
     if any(k in low for k in ("accounts.google.com", "servicelogin", "signin/v2",
                               "sign in to continue", "choose an account")):
-        return {"ok": False, "level": "signin",
-                "message": ("Google answered with a sign-in page, which means this web "
+        return dict(base, ok=False, level="signin",
+                message=("Google answered with a sign-in page, which means this web "
                             "app is not published for anyone to reach. Deploy > Manage "
                             "deployments > pencil icon, set **Who has access** to "
-                            "**Anyone** (not 'Anyone with Google account'), and Deploy.")}
+                            "**Anyone** (not 'Anyone with Google account'), and Deploy."))
 
     if any(k in low for k in ("access denied", "you need permission",
                               "request access", "permission denied")):
-        return {"ok": False, "level": "denied",
-                "message": ("Google refused the request. Set **Execute as: Me** and "
+        return dict(base, ok=False, level="denied",
+                message=("Google refused the request. Set **Execute as: Me** and "
                             "**Who has access: Anyone** on the deployment, redeploy, and "
-                            "approve the permissions prompt when it appears.")}
+                            "approve the permissions prompt when it appears."))
 
     if "script function not found" in low or "requested entity was not found" in low:
-        return {"ok": False, "level": "missing",
-                "message": ("Google could not find the function to run. Paste the script "
+        return dict(base, ok=False, level="missing",
+                message=("Google could not find the function to run. Paste the script "
                             "below into the editor, save, then Deploy > Manage "
-                            "deployments > pencil icon > Version: **New version**.")}
+                            "deployments > pencil icon > Version: **New version**."))
 
     # Answered, in this script's own voice or not, but without the token. Far
     # and away the most likely cause is a deployment still serving the code
     # from before the script was pasted - saving the editor does not publish.
     snippet = " ".join(body.split())[:120]
-    return {"ok": False, "level": "stale",
-            "message": ("Something answered, but not with this script's reply. Nearly "
+    return dict(base, ok=False, level="stale",
+            message=("Something answered, but not with this script's reply. Nearly "
                         "always this means the deployment is still serving the older "
                         "code: **saving the editor does not publish it.** Go to Deploy > "
                         "Manage deployments, click the pencil, set Version to "
                         "**New version**, and Deploy. Then test again."
-                        + (f"\n\nWhat came back: `{snippet}`" if snippet else ""))}
+                        + (f"\n\nWhat came back: `{snippet}`" if snippet else "")))
 
 
 SETUP_STEPS = (

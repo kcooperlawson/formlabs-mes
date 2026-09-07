@@ -83,7 +83,12 @@ else:
                 verdict = sheet_sync.diagnose_response(r.status_code, r.text,
                                                        target["webhook_url"])
                 if verdict["ok"]:
-                    st.success("Answered. This sheet is reachable and the script is live.")
+                    _named = verdict.get("sheet")
+                    st.success("Answered from “%s”. This sheet is reachable and the "
+                               "script is live." % esc(_named) if _named else
+                               "Answered. This sheet is reachable and the script is live.")
+                    if verdict["message"]:
+                        st.warning(verdict["message"])
                 else:
                     st.error(verdict["message"])
             except Exception as exc:
@@ -311,21 +316,35 @@ if _push:
                 target_tab = "KPI Summary" if "Aggregated" in export_mode else "Raw Audit Logs"
                 wrapped_payload = {"sheet_name": target_tab, "data": payload}
                 response = requests.post(target["webhook_url"], json=wrapped_payload, timeout=120)
-                # The status code alone is not evidence. A web app that is not
-                # published for anyone to reach answers with a sign-in PAGE and
-                # status 200, so a check on the code alone reports that it
-                # dispatched several hundred records into a login form. The
-                # script signs every reply; nothing else counts as delivered.
+                # Neither the status code nor the fact of a reply is evidence.
+                # A web app that is not published for anyone to reach answers
+                # with a sign-in PAGE and status 200; and a payload that
+                # reaches the script empty comes back signed and cheerful. So
+                # the script says what it actually wrote, read back off the
+                # tab, and that count is checked against what was sent before
+                # anything on this screen claims a delivery.
                 verdict = sheet_sync.diagnose_response(response.status_code, response.text,
-                                                       target["webhook_url"])
+                                                       target["webhook_url"],
+                                                       expect_rows=len(final_df))
                 if verdict["ok"]:
-                    record_sheet_sync(target["id"], "ok", len(final_df))
-                    st.success(f"✅ Dispatched {len(final_df)} records to tab '{target_tab}' "
-                               f"in {esc(target['name'])}.")
+                    _wrote = verdict["rows"] if verdict["rows"] is not None else len(final_df)
+                    record_sheet_sync(target["id"], "ok", int(_wrote))
+                    _where = verdict.get("sheet") or target["name"]
+                    st.success(f"✅ {_wrote:,} rows written to tab "
+                               f"'{verdict.get('tab') or target_tab}' in “{esc(_where)}”.")
+                    # The sheet's own address, from the sheet itself. If the
+                    # rows went somewhere other than where they were expected,
+                    # this is the line that shows it.
+                    if verdict.get("url"):
+                        st.markdown(f"[Open “{esc(_where)}” →]({verdict['url']})")
+                    if verdict["message"]:
+                        st.warning(verdict["message"])
                 else:
                     record_sheet_sync(target["id"], f"{verdict['level']} (HTTP {response.status_code})", 0)
                     st.error("❌ Nothing was written to the sheet.")
                     st.markdown(verdict["message"])
+                    if verdict.get("url"):
+                        st.caption(f"The script answered from: {verdict['url']}")
             except Exception as e:
                 record_sheet_sync(target["id"], str(e)[:180], 0)
                 st.error(f"❌ Transmission Error: {str(e)[:200]}")
