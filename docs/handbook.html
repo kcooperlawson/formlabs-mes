@@ -175,7 +175,7 @@ td.k{font-weight:600; color:var(--ink);}
   operator guide covering a shift start to finish &mdash; so nothing here is written for an
   operator to follow.</div>
   <div class="meta">
-    <div>Release<b>Version 3.25.1</b></div>
+    <div>Release<b>Version 3.26</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -482,10 +482,15 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="grid2" style="margin-top:11pt;">
     <div class="card"><span class="tag">Cloud export</span><h4>Google Sheets sync</h4>
       <p>For the people who work in a spreadsheet and are not going to stop. The sheet is a copy, not a
-      second system: it is written from the same rows and never read back.</p></div>
-    <div class="card"><span class="tag">Self-service</span><h4>CSV from any view</h4>
-      <p>Filtered log views and the verification register export directly, so finance, quality or an audit
-      can be answered without a developer.</p></div>
+      second system: it is written from the same rows and never read back. Each manager links their own
+      spreadsheet rather than sharing one the installer set up, and a sheet stays private unless its
+      owner shares it.</p></div>
+    <div class="card"><span class="tag">Self-service</span><h4>Excel or CSV, straight down</h4>
+      <p>The same rows as a file &mdash; no account, nothing to publish, nobody&rsquo;s permission to ask
+      for &mdash; opening straight into Sheets or Excel. This is the route that cannot fail: a company
+      Google account usually sits under a policy forbidding the kind of connection a live sync needs, and
+      no amount of correct setup gets past it. Filtered log views and the verification register export
+      directly too, so finance, quality or an audit can be answered without a developer.</p></div>
   </div>
   <div class="note" style="margin-top:11pt;"><span class="eyebrow">Removed, and worth saying why</span>
     <p>There was a shift handover here: four whole-day figures rendered as a PDF and emailed to a
@@ -612,7 +617,7 @@ td.k{font-weight:600; color:var(--ink);}
     computed from the log, and the last good hour is still the last good hour. So the system watches
     its own intake: after roughly three hours with nothing logged <em>during a running shift</em>,
     the main screen and the floor display both say so plainly. Quiet outside a shift is not treated
-    as a fault, because a warning that shouts all night is one people stop reading.</p></div>
+    as a fault, because a warning that shouts all night is one people stop reading. Nor is a day the plant does not run: the days of the week this plant works are set once in the admin console, and a shift counts by the day it starts, so a Friday night shift is still watched into Saturday morning. An alarm that cries wolf every weekend is worse than no alarm at all &mdash; by Monday nobody reads it, and the one that means something looks exactly like the fifty that did not.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
 </section>
 
@@ -628,6 +633,13 @@ td.k{font-weight:600; color:var(--ink);}
   vessel having been refilled; and each log carries the container format it was poured in, so a
   bulk jug and a cartridge are counted at their own volumes rather than one assumed for all.
   Nothing has to be entered anywhere else for the levels to be right.</p>
+  <p>Not everything leaving a vessel is a counted container. An amount decanted into a drum or a
+  tote is entered as the amount &mdash; in litres or in kilograms &mdash; and converted using the
+  density already implied by the resin&rsquo;s own fill-weight spec, so no new figure has to be
+  looked after. An amount larger than the vessel could have given out is refused at the keyboard,
+  because a typed volume is not self-checking the way a container count is: nobody types 2,500
+  cartridges and believes it, but 1800 litres instead of 180 looks perfectly ordinary and only
+  shows up an hour later as an empty vessel on the wall.</p>
   <p>The consequence worth stating plainly: the level does not depend on work orders. It reads
   identically whether or not the plant is dispatching runs.</p>
   <p>When a gauge disagrees with the calculated figure &mdash; a transfer nobody logged, a partial

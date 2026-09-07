@@ -248,12 +248,22 @@ PAGES.append(page(
     + step(1, "Pump station",
            "Already set from your checklist. Change it only if you have actually moved.")
     + step(2, "Container format",
-           "V2 or V1 cartridge, RPS bulk jug, or Pigment. Pick what you are physically filling.")
+           "V2 or V1 cartridge, RPS bulk jug, or Pigment. Pick what you are physically filling. "
+           "If your plant has it switched on there is also Drum / Tote, for the times you pour a "
+           "measured amount into something rather than filling a count of containers \u2014 see "
+           "below.")
     + step(3, "Resin formulation",
            "The resin you are running. Its colour tag appears underneath so you can check it "
            "against the master sheet at a glance.")
     + '<p style="margin-top:11pt; font-size:10.6pt;">Under the resin you will see its '
       '<b>target fill weight and the acceptable range</b>. Worth a glance against your scale.</p>'
+    + '<p style="margin-top:9pt; font-size:10.6pt;"><b>Pouring into a drum or a tote.</b> Pick '
+      '<em>Drum / Tote</em> as the format and the box asking for a count of containers becomes a box '
+      'asking for the amount \u2014 in litres or in kilograms, whichever you measured. Say how many '
+      'containers you filled with that amount, and what you poured into. The screen tells you what it '
+      'works out to in litres before you submit; check that line, because it is the app\u2019s sum, not '
+      'yours. If the amount is more than the vessel could have given out it will not let you send it \u2014 '
+      'check the number and the unit.</p>'
     + '</div>'
     + shot("figs_op/02_material.png", "Station and material, with the target weight underneath.")
     + '</div>'
@@ -355,7 +365,7 @@ PAGES.append(page(
     + '<div class="row wide">'
     + '<div>'
     + '<h3 style="font-size:12.6pt; margin:0 0 5pt;">When the line stops</h3>'
-    + '<p style="font-size:10.6pt;">Use the <em>Log Station Downtime</em> tab: the reason, how '
+    + '<p style="font-size:10.6pt;">Use the <em>Downtime</em> tab: the reason, how '
       'many minutes, and what was done about it.</p>'
     + '<p style="font-size:10.6pt; margin-top:7pt;">Log it as it happens rather than reconstructing '
       'it later. Downtime nobody records does not disappear &mdash; it turns up as bad yield '
@@ -364,7 +374,7 @@ PAGES.append(page(
     + shot("figs_op/07_downtime.png", "The downtime tab.")
     + '</div>'
     + '<h3 style="font-size:12.6pt; margin:14pt 0 5pt;">Photo audits</h3>'
-    + '<p style="font-size:10.6pt;">The <em>Cleanliness &amp; Photo Audit</em> tab covers start of '
+    + '<p style="font-size:10.6pt;">The <em>Audit</em> tab covers start of '
       'shift, end of shift, moving a line onto a different resin, and spills. There is a tick box '
       'to mark a photo as an active spill or leak, which flags it for attention rather than '
       'filing it as routine.</p>'
