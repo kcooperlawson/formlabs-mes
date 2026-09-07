@@ -6,6 +6,24 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.22.1 — Monday, September 7, 2026
+**A library nobody installed took a whole page down**
+
+Picking "Past 7 Days" on the plant PC produced *"the app has encountered an error"* and a blank page. The cause: **pandas cannot write an .xlsx without `openpyxl`, does not install it for itself, and it was not on that machine.**
+
+What made it a blank page rather than a failed download is worth writing down. **A download button builds its file while the page renders, not when somebody presses it.** So the ImportError was never near the button — it happened during the render, and it took the screen with it. And it stayed hidden until exactly the right moment: the default scope is Live Today, the plant had logged nothing yet today, so the button was inert and the file was never built. Widening to seven days gave it rows to work with, and the page died. **A control that only breaks once there is data in it is the worst kind to ship**, because it passes every check you make while writing it.
+
+- **The page asks first.** With `openpyxl` absent it offers CSV alone, says why in one line, and prints the command that turns the Excel button on. **CSV needs nothing at all** — the file everybody can open is not allowed to depend on a library being present.
+- `workbook_bytes` returns nothing rather than raising, for the same reason: its caller renders on every rerun, so an exception there is not a failed download, it is a missing screen.
+- **`openpyxl` is in `requirements.txt` now**, which is where it should have been the moment I used it.
+- **`Check_This_PC.bat` reports it.** A new "Optional packages" line, as a warning rather than a failure — every screen still works and the record still exports as CSV without it, and reporting a working machine as unready is how a readiness check stops being read.
+
+The page was re-rendered with `openpyxl` forcibly unavailable to prove it survives, which is the only test that would have caught this before it shipped.
+
+- Suite: 1,273 assertions across sixteen files, 18 screens rendered (also verified with the package missing), 58 browser checks. 1,349 total.
+
+---
+
 ## 3.22 — Monday, September 7, 2026
 **Take the file. Google's permission is not required.**
 

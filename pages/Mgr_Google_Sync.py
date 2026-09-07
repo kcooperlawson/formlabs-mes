@@ -251,16 +251,25 @@ st.caption("No Google account, no setup, nothing to publish — and the file ope
 _ready = (not export_payload_df.empty) and bool(selected_export_cols)
 _file_df = export_payload_df[selected_export_cols] if _ready else pd.DataFrame()
 
+# Excel needs openpyxl, which pandas does not install for itself. CSV needs
+# nothing at all, so it is always here: the file everybody can open is not
+# allowed to depend on a library being present.
+_xlsx = sheet_sync.excel_available()
+
 f1, f2 = st.columns(2)
 with f1:
-    st.download_button(
-        "📗 Download Excel (.xlsx)",
-        data=sheet_sync.workbook_bytes(
-            _file_df, "KPI Summary" if "Aggregated" in export_mode else "Raw Audit Logs")
-        if _ready else b"",
-        file_name=sheet_sync.export_filename(export_mode, sync_horizon, "xlsx"),
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True, disabled=not _ready, key="gs_xlsx")
+    if _xlsx:
+        st.download_button(
+            "📗 Download Excel (.xlsx)",
+            data=sheet_sync.workbook_bytes(
+                _file_df, "KPI Summary" if "Aggregated" in export_mode else "Raw Audit Logs")
+            if _ready else b"",
+            file_name=sheet_sync.export_filename(export_mode, sync_horizon, "xlsx"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True, disabled=not _ready, key="gs_xlsx")
+    else:
+        st.button("📗 Excel unavailable on this PC", use_container_width=True,
+                  disabled=True, key="gs_xlsx_off")
 with f2:
     st.download_button(
         "📄 Download CSV",
@@ -268,6 +277,12 @@ with f2:
         file_name=sheet_sync.export_filename(export_mode, sync_horizon, "csv"),
         mime="text/csv",
         use_container_width=True, disabled=not _ready, key="gs_csv")
+
+if not _xlsx:
+    st.caption("Excel files need the `openpyxl` package, which is not installed here. "
+               "CSV works now and opens in Sheets and Excel just the same. To turn the "
+               "Excel button on, run `venv\\Scripts\\pip install openpyxl` in the "
+               "application folder and restart.")
 
 st.markdown("---")
 st.markdown("#### 🚀 Or push it straight into a linked sheet")

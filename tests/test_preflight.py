@@ -105,6 +105,22 @@ check("and its size is reported, so an empty one is visible",
       "2.3 MB" in pf.judge_backup("x.sql", 2_400_000)["detail"], True)
 print("  test backup OK")
 
+# --- packages the plant can manage without -----------------------------------
+# openpyxl was missing on the plant PC and nothing said so until a page went
+# blank. It is a warning and not a failure because every screen still works
+# and the record still exports as CSV: reporting a working machine as unready
+# is how a check stops being read.
+check("no optional packages missing passes", pf.judge_optional({})["state"], pf.OK)
+check("a missing one warns rather than failing",
+      pf.judge_optional({"openpyxl": "Excel downloads"})["state"], pf.WARN)
+check("it says what stops working",
+      "Excel downloads" in pf.judge_optional({"openpyxl": "Excel downloads"})["detail"], True)
+check("and hands over the command that installs it",
+      "pip install openpyxl" in pf.judge_optional({"openpyxl": "x"})["fix"], True)
+check("a missing optional package never makes a PC unready",
+      pf.exit_code([pf.judge_optional({"openpyxl": "x"})]), 0)
+print("  optional packages OK")
+
 # --- the port and the firewall ----------------------------------------------
 check("a port held by something else fails", pf.judge_port(False, False)["state"], pf.FAIL)
 check("a port held by our own app is fine", pf.judge_port(False, True)["state"], pf.OK)

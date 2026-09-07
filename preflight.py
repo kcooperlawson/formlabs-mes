@@ -269,6 +269,37 @@ def _in_venv() -> bool:
     return sys.prefix != getattr(sys, "base_prefix", sys.prefix)
 
 
+def _missing_optional():
+    """Packages the app can manage without, and what stops working if they go.
+
+    Kept apart from the required list on purpose: a plant with no openpyxl can
+    still run every screen and still export its record as CSV, so reporting
+    that as a failure would tell somebody a working PC is not ready. It is
+    still worth saying, because the button it turns off is one somebody will
+    go looking for.
+    """
+    import contextlib
+    optional = {"openpyxl": "Excel (.xlsx) downloads on the Google Sync page — "
+                            "CSV still works without it"}
+    missing = {}
+    with open(os.devnull, "w") as devnull, contextlib.redirect_stderr(devnull):
+        for mod, what in optional.items():
+            try:
+                __import__(mod)
+            except Exception:
+                missing[mod] = what
+    return missing
+
+
+def judge_optional(missing: dict):
+    """An optional package that is absent is worth knowing, never a blocker."""
+    if not missing:
+        return check("Optional packages", OK, "All present.")
+    lines = "; ".join(f"{m} ({w})" for m, w in missing.items())
+    return check("Optional packages", WARN, f"Not installed: {lines}",
+                 "venv\\Scripts\\pip install " + " ".join(missing))
+
+
 def _missing_dependencies():
     """Which of the app's packages will not import.
 
@@ -489,6 +520,8 @@ def run_all(quick: bool = False):
         checks.append(check("Everything else", INFO,
                             "Skipped until the packages above are installed."))
         return checks
+
+    checks.append(judge_optional(_missing_optional()))
 
     reachable, dbname, server_version, error = _database_facts()
     checks.append(judge_database(reachable, dbname, error))

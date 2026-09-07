@@ -27,6 +27,10 @@ numpy==2.5.2
 oauthlib==3.3.1
 packaging==26.3
 pandas==3.0.5
+# Excel export on the Google Sync page. pandas cannot write .xlsx without it
+# and does not install it for itself; the page degrades to CSV when it is
+# missing rather than failing, but a plant that wants .xlsx needs this line.
+openpyxl==3.1.5
 pillow==12.3.0
 plotly==7.0.0
 protobuf==7.36.0

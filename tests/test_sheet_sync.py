@@ -249,6 +249,23 @@ check("an empty frame still produces a file rather than raising",
 check("an over-long tab name is trimmed rather than rejected",
       ss.workbook_bytes(_df, "A" * 60)[:2], b"PK")
 
+# The fault that took the page down on the plant PC. pandas cannot write xlsx
+# without openpyxl, which it does not install for itself - and the download
+# button builds its file while the PAGE RENDERS, not when the button is
+# pressed. So the ImportError was not a failed download; it was a blank screen,
+# and it appeared the moment a time scope with rows in it made the button live.
+check("the page can ask whether this machine can write Excel at all",
+      isinstance(ss.excel_available(), bool), True)
+
+_saved = ss.excel_available
+try:
+    ss.excel_available = lambda: False
+    check("with openpyxl absent the workbook is empty rather than an exception",
+          ss.workbook_bytes(_df), b"")
+finally:
+    ss.excel_available = _saved
+check("and present, it is a real file again", ss.workbook_bytes(_df)[:2], b"PK")
+
 TODAY = date(2026, 9, 7)
 check("a file is named for what is in it",
       ss.export_filename("📊 Aggregated Calculated Metrics (KPI Summary)",

@@ -256,14 +256,41 @@ def export_filename(mode_label, horizon_label, ext, today=None) -> str:
     return f"formlabs-mes-{kind}-{scope}-{stamp}.{ext}"
 
 
+def excel_available() -> bool:
+    """Whether this machine can write .xlsx at all.
+
+    pandas can only produce a workbook through openpyxl, which is an optional
+    dependency it does not install for itself. It was missing on the plant PC,
+    and because the download button builds its file while the page renders
+    rather than when the button is pressed, the ImportError did not surface as
+    a failed download - it took the whole page down, at the moment a time
+    scope with rows in it made the button live. So the page asks first and
+    offers CSV alone when the answer is no. **A missing optional library must
+    never be able to remove a screen.**
+    """
+    try:
+        import openpyxl  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
 def workbook_bytes(df, sheet_name="MES Export") -> bytes:
     """The frame as a .xlsx, with a header somebody can read.
 
     Frozen bold header and columns wide enough for their contents: this lands
     in front of a manager who did not ask for a puzzle, and the difference is
     about fifteen lines.
+
+    Returns b"" rather than raising when openpyxl is not installed. The caller
+    is a download button that renders on every rerun, so raising here is not a
+    failed download - it is a blank page.
     """
     import io
+
+    if not excel_available():
+        return b""
+
     import pandas as pd
 
     buffer = io.BytesIO()
