@@ -247,6 +247,29 @@ class Suggestion(Base):
     status = Column(String(20), default="Open")  # Open, In Review, Implemented, Dismissed
     admin_notes = Column(Text, nullable=True)
 
+class SheetTarget(Base):
+    """One Google Sheet somebody can push an export to.
+
+    Owned by whoever added it and private to them unless is_shared is set:
+    the point of letting managers add their own is that they do not have to
+    negotiate for one. The last three columns are how a destination that has
+    quietly stopped working says so on the page instead of at the moment
+    somebody needs the numbers. See sheet_sync and migration 0013.
+    """
+    __tablename__ = "sheet_targets"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(80), nullable=False)
+    webhook_url = Column(Text, nullable=False)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),
+                           nullable=True, index=True)
+    owner_name = Column(String(100), nullable=True)
+    is_shared = Column(Integer, default=0)      # 1 = True, 0 = False
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_sync_at = Column(DateTime, nullable=True)
+    last_status = Column(String(200), nullable=True)
+    last_rows = Column(Integer, nullable=True)
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -6,6 +6,25 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.21 — Monday, September 7, 2026
+**Everyone gets their own spreadsheet**
+
+The Google export had one destination, and it was a line in a `.env` file. That is three problems and this plant hit all of them. **Nobody but whoever installed the application could point it anywhere.** There was exactly one sheet, so a second manager who wanted their own could not have one. And when the line was missing — **which on this install it was, which is the whole reason the sync was "broken"** — the page said "webhook missing" and there was nothing anybody standing in front of it could do about it.
+
+**A destination is a row now.** Anybody who can reach the page can link a spreadsheet of their own, name it, and choose whether other managers can send to it. Yours stays yours by default: the point of letting people add their own is that they do not have to negotiate for one. An administrator sees all of them.
+
+**The awkward part is said out loud instead of being assumed away.** A Google Sheet is a document — it has no inbox, so it cannot be sent rows. The sheet needs a small Apps Script published as a web app, and the address of *that* is what goes in the box. **Everybody pastes the spreadsheet link first, because that is the link they have**, so the page recognises it, says in one sentence why it cannot work, and hands over the four steps and the script to paste rather than reporting a validation failure and leaving somebody to work out why. It also catches the two near misses: the script *editor* link, which is the project rather than its address, and a `/dev` URL, which works while the editor is open and stops the moment it is not — the worst kind, because it tests clean and dies later.
+
+**A Test button that writes nothing.** A destination that has quietly stopped working — a deployment revoked, a sheet deleted — looks exactly like a healthy one until somebody needs the numbers. The script answers a plain request with a token, so the address can be checked without putting a row in anybody's sheet. A test that changes the thing it is testing is not a test. Every push is recorded too, success or failure, and the page says when this sheet last worked and what went wrong if it did not.
+
+**The time horizon now actually does something.** It never did: the page offered four scopes, read the answer into a variable and exported every log ever recorded regardless — so "Live Today" on a plant with two years of history sent two years of history, and the only sign was a row count nobody was checking. That is the second control on this page found doing nothing while appearing to configure something, after the automation picker removed in 3.14. The row count about to be sent is now printed above the button, which is the number that shows the scope is being honoured.
+
+- **Migration 0013** adds a `sheet_targets` table. If `GOOGLE_SHEETS_WEBHOOK` is set on your install it is read once and carried across as a shared destination named "Plant sheet", so an install that was working keeps working and nobody has to go and find the URL again.
+- **New `sheet_sync.py`** and **`tests/test_sheet_sync.py`** — 52 assertions on the reasoning rather than on Google: which kind of URL you pasted, what a horizon includes, and who can see whose sheet. The one that matters most is that a colleague's private sheet never appears in your list.
+- Suite: 1,229 assertions across sixteen files, 18 screens rendered, 58 browser checks. 1,305 total.
+
+---
+
 ## 3.20 — Monday, September 7, 2026
 **Not everything that leaves a tank is a cartridge**
 

@@ -15,7 +15,7 @@ from sqlalchemy import desc, text, func, or_
 
 import bulk_pour as _bulk
 from db_core import engine, ScopedSession, Base
-from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
+from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor, SheetTarget,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
                     LotVerification)
@@ -1432,6 +1432,131 @@ def add_hourly_log(
                 matched_run = True
         session.commit()
         return matched_run
+    finally:
+        session.close()
+
+
+
+# =============================================================================
+# EXPORT DESTINATIONS
+# -----------------------------------------------------------------------------
+# Where a Google Sheets export goes. This used to be one environment variable
+# set at install time, which meant one destination for the whole plant and no
+# way to change it from inside the application - see migration 0013. Each row
+# belongs to whoever added it; sheet_sync.visible_targets decides who sees it.
+# =============================================================================
+
+def get_sheet_targets_df() -> pd.DataFrame:
+    """Every export destination on file, newest last."""
+    session = ScopedSession()
+    try:
+        rows = session.query(SheetTarget).order_by(SheetTarget.id.asc()).all()
+        return pd.DataFrame([{
+            "id": r.id, "name": r.name, "webhook_url": r.webhook_url,
+            "owner_user_id": r.owner_user_id, "owner_name": r.owner_name,
+            "is_shared": bool(r.is_shared), "created_at": r.created_at,
+            "last_sync_at": r.last_sync_at, "last_status": r.last_status,
+            "last_rows": r.last_rows,
+        } for r in rows])
+    finally:
+        session.close()
+
+
+def add_sheet_target(name: str, webhook_url: str, owner_user_id=None,
+                     owner_name: str = "", is_shared: bool = False) -> tuple:
+    """Add a destination. Returns (ok, message).
+
+    The same person adding the same address twice is refused by name rather
+    than quietly creating a duplicate, because two identical entries in a
+    picker is a question nobody can answer from the picker.
+    """
+    name = str(name or "").strip()[:80]
+    url = str(webhook_url or "").strip()
+    if not name:
+        return False, "Give this sheet a name so it can be told apart in the list."
+    if not url:
+        return False, "Paste the web app address for the sheet."
+
+    session = ScopedSession()
+    try:
+        clash = session.query(SheetTarget).filter(
+            SheetTarget.owner_user_id == owner_user_id,
+            SheetTarget.name == name).first()
+        if clash:
+            return False, f"You already have a sheet called '{name}'."
+        session.add(SheetTarget(name=name, webhook_url=url,
+                                owner_user_id=owner_user_id,
+                                owner_name=str(owner_name or "").strip()[:100],
+                                is_shared=1 if is_shared else 0))
+        session.commit()
+        return True, f"Added '{name}'."
+    except Exception as exc:
+        session.rollback()
+        return False, str(exc)[:160]
+    finally:
+        session.close()
+
+
+def update_sheet_target(target_id: int, name=None, webhook_url=None,
+                        is_shared=None) -> bool:
+    """Edit a destination in place. Only the fields given are changed."""
+    session = ScopedSession()
+    try:
+        row = session.query(SheetTarget).filter(SheetTarget.id == int(target_id)).first()
+        if not row:
+            return False
+        if name is not None and str(name).strip():
+            row.name = str(name).strip()[:80]
+        if webhook_url is not None and str(webhook_url).strip():
+            row.webhook_url = str(webhook_url).strip()
+        if is_shared is not None:
+            row.is_shared = 1 if is_shared else 0
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def delete_sheet_target(target_id: int) -> bool:
+    session = ScopedSession()
+    try:
+        row = session.query(SheetTarget).filter(SheetTarget.id == int(target_id)).first()
+        if not row:
+            return False
+        session.delete(row)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def record_sheet_sync(target_id: int, status: str, rows: int = 0) -> bool:
+    """Remember how a destination last behaved.
+
+    Recorded whether it worked or not, on purpose: a destination that has
+    stopped working looks exactly like one nobody has used yet, and the
+    difference matters at the moment somebody is deciding whether to trust
+    the numbers in that sheet.
+    """
+    session = ScopedSession()
+    try:
+        row = session.query(SheetTarget).filter(SheetTarget.id == int(target_id)).first()
+        if not row:
+            return False
+        row.last_sync_at = datetime.utcnow()
+        row.last_status = str(status or "")[:200]
+        row.last_rows = int(rows or 0)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
     finally:
         session.close()
 
