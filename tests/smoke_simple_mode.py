@@ -69,7 +69,7 @@ async def main():
                     continue
 
             body = await pg.inner_text("body")
-            check("the operator terminal loaded", "Log Hourly Pouring" in body)
+            check("the operator terminal loaded", "Pouring" in body)
             check("no run cards headed by a manager's name",
                   "Active Assigned Production Runs" in body, False)
             check("no leftover 'No production runs in database'",

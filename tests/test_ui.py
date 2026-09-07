@@ -75,7 +75,7 @@ check("lock screen names the station", "Pump" in body, True)
 check("lock screen offers a pump picker",
       any(sb.label.startswith("📍 Which pump") for sb in at.selectbox), True)
 check("no logging tabs while locked",
-      any("Log Hourly Pouring" in "".join(t.label or "" for t in at.tabs) for _ in [0]), False)
+      any("Pouring" in "".join(t.label or "" for t in at.tabs) for _ in [0]), False)
 print(f"  locked render OK  ({len(at.selectbox)} selectboxes, {len(at.button)} buttons)")
 
 # --- B. clear the checklist for that station, page unlocks ----------------
@@ -91,7 +91,7 @@ at = run_as(OP, h_pump=STATION)
 check("page still renders", at.exception, [])
 check("checklist cleared -> terminal unlocks", "TERMINAL LOCKED" not in texts(at), True)
 check("logging tabs now present",
-      any("Log Hourly Pouring" in (t.label or "") for t in at.tabs), True)
+      any("Pouring" in (t.label or "") for t in at.tabs), True)
 at.selectbox(key="h_cart").set_value(CART).run()
 at.selectbox(key="h_resin").set_value(RESIN).run()
 print(f"  unlocked render OK ({len(at.tabs)} tabs, {STATION} / {CART} / lot {GOOD_LOT})")

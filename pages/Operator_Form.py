@@ -1058,36 +1058,42 @@ elif _pump_problem and current_role in ("manager", "admin"):
     # just noise on the screen they work from.
     st.caption(f"⚠️ The pump form address in plant settings is not usable: {_pump_problem}")
 
+# Short tab labels, deliberately. At 390px the four full titles needed 642px
+# of strip and only two of them were fully visible; the rest sat off the right
+# edge behind a horizontal scroll that nobody finds, so half this form was
+# effectively unreachable on the device the operators actually hold. Each tab's
+# own heading still carries the full wording - the label is a handle, not the
+# sentence.
 if current_role == "packer":
     if packing_enabled:
-        tab_pack, tab_chat = st.tabs(["📦 Log Packing", "📋 Note to Management"])
+        tab_pack, tab_chat = st.tabs(["📦 Packing", "📋 Notes"])
         tab1 = tab2 = tab3 = None
     else:
         st.error("Packing module is disabled by management.")
         st.stop()
 elif current_role == "operator":
     tab1, tab2, tab3, tab_chat = st.tabs((
-        "⚡ Log Hourly Pouring",
-        "⚠️ Log Station Downtime",
-        "📸 Cleanliness & Photo Audit",
-        "📋 Note to Management"
+        "⚡ Pouring",
+        "⚠️ Downtime",
+        "📸 Audit",
+        "📋 Notes"
     ))
     tab_pack = None
 else:
     if packing_enabled:
         tab1, tab_pack, tab2, tab3, tab_chat = st.tabs((
-            "⚡ Log Hourly Pouring",
-            "📦 Log Packing",
-            "⚠️ Log Station Downtime",
-            "📸 Cleanliness & Photo Audit",
-            "📋 Note to Management"
+            "⚡ Pouring",
+            "📦 Packing",
+            "⚠️ Downtime",
+            "📸 Audit",
+            "📋 Notes"
         ))
     else:
         tab1, tab2, tab3, tab_chat = st.tabs((
-            "⚡ Log Hourly Pouring",
-            "⚠️ Log Station Downtime",
-            "📸 Cleanliness & Photo Audit",
-            "📋 Note to Management"
+            "⚡ Pouring",
+            "⚠️ Downtime",
+            "📸 Audit",
+            "📋 Notes"
         ))
         tab_pack = None
 
@@ -1766,7 +1772,7 @@ if tab_chat is not None:
         # part, and they are the cheap part to fix: this is a written note that
         # gets read when somebody next looks, and it now says so before
         # anything is typed rather than after nobody answers.
-        st.subheader("📋 Note to Management")
+        st.subheader("📋 Notes")
         st.caption("A written note for the plant lead — it stays on the record with "
                    "your name and the time on it.")
         st.warning("**Nobody is watching this in real time.** Use the radio or find a "

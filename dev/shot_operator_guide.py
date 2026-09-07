@@ -143,7 +143,7 @@ async def main():
 
             # 7. the other tabs
             try:
-                await pg.get_by_text("Log Station Downtime", exact=False).first.click(timeout=8000)
+                await pg.get_by_text("Downtime", exact=False).first.click(timeout=8000)
                 await pg.wait_for_timeout(7000)
                 await frame(pg, f"{OUT}/07_downtime.png",
                             pg.get_by_text("Station Downtime Event Logger", exact=False).first,
@@ -152,7 +152,7 @@ async def main():
                 print("  !! downtime:", e)
 
             try:
-                await pg.get_by_text("Cleanliness & Photo Audit", exact=False).first.click(timeout=8000)
+                await pg.get_by_text("Audit", exact=False).first.click(timeout=8000)
                 await pg.wait_for_timeout(7000)
                 await frame(pg, f"{OUT}/08_photo.png",
                             pg.get_by_text("Cleanliness, Changeover", exact=False).first, height=760)

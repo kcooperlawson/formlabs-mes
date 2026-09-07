@@ -6,6 +6,24 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.25.1 — Monday, September 7, 2026
+**Half the operator form was off the side of the phone**
+
+Measured rather than eyeballed, on a 390&times;844 touch profile. The four tab labels needed **642px of strip and had 358px**, so exactly **two of four tabs were fully visible**. "Cleanliness & Photo Audit" and "Note to Management" sat off the right edge behind a horizontal scroll — a faint chevron and nothing else. An operator who was never told those tabs exist would never find them, on the device the operators actually hold.
+
+Shorter labels: **Pouring · Downtime · Audit · Notes**. All four now fit in 358px with room to spare. Each tab's own heading still carries the full wording — the label is a handle, not the sentence.
+
+Also audited and **left alone**, because they turned out to be fine: the numeric fields are `type="number"`, so a phone already offers a number pad rather than a full keyboard; the dropdowns are 68px, comfortably tappable; the sidebar is collapsed by default; and glove mode already forces every target to 48px when a plant switches it on.
+
+Three things measured and **deliberately not fixed before the floor test**, because they are judgement calls that watching a real operator will answer better than a guess:
+- The form is **3,495px — 4.1 phone screens** — and Submit sits 1,594px down, about two screens of scrolling, every hour. Much of that is the lot-check guidance, which is essential the first week and re-read in full on every log after. Collapsing it once the gate is satisfied would cut close to a screen — but that guidance exists to stop a real failure, and shortening it on a hunch is how a check quietly stops working.
+- Tap targets are 36–38px by default, under the 44–48px guidance. Glove mode already solves it; the open question is whether an operator on a handset should get it automatically rather than having to know it exists.
+- The startup checklist shows a camera permission block as the first thing an operator sees each morning. If permission is never granted that is a permanent dead panel between them and starting work.
+
+- Suite: 1,328 assertions across seventeen files, 18 screens rendered, 8 round trips, 66 browser checks. 1,420 total.
+
+---
+
 ## 3.25 — Monday, September 7, 2026
 **The alarm did not know it was Saturday**
 

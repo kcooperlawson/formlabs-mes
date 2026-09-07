@@ -127,7 +127,7 @@ async def main():
             except Exception:
                 continue
         try:
-            await pg.get_by_text("Log Packing", exact=False).first.click(timeout=9000)
+            await pg.get_by_text("Packing", exact=False).first.click(timeout=9000)
             await pg.wait_for_timeout(8000)
             await frame(pg, "22_packing", "Packing Details", -120, 759)
         except Exception as e:
