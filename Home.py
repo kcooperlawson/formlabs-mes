@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from crud import delete_session, create_session, get_user_by_session_token, last_log_at
 from shift_clock import PLANT_TZ, compute_shift_status
+from print_build import laser_sweep
 from utils import run_scheduled_backup
 from record_health import record_state
 from app_logger import logger
@@ -90,6 +91,7 @@ def get_base64_image(image_path):
 
 
 logo_b64 = get_base64_image("assets/formlabs_logo.png")
+printer_b64 = get_base64_image("assets/form_printer.png")
 
 # --- INITIALIZE SESSION STATE ---
 if "authenticated" not in st.session_state:
@@ -118,7 +120,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.18.0"
+APP_VERSION = "PT-V3.19.0"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -271,14 +273,22 @@ if not st.session_state["authenticated"]:
         _title_lead, _title_tail = "SCADA", "TERMINAL"
         _title_sub = "Manufacturing Execution System"
 
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
     auth_col1, auth_col2, auth_col3 = st.columns([1, 1.2, 1])
     with auth_col2:
+        # The machine this plant's resin goes into, with a laser passing over
+        # it once as the screen arrives. It is the front door of a printing
+        # company's software and it should look like one - but it plays once
+        # and stops, because a login screen that never settles is a login
+        # screen people learn to look away from.
+        if printer_b64:
+            st.markdown(laser_sweep(printer_b64, height_px=132, uid="signin"),
+                        unsafe_allow_html=True)
+
         st.markdown(
             f"""
-            <div style="text-align:center; margin-bottom:30px;">
-                <div style="display:flex; justify-content:center; align-items:center; margin-bottom:15px;">
-                    <img src="data:image/png;base64,{logo_b64}" style="height: 85px; object-fit: contain; filter: drop-shadow(0px 0px 10px rgba(0, 210, 255, 0.5));">
+            <div style="text-align:center; margin-bottom:22px;">
+                <div style="display:flex; justify-content:center; align-items:center; margin-bottom:10px;">
+                    <img src="data:image/png;base64,{logo_b64}" style="height: 66px; object-fit: contain; filter: drop-shadow(0px 0px 10px rgba(0, 210, 255, 0.5));">
                 </div>
                 <h1 style="color:#FFFFFF; font-weight:900; margin-top: 15px; font-size: 2.8rem; letter-spacing: 0.02em;">{_title_lead} <span style="color:#00D2FF; font-weight:300;">{_title_tail}</span></h1>
                 <p style="color:#00D2FF; font-family: monospace; letter-spacing: 0.15em; font-size: 0.85rem; text-transform: uppercase; border-top: 1px solid #1E293B; border-bottom: 1px solid #1E293B; padding: 8px 0; display: inline-block;">{_title_sub}</p>

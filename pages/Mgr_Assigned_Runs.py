@@ -16,6 +16,7 @@ from database import (
 from database import esc
 from components import empty_state
 from resin_palette import resin_chip, stored_color_map, style_resin_column
+from print_build import layer_bar
 
 st.set_page_config(page_title="Assigned Runs | Formlabs MES", page_icon="🎯", layout="wide")
 
@@ -176,7 +177,13 @@ with active_tab:
                 </div>
                 """, unsafe_allow_html=True)
 
-                st.progress(prog_pct, text=f"Output: {run['current_units']:,} / {run['target_units']:,} Units ({prog_pct * 100:.1f}%) | Lot: {run.get('lot_number', 'N/A')}")
+                st.markdown(
+                    f"<div style='font-size:0.8rem; color:#94A3B8; margin-bottom:5px;'>"
+                    f"Output: <b style='color:#E2E8F0;'>{run['current_units']:,} / "
+                    f"{run['target_units']:,}</b> Units ({prog_pct * 100:.1f}%) "
+                    f"&nbsp;|&nbsp; Lot: {esc(run.get('lot_number', 'N/A'))}</div>"
+                    + layer_bar(prog_pct * 100.0, height_px=16),
+                    unsafe_allow_html=True)
 
                 b_c1, b_c2, b_c3, b_c4 = st.columns(4)
                 with b_c1:

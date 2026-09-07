@@ -6,6 +6,27 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.19 — Monday, September 7, 2026
+**A shift, drawn as a print job**
+
+We are a 3D printing company and the software did not look like it. Everything here is presentation — no schema change, no change to how anything is logged, no change to the operator's form.
+
+**The wall display now builds a resin cartridge as the shift pours.** The part is revealed from the bottom up as output climbs toward the shift's target, with layer lines on the built portion and the laser sitting on the layer being written. It carries no digit anybody has to read; the point is that from the far side of the floor you can see how the shift is going without reading one. It is measured against the whole shift's target rather than what is expected by now, so the part is finished when the shift is — "expected now" already has a figure of its own two cards over, and a second reading of the same thing drawn differently is how a wall display stops being read at all.
+- **Nothing on it is on a repeating timer.** Every page this appears on re-runs itself every ten seconds, and a looping animation restarts mid-cycle each time — which on a wall reads as a machine faulting rather than a shift progressing. The build height is a plain value with a transition on it, so it glides when the number actually changes and sits perfectly still when it does not. **Movement means something happened.**
+- The target shape is ghosted in behind, so an empty shift is a part waiting to be printed rather than a blank card. The ghost and the laser both drop away when the build completes, because a finished print has no layer being written.
+
+**Progress bars are laid down in layers rather than poured as one block.** Same information, read the same way, on the work-order cards on the wall display and on the manager's run list. It costs nothing and it makes the application look like it belongs to the company running it.
+
+**The sign-in screen leads with the machine.** A Form 4 with a laser passing over it once as the screen arrives. It plays once and stops — a login screen that never settles is one people learn to look away from. The wordmark under it is smaller now, because the machine already carries the brand, and that is also what keeps the operator's username and PIN on the screen without scrolling on a phone.
+
+**The product photographs are the company's own.** Nothing here draws a Formlabs machine or a cartridge; it positions and reveals the real renders, which is the only version of this worth shipping in a Formlabs plant.
+
+- **New `print_build.py`** — pure functions from a percentage to a string of HTML, no Streamlit and no database, which is what makes the next line possible.
+- **New `tests/test_print_build.py`** — 53 assertions. Decoration is the part nobody re-reads, so a mistake in it survives: a build that reads 40% when the shift is at 4%, a caption saying COMPLETE at ninety-nine, a percentage arriving as `None` the one morning nothing has been poured yet and taking the wall display down with it. None of those look like bugs on the page — they look like the plant. Two assertions guard faults that are invisible when they recur: that the build is a transition and never an animation, and that two of these on one page cannot share an element id (the same fault the reactor vessels had, found the same way).
+- Suite: 1,094 assertions across fourteen files, 18 screens rendered, 58 browser checks. 1,170 total.
+
+---
+
 ## 3.18 — Sunday, September 6, 2026
 **Getting ready to be carried onto a floor, and moved twice**
 

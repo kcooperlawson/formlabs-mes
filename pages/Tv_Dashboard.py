@@ -27,6 +27,7 @@ from database import esc
 from resin_palette import resin_chip, stored_color_map
 from record_health import record_state
 from shift_clock import compute_shift_status
+from print_build import cartridge_build, layer_bar
 import base64
 
 def get_base64_image(image_path):
@@ -37,6 +38,7 @@ def get_base64_image(image_path):
         return ""
 
 logo_b64 = get_base64_image("assets/formlabs_logo.png")
+cartridge_b64 = get_base64_image("assets/resin_cartridge.png")
 
 st.set_page_config(page_title="Factory Live TV | Formlabs SCADA", page_icon="📺", layout="wide")
 
@@ -346,6 +348,15 @@ blended_rate = current_run_rate if elapsed_hours > 0.5 else target_lph
 projected_total = current_output + (blended_rate * remaining_hrs)
 expected_now = target_lph * elapsed_hours
 
+# --- the shift, as a print job ---------------------------------------------
+# Against the whole shift's target rather than what is expected by now, so the
+# part is finished when the shift is finished. "Expected now" already has a
+# figure of its own two cards over; a second reading of the same thing drawn
+# differently is how a wall display stops being read at all.
+build_hours = total_shift_length if active_shift.startswith("ALL") else shift_length_hrs
+shift_target_l = target_lph * max(0.0, build_hours)
+build_pct = (current_output / shift_target_l * 100.0) if shift_target_l > 0 else 0.0
+
 # --- the record, and whether anything is still reaching it ----------------
 # Every figure below is computed from the log. When the log stops arriving -
 # the PC rebooted, Postgres did not come back, the phones cannot reach the
@@ -384,10 +395,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ===================== DYNAMIC KPI ROW =====================
+# The build column is narrow on purpose: it is a tall object, it carries no
+# digits anyone has to read, and it must not take width from the gauges.
 if packing_enabled:
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col_build = st.columns([1.15, 1.15, 1.15, 1.15, 0.75])
 else:
-    col1, col2 = st.columns(2)
+    col1, col2, col_build = st.columns([1.5, 1.5, 0.8])
 
 with col1:
     fig_rate = go.Figure(go.Indicator(
@@ -439,6 +452,17 @@ if packing_enabled:
             <div class="tv-value" style="color:#F59E0B;">{total_poured - total_packed:,} <span style="font-size:1.5rem; color:#94A3B8;">Pending</span></div>
             <div style="color:#94A3B8; font-size:1.2rem; font-weight:bold; margin-top:20px;">Units awaiting pack-out</div></div>""",
                     unsafe_allow_html=True)
+
+with col_build:
+    # No number on this card that has not already been said elsewhere. The
+    # point of it is that it can be read from the far end of the floor by
+    # somebody who is not going to walk over and squint at a percentage.
+    st.markdown(
+        "<div class='tv-card' style='padding:14px 10px;'>"
+        "<div class='tv-label' style='text-align:center;'>🖨️ SHIFT BUILD</div>"
+        + cartridge_build(build_pct, cartridge_b64, current_output, shift_target_l,
+                          unit="L", height_px=232, uid="tvbuild")
+        + "</div>", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -536,7 +560,11 @@ if b3 is not None:
                     st.markdown(
                         f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'>{resin_chip(run['resin_type'], _run_colours.get(str(run['resin_type'])), size='lg')} &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
                         unsafe_allow_html=True)
-                    st.progress(prog_pct)
+                    # Laid down in layers rather than poured as one block -
+                    # same reading, same colour, and it looks like it belongs
+                    # to the company running it.
+                    st.markdown(layer_bar(prog_pct * 100.0, height_px=16),
+                                unsafe_allow_html=True)
             else:
                 st.info("No active Work Orders in progress.")
         else:
