@@ -236,9 +236,52 @@ if target:
     st.caption(f"Ready to send **{len(export_payload_df):,} rows** to "
                f"**{esc(target['name'])}** — {esc(sync_horizon)}.")
 
+# ===================== TAKE IT AS A FILE =====================
+# The path that cannot fail. Pushing to a Google Sheet depends on a web app
+# published to Anyone, and a work Google account usually belongs to a
+# Workspace whose administrator forbids exactly that - correct settings and
+# all, it answers 401 and nothing in the editor changes it. A download needs
+# no account, no deployment and no permission from anybody, and the file opens
+# in Sheets, Excel or anything else. It is offered first for that reason.
 st.markdown("<br>", unsafe_allow_html=True)
-if st.button("🚀 Execute Google Sheets Transmission", type="primary",
-             use_container_width=True, disabled=target is None):
+st.markdown("#### ⬇️ Take it as a file")
+st.caption("No Google account, no setup, nothing to publish — and the file opens straight "
+           "in Google Sheets (File → Import) or Excel.")
+
+_ready = (not export_payload_df.empty) and bool(selected_export_cols)
+_file_df = export_payload_df[selected_export_cols] if _ready else pd.DataFrame()
+
+f1, f2 = st.columns(2)
+with f1:
+    st.download_button(
+        "📗 Download Excel (.xlsx)",
+        data=sheet_sync.workbook_bytes(
+            _file_df, "KPI Summary" if "Aggregated" in export_mode else "Raw Audit Logs")
+        if _ready else b"",
+        file_name=sheet_sync.export_filename(export_mode, sync_horizon, "xlsx"),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True, disabled=not _ready, key="gs_xlsx")
+with f2:
+    st.download_button(
+        "📄 Download CSV",
+        data=_file_df.to_csv(index=False).encode("utf-8") if _ready else b"",
+        file_name=sheet_sync.export_filename(export_mode, sync_horizon, "csv"),
+        mime="text/csv",
+        use_container_width=True, disabled=not _ready, key="gs_csv")
+
+st.markdown("---")
+st.markdown("#### 🚀 Or push it straight into a linked sheet")
+
+# No destination, no button. A big primary button that cannot do anything is
+# an invitation to press it and learn nothing.
+_push = False
+if target is None:
+    st.caption("Nothing linked yet — link a sheet above, or just take the file.")
+else:
+    _push = st.button("🚀 Execute Google Sheets Transmission", type="primary",
+                      use_container_width=True)
+
+if _push:
     if not selected_export_cols:
         st.warning("⚠️ Please select at least one metric column to export.")
     elif export_payload_df.empty:

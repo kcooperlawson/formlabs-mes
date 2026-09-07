@@ -243,6 +243,48 @@ function doGet() {
 OK_TOKEN = "formlabs-mes-ok"
 
 
+def export_filename(mode_label, horizon_label, ext, today=None) -> str:
+    """A filename somebody can find again in a downloads folder.
+
+    Named for what is in it and when it was taken, because a plant ends up
+    with a dozen of these and "export (3).xlsx" tells nobody which shift they
+    are looking at.
+    """
+    kind = "kpi-summary" if "Aggregated" in str(mode_label) else "audit-log"
+    scope = {0: "today", 7: "7-days", 30: "30-days"}.get(horizon_days(horizon_label), "all-time")
+    stamp = (today or date.today()).isoformat()
+    return f"formlabs-mes-{kind}-{scope}-{stamp}.{ext}"
+
+
+def workbook_bytes(df, sheet_name="MES Export") -> bytes:
+    """The frame as a .xlsx, with a header somebody can read.
+
+    Frozen bold header and columns wide enough for their contents: this lands
+    in front of a manager who did not ask for a puzzle, and the difference is
+    about fifteen lines.
+    """
+    import io
+    import pandas as pd
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=str(sheet_name)[:31])
+        sheet = writer.sheets[str(sheet_name)[:31]]
+        sheet.freeze_panes = "A2"
+        from openpyxl.styles import Alignment, Font, PatternFill
+        head = Font(bold=True, color="FFFFFF")
+        fill = PatternFill("solid", fgColor="0B1220")
+        for cell in sheet[1]:
+            cell.font, cell.fill = head, fill
+            cell.alignment = Alignment(vertical="center")
+        for i, column in enumerate(df.columns, start=1):
+            widest = max([len(str(column))] +
+                         [len(str(v)) for v in df[column].head(200).tolist()] or [0])
+            sheet.column_dimensions[sheet.cell(row=1, column=i).column_letter].width = \
+                min(46, max(11, widest + 2))
+    return buffer.getvalue()
+
+
 def diagnose_response(status, text, url="") -> dict:
     """What a reply from a destination actually means.
 
@@ -261,12 +303,36 @@ def diagnose_response(status, text, url="") -> dict:
     if OK_TOKEN in body:
         return {"ok": True, "level": "ok", "message": ""}
 
-    if int(status or 0) != 200:
+    code = int(status or 0)
+
+    # 401 and 403 have two causes and only one of them is fixable from the
+    # editor, so both are named. The second one is the reason this page has a
+    # download button: a work Google account usually belongs to a Workspace
+    # whose administrator forbids publishing a web app to "Anyone", and no
+    # amount of correct configuration gets past that.
+    if code in (401, 403):
+        return {"ok": False, "level": "auth",
+                "message": (f"Google refused the request ({code}). Two things cause this:\n\n"
+                            "**1. Execute as.** On the deployment it must be **Me**, not "
+                            "*User accessing the web app*. Deploy > Manage deployments > "
+                            "pencil icon. This is the one worth checking first.\n\n"
+                            "**2. Your organisation forbids it.** A work Google account "
+                            "usually belongs to a Workspace whose administrator does not "
+                            "allow Apps Script web apps to be published to Anyone. If you "
+                            "have set both options correctly and still get this, that is "
+                            "what is happening and nothing in the editor will change it.\n\n"
+                            "**Use the download buttons below instead** — they produce the "
+                            "same rows with no Google account involved. Or own the sheet "
+                            "and script from a personal Gmail account, which has no such "
+                            "policy, and share it with whoever needs it.")}
+
+    if code != 200:
         return {"ok": False, "level": "http",
-                "message": (f"The address answered {status}. If it is 401, 403 or a "
-                            "redirect to a sign-in page, the deployment's access is not "
-                            "set to Anyone. Deploy > Manage deployments > pencil icon, "
-                            "set Who has access to Anyone, and Deploy again.")}
+                "message": (f"The address answered {code}. If it is a redirect to a "
+                            "sign-in page the deployment is not published for anyone to "
+                            "reach; otherwise the deployment may have been deleted. "
+                            "Deploy > Manage deployments, check it is still there, and "
+                            "redeploy. The download buttons below always work.")}
 
     # A sign-in page. This is the common one and it looks like success.
     if any(k in low for k in ("accounts.google.com", "servicelogin", "signin/v2",

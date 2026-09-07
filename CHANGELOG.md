@@ -6,6 +6,24 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.22 — Monday, September 7, 2026
+**Take the file. Google's permission is not required.**
+
+Everything correct on the deployment — script pasted, new version published, *Execute as: Me*, *Who has access: Anyone* — and it still answered **401**. That is not a misconfiguration. A work Google account belongs to a Workspace, and Workspace administrators routinely forbid publishing an Apps Script web app where anyone can reach it. **No amount of correct setup gets past a policy set by somebody else**, and an export that only knows how to push into Google is an export that this plant cannot use.
+
+**So the page leads with a download.** Excel or CSV, of exactly the rows and columns shown above it, honouring the same time horizon. No account, no deployment, nothing to publish, nothing to ask permission for — and the file opens straight into Google Sheets via File → Import, or into Excel. It is listed above the push, not below it, because it is the path that cannot fail.
+- The workbook is not a raw dump: bold frozen header, columns sized to their contents. This lands in front of a manager who did not ask for a puzzle, and the difference is about fifteen lines.
+- Named for what is in it — `formlabs-mes-kpi-summary-7-days-2026-09-07.xlsx` — because a plant ends up with a dozen of these and `export (3).xlsx` tells nobody which shift they are looking at.
+
+**A 401 now explains itself properly.** It names the one cause that *is* fixable from the editor (*Execute as* must be **Me**, not *User accessing the web app* — worth checking first), then says plainly that if both options are already right, the organisation is refusing it and nothing in the editor will change that. Then it points at the download, and at the workaround: own the sheet and script from a personal Gmail account, which has no such policy, and share it with whoever needs it.
+
+**And the push button is gone when there is nowhere to push.** A big primary button that cannot do anything is an invitation to press it and learn nothing.
+
+- 15 more assertions: that a 401 is diagnosed as its own thing rather than as a generic HTTP failure, that a 404 is not (that is a deleted deployment), that the workbook is a real xlsx even from an empty frame, and that an over-long tab name is trimmed rather than rejected by Excel.
+- Suite: 1,265 assertions across sixteen files, 18 screens rendered, 58 browser checks. 1,341 total.
+
+---
+
 ## 3.21.1 — Monday, September 7, 2026
 **A 200 from Google is not evidence that anything arrived**
 

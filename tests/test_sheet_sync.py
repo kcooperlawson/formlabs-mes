@@ -215,6 +215,55 @@ check("an empty reply is not a send", ss.diagnose_response(200, "")["ok"], False
 check("nor is a missing one", ss.diagnose_response(200, None)["ok"], False)
 print("  reading a reply OK")
 
+# --- the path that does not depend on Google ---------------------------------
+# A work Google account usually belongs to a Workspace whose administrator
+# forbids publishing an Apps Script web app to "Anyone". With Execute as and
+# Who has access both set correctly it still answers 401, and nothing in the
+# editor changes that - so the export cannot only be a push, and the failure
+# has to say so rather than sending somebody round the settings again.
+auth = ss.diagnose_response(401, "Unauthorized")
+check("a 401 is its own diagnosis, not a generic HTTP failure", auth["level"], "auth")
+check("it names the setting worth checking first",
+      "Execute as" in auth["message"], True)
+check("and the cause nobody can fix from the editor",
+      "administrator" in auth["message"], True)
+check("then points at the way out", "download buttons" in auth["message"], True)
+check("including the personal-account workaround",
+      "Gmail" in auth["message"], True)
+check("a 403 is diagnosed the same way", ss.diagnose_response(403, "")["level"], "auth")
+check("and a 404 is not, because that is a deleted deployment",
+      ss.diagnose_response(404, "")["level"], "http")
+
+import pandas as _pd  # noqa: E402
+
+_df = _pd.DataFrame({"Date": ["2026-09-07", "2026-09-06"],
+                     "Operator Name": ["Ana Ruiz", "Keagan Whitfield"],
+                     "Volume Output (Liters)": [412.5, 388.0]})
+_book = ss.workbook_bytes(_df, "KPI Summary")
+check("the workbook is a real xlsx", _book[:2], b"PK")
+check("and it is not empty", len(_book) > 2000, True)
+check("an empty frame still produces a file rather than raising",
+      ss.workbook_bytes(_pd.DataFrame())[:2], b"PK")
+# A tab name over 31 characters is rejected by Excel outright, and the frame
+# is named after an export mode whose label can be long.
+check("an over-long tab name is trimmed rather than rejected",
+      ss.workbook_bytes(_df, "A" * 60)[:2], b"PK")
+
+TODAY = date(2026, 9, 7)
+check("a file is named for what is in it",
+      ss.export_filename("📊 Aggregated Calculated Metrics (KPI Summary)",
+                         "📆 Past 7 Days", "xlsx", TODAY),
+      "formlabs-mes-kpi-summary-7-days-2026-09-07.xlsx")
+check("the raw stream is named differently",
+      "audit-log" in ss.export_filename("📋 Raw Production Audit Stream",
+                                        "⚡ Live Today (Active Shift)", "csv", TODAY), True)
+check("and the scope is in the name, so two downloads are not both 'export (3)'",
+      "today" in ss.export_filename("📋 Raw Production Audit Stream",
+                                    "⚡ Live Today (Active Shift)", "csv", TODAY), True)
+check("all-time says so",
+      "all-time" in ss.export_filename("x", "🌐 All Time History", "csv", TODAY), True)
+print("  the file path OK")
+
 # --- the script handed to the user -------------------------------------------
 # It is quoted in the interface as the thing to paste, so it has to be the
 # thing that works with what the page actually sends.
