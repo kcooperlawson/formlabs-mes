@@ -1,91 +1,29 @@
 # Formlabs MES — Changelog
 
-What got added and what got fixed, newest first. One entry per release.
+What got added and what got fixed, newest first. One entry per day, and where a day had several releases in it the version numbers are marked inside the entry.
 
-Three version numbers are missing from the list. 3.16, 3.26 and 3.26.1 only changed the handbook, the operator guide and this file. Nothing in the app moved on any of them, so there is nothing to write down here. The app currently reads 3.26.1, and the newest release that actually changed it is 3.25.1 below.
+Three version numbers are missing. 3.16, 3.26 and 3.26.1 only changed the handbook, the operator guide and this file. Nothing in the app moved on any of them, so there is nothing to write down here. The app currently reads 3.26.1, and the newest release that actually changed it is 3.25.1.
 
 Anything before August 31 is written up from the short notes I made at the time. Some days had two or three releases in them.
 
 ---
 
-## 3.25.1 — Monday, September 7, 2026
+## 3.19 – 3.25.1 — Monday, September 7, 2026
+**The last day before the floor test**
 
-Half the operator form was off the side of the phone. I measured it at 390 px wide. The four tab labels wanted 642 px of room and had 358, so only two of them were visible. The other two sat off the right edge behind a scroll nobody finds.
+Nine releases. I have put them under one heading and sorted them by subject rather than by release, with the version numbers in brackets so I can still find any of it in the history.
 
-They are Pouring, Downtime, Audit and Notes now. All four fit.
+### Making it look like a 3D printing company's app *(3.19)*
 
-Three other things I measured on a phone and left alone until real operators have used it. The form is four phone screens tall with Submit two screens down. Tap targets are under the recommended size unless glove mode is on. And the startup checklist asks for camera permission first thing every morning.
+We print things for a living and the software did not show it anywhere. None of this changed how anything gets recorded.
 
----
+- **The wall display builds a resin cartridge as the shift pours.** It fills from the bottom as output climbs toward the shift target, with layer lines on the part that is done and the laser sitting on the layer being written. There is no number to read. You can see how the shift is going from the far side of the floor.
+- Nothing on it loops. The page reloads itself every ten seconds, so a repeating animation would restart mid-cycle every time and look like a fault. The height is a value that slides when the number actually changes and sits still when it does not. If it moves, something happened.
+- Progress bars are laid down in slices now instead of one solid block. Same reading, and it looks like ours.
+- The sign-in screen leads with a Form 4 and a laser passes over it once as the page loads. Once, not looping.
+- All the pictures are our own product renders. Nothing in here draws a Formlabs machine, it just positions and reveals the real ones.
 
-## 3.25 — Monday, September 7, 2026
-**The stopped-record alarm did not know it was Saturday**
-
-It asks the shift clock whether a shift is running, and the clock only knew what time it was. Every day looked like a working day. So Saturday at six in the morning read as Shift 1 running with nothing logged, and the wall put up an alarm about a weekend. Every week. If it fires when nothing is wrong then by Monday nobody reads it.
-
-- Seven checkboxes under IT Admin for the days the plant runs.
-- A shift counts by the day it starts, so a Friday night shift is still watched into Saturday morning.
-- Defaults to every day. One visit to IT Admin switches the weekend off.
-
----
-
-## 3.24.1 — Monday, September 7, 2026
-
-Log Out looked like it did nothing. It was revoking the session and clearing the cookie fine, but the signed-in screen stayed up until you hit refresh. An operator handing a phone to the next shift had no way to know the account was actually signed out.
-
-Writing a cookie makes the browser reload the page, so the line after it never ran, and that line was the one that forgot who was signed in. I swapped the order.
-
-Nine logout buttons also had a line after "go to the home page" that could never run. Deleted.
-
----
-
-## 3.24 — Monday, September 7, 2026
-**The messaging tab was promising somebody was listening**
-
-Nothing in this app tells a manager a message has arrived. Not the home screen, not the sidebar, not the wall display. A manager sat at the PC all day would never know. But it was called "Direct Manager Communications", drawn like a chat, and sitting on the operator's screen.
-
-An operator typing "pump 2 is leaking" and going back to work thinking it was reported is the app swallowing something urgent.
-
-The data settles it. Four messages ever, all from my account, all saying "test".
-
-It is called **Note to Management** now, and it says before you type that nobody is watching it live and to use the radio for anything urgent. I deleted nothing. Whether it earns a proper alert should come out of whether anyone uses it during testing.
-
----
-
-## 3.23 — Monday, September 7, 2026
-
-Two more on the export.
-
-The time period picker never did anything. All four options exported every log ever recorded, so "Live Today" on two years of history sent two years of history. It filters now, and the row count is printed above the button.
-
-Then one of mine. Excel needs a package that was not installed here, and the download button builds its file while the page loads rather than when you press it. So the missing package did not fail a download, it took the whole page down. It only showed up once a wider date range gave the button some rows to work with. Something that only breaks once there is data in it will pass every check you make while writing it. CSV needs nothing, so that one is always there.
-
----
-
-## 3.22 — Monday, September 7, 2026
-**The export said it worked when it had not**
-
-Two problems, both the same shape. The page was reporting success off something that is not evidence of success.
-
-- **A success code is not proof anything arrived.** A web app that is not published for everyone answers with a sign-in page and a success code. The export would have told me it sent several hundred records into a login form. Every reply from the script is signed now and only that signature counts.
-- **The page was telling me how many rows it sent, not how many arrived.** Those are two different things and I was printing the wrong one. A payload that reached the script and did nothing still came back looking fine. The script now reports what it actually wrote, read back off the sheet, and names the spreadsheet it answered from with a link. That link is the only thing that would show rows landing in the wrong sheet.
-- The script stamps its own version on every reply. The usual way this breaks is a deployment still running last week's code, because saving the script editor publishes nothing and Google never mentions it.
-- **Then a 401 that no setting could fix.** A work Google account belongs to a company Workspace, and Workspace admins normally forbid publishing a web app where anyone can reach it. So the page leads with **Excel and CSV downloads** now. No account, nothing to publish, nobody's permission to ask for, and the file opens straight into Sheets or Excel. It sits above the push because it is the one that cannot fail.
-
----
-
-## 3.21 — Monday, September 7, 2026
-**Everyone gets their own spreadsheet**
-
-The Google export was broken because the destination was one line in a settings file, and that line was not set on this install at all. So the page could only ever say "webhook missing", and the fix lived on the server where nobody standing at the page could get to it.
-
-- Name it, paste the address, choose whether other managers can send to it. Yours stays private unless you share it.
-- A Google Sheet link cannot receive rows. It is a document and it has no inbox. The sheet needs a small script published as a web app, and that address is the one that goes in the box. Everyone pastes the spreadsheet link first because that is the link they have, so the page spots it, says why it will not work, and hands over the four steps and the script.
-
----
-
-## 3.20 — Monday, September 7, 2026
-**Pouring an amount instead of counting containers**
+### Pouring an amount instead of counting containers *(3.20)*
 
 The record could only say how many containers got filled and then multiply by a fixed size. That is right for cartridges and jugs and wrong for anything decanted. There was no way to write down "we put 180 litres into a drum". So it went in as the wrong number of cartridges, or it did not go in at all. Either way the tank it came out of was wrong from then on.
 
@@ -97,18 +35,30 @@ The record could only say how many containers got filled and then multiply by a 
 
 One bug caught before it shipped. The form picked its format by matching text, and "RPS (5L Bulk Jug)" has the word "Bulk" in it. Adding the drum option quietly turned every 5 litre jug into a measured pour and stopped lot-checking them. All 69 of the new sums passed while that was broken. The interface tests caught it.
 
----
+### The Google export, which took me four goes *(3.21 – 3.23)*
 
-## 3.19 — Monday, September 7, 2026
-**Making it look like a 3D printing company's app**
+It was broken because the destination was one line in a settings file, and that line was not set on this install at all. So the page could only ever say "webhook missing", and the fix lived on the server where nobody standing at the page could get to it.
 
-We print things for a living and the software did not show it anywhere. None of this changed how anything gets recorded.
+- **Anyone can link their own spreadsheet now.** Name it, paste the address, choose whether other managers can send to it. Yours stays private unless you share it.
+- A Google Sheet link cannot receive rows. It is a document and it has no inbox. The sheet needs a small script published as a web app, and that address is the one that goes in the box. Everyone pastes the spreadsheet link first because that is the link they have, so the page spots it, says why it will not work, and hands over the four steps and the script.
+- **A success code is not proof anything arrived.** A web app that is not published for everyone answers with a sign-in page and a success code. The export would have told me it sent several hundred records into a login form. Every reply from the script is signed now and only that signature counts.
+- **The page was also telling me how many rows it sent, not how many arrived.** Those are two different things and I was printing the wrong one. A payload that reached the script and did nothing still came back looking fine. The script now reports what it actually wrote, read back off the sheet, and names the spreadsheet it answered from with a link. That link is the only thing that would show rows landing in the wrong sheet.
+- The script stamps its own version on every reply. The usual way this breaks is a deployment still running last week's code, because saving the script editor publishes nothing and Google never mentions it.
+- **Then a 401 that no setting could fix.** A work Google account belongs to a company Workspace, and Workspace admins normally forbid publishing a web app where anyone can reach it. So the page leads with **Excel and CSV downloads** now. No account, nothing to publish, nobody's permission to ask for, and the file opens straight into Sheets or Excel. It sits above the push because it is the one that cannot fail.
+- The time period picker never did anything. All four options exported every log ever recorded, so "Live Today" on two years of history sent two years of history. It filters now, and the row count is printed above the button.
+- One more of mine. Excel needs a package that was not installed here, and the download button builds its file while the page loads rather than when you press it. So the missing package did not fail a download, it took the whole page down. It only showed up once a wider date range gave the button some rows to work with. Something that only breaks once there is data in it will pass every check you make while writing it. CSV needs nothing, so that one is always there.
 
-- **The wall display builds a resin cartridge as the shift pours.** It fills from the bottom as output climbs toward the shift target, with layer lines on the part that is done and the laser sitting on the layer being written. There is no number to read. You can see how the shift is going from the far side of the floor.
-- Nothing on it loops. The page reloads itself every ten seconds, so a repeating animation would restart mid-cycle every time and look like a fault. The height is a value that slides when the number actually changes and sits still when it does not. If it moves, something happened.
-- Progress bars are laid down in slices now instead of one solid block. Same reading, and it looks like ours.
-- The sign-in screen leads with a Form 4 and a laser passes over it once as the page loads. Once, not looping.
-- All the pictures are our own product renders. Nothing in here draws a Formlabs machine, it just positions and reveals the real ones.
+### Two things quietly doing nothing *(3.24, 3.24.1)*
+
+**The messaging tab was promising somebody was listening.** Nothing in this app tells a manager a message has arrived. Not the home screen, not the sidebar, not the wall display. A manager sat at the PC all day would never know. But it was called "Direct Manager Communications", drawn like a chat, and sitting on the operator's screen. An operator typing "pump 2 is leaking" and going back to work thinking it was reported is the app swallowing something urgent. The data settles it, four messages ever, all from my account, all saying "test". It is called **Note to Management** now and says before you type that nobody is watching it live and to use the radio for anything urgent. I deleted nothing. Whether it earns a proper alert should come out of whether anyone uses it during testing.
+
+**Log Out looked like it did nothing.** It was revoking the session and clearing the cookie fine, but the signed-in screen stayed up until you hit refresh, so an operator handing a phone to the next shift had no way to know the account was actually signed out. Writing a cookie makes the browser reload the page, so the line after it never ran, and that line was the one that forgot who was signed in. I swapped the order. Nine logout buttons also had a line after "go to the home page" that could never run.
+
+### Weekends, and phones *(3.25, 3.25.1)*
+
+- **The stopped-record alarm did not know it was Saturday.** It asks the shift clock whether a shift is running, and the clock only knew what time it was. Every day looked like a working day, so Saturday at six in the morning read as Shift 1 running with nothing logged, and the wall put up an alarm about a weekend. Every week. If it fires when nothing is wrong then by Monday nobody reads it. There are seven checkboxes under IT Admin now for the days the plant runs. A shift counts by the day it starts, so a Friday night shift is still watched into Saturday morning. It defaults to every day, so I need one visit to IT Admin to switch the weekend off.
+- **Half the operator form was off the side of the phone.** I measured it at 390 px wide. The four tab labels wanted 642 px of room and had 358, so only two of them were visible. The other two sat off the right edge behind a scroll nobody finds. They are Pouring, Downtime, Audit and Notes now, and all four fit.
+- Three other things I measured on a phone and left alone until real operators have used it. The form is four phone screens tall with Submit two screens down. Tap targets are under the recommended size unless glove mode is on. And the startup checklist asks for camera permission first thing every morning.
 
 ---
 
