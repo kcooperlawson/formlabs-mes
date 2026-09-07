@@ -24,6 +24,7 @@ from backup_policy import backup_state, DUE_AFTER_HOURS, KEEP_BACKUPS
 from database import esc
 from shifts import picker_options as shift_picker_options
 import external_links
+import shift_clock
 
 st.set_page_config(page_title="IT Admin Console | Formlabs MES", page_icon="🛡️", layout="wide")
 
@@ -458,6 +459,37 @@ with tab_settings:
                                        "reactor page. Leave off if everything here is poured "
                                        "into cartridges and jugs.")
 
+
+
+        # Full width, outside the three columns: seven checkboxes squeezed into a
+        # third of the width wrapped their labels one letter per line, which is a
+        # worse way of saying "Mon" than not saying it.
+        #
+        # This is what stops the stopped-record alarm going off every Saturday on
+        # a plant that does not work weekends. The shift clock only ever knew what
+        # time it was, never what day, so every day looked like a working day and
+        # the wall display raised an alarm about a weekend - and an alarm that
+        # cries wolf every weekend is one nobody reads by Monday.
+        st.markdown("---")
+        st.markdown("**📅 Days this plant runs**")
+        st.caption("Shifts only count as running on these days, so the stopped-record alarm "
+                   "stays quiet on a weekend or a shutdown day instead of reporting an empty "
+                   "log as a fault. A shift counts by the day it STARTS, so a Friday night "
+                   "shift is still watched into Saturday morning.")
+        _saved_days = shift_clock.parse_operating_days(current_settings.get("operating_days"))
+        # Saved, not picked: these are inside a form, so their values do not reach
+        # Python until Save is pressed. A line claiming to describe the current
+        # selection would be describing the previous one.
+        st.caption(f"Saved: **{shift_clock.describe_operating_days(current_settings.get('operating_days'))}** "
+                   "— change the boxes and press Save Operational Parameters.")
+        _day_cols = st.columns(7)
+        _picked = set()
+        for _i, _lbl in enumerate(shift_clock.DAY_LABELS):
+            with _day_cols[_i]:
+                if st.checkbox(_lbl, value=_i in _saved_days, key=f"op_day_{_i}"):
+                    _picked.add(_i)
+        op_days = shift_clock.format_operating_days(_picked)
+
         # ------------------ HOW MUCH OF THE APP THIS PLANT USES ------------------
         # The application grew work orders and a separate IT role first, so
         # every screen assumed a manager had dispatched a run and somebody else
@@ -544,6 +576,7 @@ with tab_settings:
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
                 "enable_bulk_pour": en_bulk,
+                "operating_days": op_days,
                 # Stored as the negative of the picker: the column is named for
                 # the smaller configuration, so the default value of a row
                 # nobody has touched is the smaller one.

@@ -6,6 +6,28 @@ Entries before August 31 have been written back up from the release notes I cut 
 
 ---
 
+## 3.25 — Monday, September 7, 2026
+**The alarm did not know it was Saturday**
+
+The stopped-record alarm asks the shift clock whether a shift is running, and **the shift clock only ever knew what time it was, never what day.** So on a plant that works Monday to Friday, Saturday at six in the morning read as Shift 1 running with nothing logged against it, and the wall display raised an alarm about a weekend. Sunday did it again. Every week.
+
+That is not cosmetic. **An alarm that cries wolf every weekend is worse than no alarm at all** — by Monday nobody reads the red band, and the one that means something looks exactly like the fifty that did not. The whole value of that band is that it is rare.
+
+**A new setting under IT Admin: the days this plant runs.** Seven checkboxes. Shifts only count as running on those days, so the alarm stays quiet on a weekend or a shutdown day instead of reporting an empty log as a fault.
+
+**A shift counts by the day it STARTS, not the day it is now.** This is the half that is easy to get backwards. A shift beginning Friday night is a *Friday* shift at two o'clock on Saturday morning, and the alarm has to stay armed for it — otherwise switching the weekend off would quietly disarm the back half of every Friday night, which is precisely when nobody is around to notice the record has stopped. Asserted in both directions.
+
+**Every unreadable setting fails towards the alarm still working.** Missing, empty, wrong length, nonsense, or every day switched off all mean *every day*. A setting whose job is to silence an alarm must never fail open by accident, and "no days at all" is a mistake in a form rather than a description of a plant.
+
+**Defaulted to every day, so nothing changes until you say so.** An existing install behaves the day after this migration exactly as it did the day before. Assumptions about somebody's shift pattern are not the kind of thing to make on their behalf when the consequence is a disarmed alarm — **so this needs one visit to IT Admin to switch the weekend off.**
+
+- The idle state looks a week ahead rather than to tomorrow. "Next shift tomorrow" on a Saturday is the same wrong answer in a smaller font; it now says *Shift 1 Monday at 6:00 AM*.
+- **Migration 0014** adds one `String(7)` column of "1"s and "0"s, Monday first. One small column that still reads correctly in a database dump a year from now and needs no parser to understand.
+- 32 more assertions in `tests/test_shifts_and_display.py`, including the Friday-night-into-Saturday case, every malformed setting, and a check that a plant which has not touched this setting runs on all seven days exactly as before.
+- Suite: 1,328 assertions across seventeen files, 18 screens rendered, 8 round trips, 66 browser checks. 1,420 total.
+
+---
+
 ## 3.24.1 — Monday, September 7, 2026
 **Log Out & Clear Device looked like it did nothing**
 

@@ -2156,6 +2156,9 @@ def get_plant_settings() -> dict:
                 # a new one. A floor that never decants into drums should not
                 # have to look at a control for it.
                 "enable_bulk_pour": bool(getattr(settings, 'enable_bulk_pour', 0)),
+                # Every day on a row written before this column existed: the
+                # alarm keeps the reach it had rather than quietly losing days.
+                "operating_days": (getattr(settings, 'operating_days', None) or "1111111"),
                 # shift_count was stored and saved but never read back out of
                 # here, so every caller fell through to shifts.py's default of
                 # two. That is the right answer for this plant today, which is
@@ -2171,7 +2174,7 @@ def get_plant_settings() -> dict:
             "yield_target_pct": 99.0, "packing_yield_target_pct": 99.5, "shift_1_break_mins": 60.0,
             "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "enable_packing": True,
             "shift_count": 2, "pump_form_url": "", "pump_form_label": "",
-            "simple_mode": True, "enable_bulk_pour": False
+            "simple_mode": True, "enable_bulk_pour": False, "operating_days": "1111111"
         }
     finally:
         session.close()

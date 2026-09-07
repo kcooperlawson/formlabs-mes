@@ -229,6 +229,10 @@ class PlantSettings(Base):
     # Off by default: a floor that never decants into drums should not
     # have to look at a control for it.
     enable_bulk_pour = Column(Integer, default=0)  # 1 = True, 0 = False
+    # Which weekdays this plant runs, Monday first, as seven "1"/"0"
+    # characters. Every day by default so an existing install does not change
+    # behaviour; see migration 0014 and shift_clock.parse_operating_days.
+    operating_days = Column(String(7), default="1111111")
     # An external form the plant links out to - today the pump form behind the
     # QR sticker on the pump. Held here rather than in source because this
     # application does not own that form and whoever does can move it. Empty

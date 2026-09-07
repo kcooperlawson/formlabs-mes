@@ -47,6 +47,49 @@ from zoneinfo import ZoneInfo
 #      yesterday's start time for each shift.
 PLANT_TZ = ZoneInfo("America/New_York")
 
+# Monday first, matching datetime.weekday(). Stored as seven characters of
+# "1" and "0" because that is one small column that reads correctly in a
+# database dump a year from now, and needs no parser to understand.
+DAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+ALL_DAYS = "1111111"
+WEEKDAYS = "1111100"
+
+
+def parse_operating_days(value) -> frozenset:
+    """Which weekdays this plant runs, as datetime.weekday() numbers.
+
+    Anything unreadable means every day. That is the safe direction: a plant
+    whose setting is missing or corrupt gets the behaviour it had before this
+    existed - every day is a working day - rather than a silently disarmed
+    alarm at the one moment somebody needs it. A setting that stops an alarm
+    must never fail open by accident.
+    """
+    text = str(value or "").strip()
+    if len(text) != 7 or any(c not in "01" for c in text):
+        return frozenset(range(7))
+    days = frozenset(i for i, c in enumerate(text) if c == "1")
+    # Every day switched off would mean no shift ever runs and no alarm ever
+    # fires. That is not a plant, it is a mistake in a settings form.
+    return days or frozenset(range(7))
+
+
+def format_operating_days(days) -> str:
+    """The seven-character form, from weekday numbers."""
+    chosen = set(days or ())
+    return "".join("1" if i in chosen else "0" for i in range(7))
+
+
+def describe_operating_days(value) -> str:
+    """The setting in words, for a screen rather than a database."""
+    days = parse_operating_days(value)
+    if len(days) == 7:
+        return "every day"
+    if days == frozenset(range(5)):
+        return "Monday to Friday"
+    if not days:
+        return "no days"
+    return ", ".join(DAY_LABELS[i] for i in sorted(days))
+
 
 def _shift_window(base_date, start_h, start_m, gross_hours):
     start = datetime.combine(base_date, dtime(start_h, start_m), tzinfo=PLANT_TZ)
@@ -54,8 +97,27 @@ def _shift_window(base_date, start_h, start_m, gross_hours):
     return start, end
 
 
-def compute_shift_status(settings):
-    now = datetime.now(PLANT_TZ)
+def compute_shift_status(settings, now=None):
+    """Which shift is running, if the plant runs at all today.
+
+    The operating days are here rather than anywhere else because everything
+    downstream already asks this function whether a shift is on - including
+    the stopped-record alarm, which is what made the omission visible. The
+    clock only ever knew what time it was, never what DAY it was, so a
+    Saturday morning on a plant that runs Monday to Friday read as Shift 1
+    running with nothing logged against it, and the wall display raised an
+    alarm about a weekend.
+
+    An alarm that cries wolf every weekend is worse than no alarm at all: by
+    Monday nobody reads the red band, and the one that means something looks
+    exactly like the fifty that did not.
+
+    A shift is judged by the day it STARTED, not by the day it is now. A shift
+    beginning Friday night is a Friday shift at two o'clock on Saturday
+    morning, and the alarm should still be armed for it - otherwise switching
+    the weekend off would quietly disarm the back half of every Friday night.
+    """
+    now = now or datetime.now(PLANT_TZ)
     today = now.date()
     yesterday = today - timedelta(days=1)
     tomorrow = today + timedelta(days=1)
@@ -73,11 +135,14 @@ def compute_shift_status(settings):
         ("Shift 1", s1_h, s1_m, s1_gross, s1_net),
         ("Shift 2", s2_h, s2_m, s2_gross, s2_net),
     ]
+    running_days = parse_operating_days(settings.get("operating_days"))
 
     # Check "started yesterday" first so a still-running overnight shift
     # takes priority over anything that merely "starts today" but hasn't
     # happened yet.
     for base_date in (yesterday, today):
+        if base_date.weekday() not in running_days:
+            continue
         for name, h, m, gross, net in shifts:
             start, end = _shift_window(base_date, h, m, gross)
             if start <= now < end:
@@ -92,12 +157,19 @@ def compute_shift_status(settings):
                     "remaining_hours": max(0.0, net - elapsed_net),
                     "shift_pct": min(100.0, max(0.0, (elapsed_net / net) * 100.0)) if net > 0 else 0.0,
                     "next_shift_label": "",
+                    "runs_today": True,
                 }
 
     # No shift running — find the next one so the idle state can say
     # something useful instead of just "nothing's active."
+    # A week of lookahead rather than to tomorrow: on a Saturday the next
+    # shift is on Monday, and "the next shift is tomorrow" on a plant that
+    # does not run on Sunday is the same wrong answer in a smaller font.
     upcoming = []
-    for base_date in (today, tomorrow):
+    for offset in range(0, 8):
+        base_date = today + timedelta(days=offset)
+        if base_date.weekday() not in running_days:
+            continue
         for name, h, m, gross, net in shifts:
             start, _ = _shift_window(base_date, h, m, gross)
             if start > now:
@@ -106,7 +178,13 @@ def compute_shift_status(settings):
     next_shift_label = ""
     if upcoming:
         next_start, next_name = upcoming[0]
-        next_shift_label = f"{next_name} at {next_start.strftime('%I:%M %p').lstrip('0')}"
+        _when = next_start.strftime("%I:%M %p").lstrip("0")
+        if next_start.date() == today:
+            next_shift_label = f"{next_name} at {_when}"
+        elif next_start.date() == tomorrow:
+            next_shift_label = f"{next_name} tomorrow at {_when}"
+        else:
+            next_shift_label = f"{next_name} {next_start.strftime('%A')} at {_when}"
 
     return {
         "is_active": False,
@@ -117,4 +195,5 @@ def compute_shift_status(settings):
         "remaining_hours": 0.0,
         "shift_pct": 0.0,
         "next_shift_label": next_shift_label,
+        "runs_today": today.weekday() in running_days,
     }

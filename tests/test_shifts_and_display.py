@@ -278,5 +278,98 @@ for label, css in (("glove", dm.glove_css()), ("night", dm.night_css())):
     check(css.startswith("<style>"), f"{label} mode CSS starts at column zero")
 print(f"  all {len(THEMES)} themes and both display modes emit unindented CSS")
 
+
+# --------------------------------------------------- days the plant runs --
+# The stopped-record alarm asks the shift clock whether a shift is running.
+# The clock only ever knew what TIME it was, so every day looked like a
+# working day: on a plant that runs Monday to Friday, Saturday at six in the
+# morning read as Shift 1 running with nothing logged, and the wall display
+# raised an alarm about a weekend. Sunday did it again.
+#
+# That is not a cosmetic bug. An alarm that cries wolf every weekend is worse
+# than no alarm, because by Monday nobody reads the red band and the one that
+# means something looks exactly like the fifty that did not.
+section("DAYS THE PLANT RUNS")
+
+import shift_clock as sc  # noqa: E402
+from datetime import datetime  # noqa: E402
+
+WEEK = {"shift_1_start": "06:00", "shift_1_hours": 8.5,
+        "shift_2_start": "14:30", "shift_2_hours": 8.5,
+        "operating_days": sc.WEEKDAYS}
+
+
+def at(y, mo, d, h, mi=0, settings=None):
+    return sc.compute_shift_status(settings or WEEK,
+                                   datetime(y, mo, d, h, mi, tzinfo=sc.PLANT_TZ))
+
+
+check(at(2026, 9, 11, 9)["is_active"], "Friday morning is a working shift")
+check(not at(2026, 9, 12, 9)["is_active"], "Saturday morning is not")
+check(not at(2026, 9, 13, 9)["is_active"], "and neither is Sunday")
+check(at(2026, 9, 14, 9)["is_active"], "Monday morning is back on")
+check(at(2026, 9, 12, 9)["shift_name"] == "Off-Shift",
+      "a non-working day reports Off-Shift rather than a shift nobody is on")
+print("  a weekend is a weekend, not a plant that has stopped logging")
+
+# The half of this that is easy to get wrong in the other direction. A shift
+# that begins on Friday night is a FRIDAY shift at two on Saturday morning,
+# and the alarm has to stay armed for it - otherwise switching the weekend off
+# quietly disarms the back half of every Friday night, which is exactly when
+# nobody is around to notice the record has stopped.
+NIGHTS = dict(WEEK, shift_2_start="22:00", shift_2_hours=8.0)
+check(at(2026, 9, 11, 23, 30, NIGHTS)["is_active"], "the Friday night shift is running")
+check(at(2026, 9, 12, 2, 0, NIGHTS)["is_active"],
+      "and is still watched at two on Saturday morning")
+check(at(2026, 9, 12, 2, 0, NIGHTS)["shift_name"] == "Shift 2",
+      "as Friday's shift, because that is the day it started")
+check(not at(2026, 9, 12, 7, 0, NIGHTS)["is_active"],
+      "but Saturday morning proper is off again")
+check(not at(2026, 9, 13, 2, 0, NIGHTS)["is_active"],
+      "and there is no Saturday night shift to watch")
+print("  a shift is judged by the day it started, not the day it ends")
+
+# What the idle state says. "Next shift tomorrow" on a Saturday is the same
+# wrong answer in a smaller font.
+sat = at(2026, 9, 12, 9)
+check("Monday" in sat["next_shift_label"],
+      "on Saturday the next shift is named as Monday's")
+check("tomorrow" in at(2026, 9, 13, 9)["next_shift_label"],
+      "and on Sunday it is tomorrow's")
+check("runs_today" in sat and sat["runs_today"] is False,
+      "the status says outright that today is not a working day")
+print("  the idle state looks past the weekend rather than to tomorrow")
+
+# The setting itself. It can silence an alarm, so every way of getting it
+# wrong has to fail towards the alarm still working.
+check(sc.parse_operating_days(sc.ALL_DAYS) == frozenset(range(7)), "all seven parse")
+check(sc.parse_operating_days(sc.WEEKDAYS) == frozenset(range(5)), "a working week parses")
+check(sc.parse_operating_days(None) == frozenset(range(7)),
+      "a missing setting means every day, not no days")
+check(sc.parse_operating_days("") == frozenset(range(7)), "and so does an empty one")
+check(sc.parse_operating_days("nonsense") == frozenset(range(7)),
+      "so does something unreadable")
+check(sc.parse_operating_days("111") == frozenset(range(7)),
+      "so does the wrong length")
+check(sc.parse_operating_days("0000000") == frozenset(range(7)),
+      "and every day switched off is a mistake in a form, not a plant")
+check(sc.format_operating_days({0, 1, 2, 3, 4}) == sc.WEEKDAYS, "days round-trip to text")
+check(sc.parse_operating_days(sc.format_operating_days({5, 6})) == frozenset({5, 6}),
+      "and back again")
+check(sc.describe_operating_days(sc.WEEKDAYS) == "Monday to Friday", "described in words")
+check(sc.describe_operating_days(sc.ALL_DAYS) == "every day", "and so is every day")
+check("Sat" in sc.describe_operating_days("1111110"), "an odd pattern names its days")
+print("  every unreadable setting fails towards the alarm still working")
+
+# The property that matters most for an existing install: the day this ships,
+# nothing changes for anybody who has not set it.
+NO_SETTING = {"shift_1_start": "06:00", "shift_1_hours": 8.5,
+              "shift_2_start": "14:30", "shift_2_hours": 8.5}
+for _d in range(11, 18):
+    check(at(2026, 9, _d, 9, settings=NO_SETTING)["is_active"],
+          f"with no setting, 2026-09-{_d} still runs as it always did")
+print("  a plant that has not set this behaves exactly as before")
+
+
 section("RESULT")
 print(f"ALL {CHECKS} SHIFT / TEXTURE / THEME / DISPLAY ASSERTIONS PASSED")
