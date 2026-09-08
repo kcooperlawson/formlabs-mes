@@ -7,7 +7,7 @@
                  of what the section says. Replaced by the log itself.
   02_cockpit     Shows a heading that no longer exists: the manager page was
                  titled "Plant Manager Operations & Work Order Dispatch" and
-                 is now "Plant Manager - Production Records".
+                 is now "Production Records", shortened again so it fits a phone.
   22_packing     Carries two strings that were deleted - a run-cards heading
                  over an empty space, and a notice telling the operator to go
                  and find their plant manager.
@@ -111,7 +111,7 @@ async def main():
         ctx, pg = await session("jrivera")
         await pg.get_by_text("Manager", exact=False).first.click()
         await pg.wait_for_timeout(14000)
-        await frame(pg, "02_cockpit", "Plant Manager", -150, 804)
+        await frame(pg, "02_cockpit", "Production Records", -150, 804)
         await ctx.close()
 
         # --- 3. the packing tab, which is what that figure is captioned as ---

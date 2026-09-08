@@ -54,7 +54,7 @@ async def main():
             # figure is capped at 1.95in tall in the handbook, so every pixel
             # spent on the filter buttons is a row of resins not shown. A wide,
             # short crop fills that box with table.
-            head = pg.get_by_text("RESIN NAME", exact=False).first
+            head = pg.get_by_text(__import__("re").compile("resin name", 2)).first
             await head.scroll_into_view_if_needed()
             await pg.mouse.move(20, 20)
             await pg.wait_for_timeout(2000)
