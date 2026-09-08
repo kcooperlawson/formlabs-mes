@@ -173,56 +173,87 @@ def build(p: Palette) -> str:
 
     return _css(f"""
     <style>
+        /* One type scale and one spacing step, for every theme.
+           These grew page by page as raw HTML in f-strings, so sizes and
+           paddings drifted a few pixels between screens. Nobody can name what
+           is wrong with that; they just feel it, and what it reads as is
+           software somebody assembled rather than software somebody bought.
+           Five sizes, two weights, one 8px step. Anything new takes a token
+           rather than inventing a number. */
+        :root {{
+            --mes-t-xs: 0.72rem;   /* eyebrow labels, all caps */
+            --mes-t-sm: 0.86rem;   /* captions, secondary lines */
+            --mes-t-md: 1rem;      /* body */
+            --mes-t-lg: 1.35rem;   /* card headings, secondary figures */
+            --mes-t-xl: 1.75rem;   /* the number a card exists to show */
+            --mes-w-mid: 600;
+            --mes-w-strong: 800;
+            --mes-sp-1: 8px;
+            --mes-sp-2: 16px;
+            --mes-sp-3: 24px;
+            /* And one rhythm for movement. Fast is feedback - a hover, a
+               button. Slow is a value actually changing. Two durations and
+               one curve is what makes motion read as designed instead of as
+               several people's defaults sitting next to each other. */
+            --mes-fast: 160ms;
+            --mes-slow: 900ms;
+            --mes-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+        }}
+
         .stApp {{ background-color: {p.ground} !important; color: {p.body} !important;
                   font-family: {p.font} !important; }}
         header[data-testid="stHeader"] {{ background: transparent !important; }}
 
         .brand-header {{ display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 20px; background: {header_bg}; border: 1px solid {p.line};
-            border-radius: {p.radius}; margin-bottom: 16px;
+            padding: var(--mes-sp-2) var(--mes-sp-3); background: {header_bg};
+            border: 1px solid {p.line};
+            border-radius: {p.radius}; margin-bottom: var(--mes-sp-2);
             border-bottom: 3px solid {p.accent};
             box-shadow: 0 4px 10px {_rgba('#000000', 0.10 if p.light else 0.35)}; }}
         .system-badge {{ background: {_rgba(p.accent, 0.15)}; color: {p.accent};
-            font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; padding: 4px 10px;
+            font-size: var(--mes-t-xs); font-weight: var(--mes-w-strong);
+            letter-spacing: 0.15em; padding: 4px 10px;
             border-radius: 4px; border: 1px solid {p.accent}; text-transform: uppercase;
             margin-left: 14px; }}
 
         .telemetry-grid-card {{ background: {p.surface}; border: 1px solid {p.line};
-            border-radius: {p.radius}; padding: 12px 16px; min-height: 96px;
-            transition: all 0.2s ease; border-left: 4px solid {p.muted}; }}
+            border-radius: {p.radius}; padding: var(--mes-sp-1) var(--mes-sp-2);
+            min-height: 96px;
+            transition: all var(--mes-fast) var(--mes-ease);
+            border-left: 4px solid {p.muted}; }}
         .telemetry-grid-card:hover {{ transform: translateX(4px);
             border-left: 4px solid {p.accent}; background: {p.raised};
             box-shadow: -4px 4px 10px {_rgba('#000000', 0.08 if p.light else 0.40)}; }}
-        .telemetry-label {{ font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em;
+        .telemetry-label {{ font-size: var(--mes-t-xs); font-weight: var(--mes-w-strong); letter-spacing: 0.12em;
             color: {p.muted}; text-transform: uppercase; }}
-        .telemetry-val-large {{ font-size: 1.7rem; font-weight: 900; color: {p.ink};
+        .telemetry-val-large {{ font-size: var(--mes-t-xl); font-weight: var(--mes-w-strong); color: {p.ink};
             line-height: 1.2; }}
 
         .stTextInput > div > div > input {{ background-color: {p.surface} !important;
             color: {p.ink} !important; border: 1px solid {p.line} !important;
-            border-radius: {p.radius} !important; font-weight: 600; }}
+            border-radius: {p.radius} !important; font-weight: var(--mes-w-mid); }}
         .stTextInput > div > div > input:focus {{ border-color: {p.accent} !important;
             box-shadow: 0 0 0 2px {_rgba(p.accent, 0.25)} !important; }}
 
         .stButton>button {{ background: {p.accent} !important; color: {p.ground} !important;
-            font-weight: 800 !important; border: none !important;
+            font-weight: var(--mes-w-strong) !important; border: none !important;
             border-radius: {p.radius} !important; {glow_btn}
-            transition: all 0.2s ease !important; {upper} }}
+            transition: all var(--mes-fast) var(--mes-ease) !important; {upper} }}
         .stButton>button:hover {{ background: {p.accent_2} !important; {glow_hover} }}
 
         .filter-section-card {{ background: {p.surface}; border: 1px solid {p.line};
-            border-radius: {p.radius}; padding: 14px 16px; margin: 16px 0; }}
+            border-radius: {p.radius}; padding: var(--mes-sp-2); margin: var(--mes-sp-2) 0; }}
 
         [data-testid="stSidebar"] {{ background-color: {p.surface} !important;
             border-right: 1px solid {p.line} !important; }}
         [data-testid="stSidebarNav"] {{ padding-top: 1.5rem; }}
-        [data-testid="stSidebarNav"] a {{ color: {p.muted} !important; font-weight: 600 !important;
-            border-radius: {p.radius} !important; margin: 4px 16px !important;
-            transition: all 0.3s ease !important; }}
+        [data-testid="stSidebarNav"] a {{ color: {p.muted} !important; font-weight: var(--mes-w-mid) !important;
+            border-radius: {p.radius} !important; margin: 4px var(--mes-sp-2) !important;
+            transition: all var(--mes-fast) var(--mes-ease) !important; }}
         [data-testid="stSidebarNav"] a:hover {{ background-color: {p.raised} !important;
             color: {p.accent} !important; transform: translateX(5px) !important; }}
         [data-testid="stSidebarNav"] a[aria-current="page"] {{ background: {p.accent} !important;
-            color: {p.ground} !important; font-weight: 900 !important; }}
+            color: {p.ground} !important; font-weight: var(--mes-w-strong) !important; }}
 
         h1, h2, h3, h4, h5, h6 {{ color: {p.ink} !important; }}
         hr {{ border-color: {p.line} !important; }}

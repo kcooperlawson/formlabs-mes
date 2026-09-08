@@ -41,7 +41,7 @@ def get_base64_image(image_path):
 logo_b64 = get_base64_image("assets/formlabs_logo.png")
 cartridge_b64 = get_base64_image("assets/resin_cartridge.png")
 
-st.set_page_config(page_title="Factory Live TV | Formlabs SCADA", page_icon="📺", layout="wide")
+st.set_page_config(page_title="Plant Command | Formlabs", page_icon="static/app-icon.png", layout="wide")
 
 
 import extra_streamlit_components as stx

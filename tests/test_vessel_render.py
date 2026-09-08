@@ -239,7 +239,7 @@ check("the fabricated one gets the surface in the resin's own colour",
 # The level glides to its new height. It has to be a transition on a plain
 # value and never an animation: every page carrying these re-runs on a timer,
 # and an animation would restart mid-cycle each time and read as a fault.
-check("the level moves by transition", "transition:y 0.9s" in fab, True)
+check("the level moves by transition", "transition:y 900ms" in fab, True)
 check("and never by animation", "animation" in fab, False)
 check("the sheen is clipped to the liquid, so an empty vessel has none",
       'height="0.0"' in draw(fill_pct=0) or surface_y(draw(fill_pct=0)) is not None,

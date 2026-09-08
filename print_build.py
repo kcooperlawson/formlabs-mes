@@ -40,6 +40,17 @@ LASER = "#F97316"
 LASER_GLOW = "rgba(249, 115, 22, 0.65)"
 RESIN = "#1E3A5F"
 
+# One rhythm for everything that moves here, matching the tokens the theme
+# engine sets. SLOW is a value actually changing - a build height, a bar, a
+# digit. ENTER is something arriving. SWEEP is a laser crossing the part. Three
+# numbers and one curve, rather than the 0.5s / 0.75s / 1s / 1.2s / 2.6s these
+# had grown into, which is what makes motion read as several people's defaults
+# sitting next to each other.
+EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)"
+SLOW = "900ms"
+ENTER = "500ms"
+SWEEP = "2.4s"
+
 # How many layer lines a full part is drawn with. High enough to read as
 # layers from across a room, low enough that they do not merge into a grey
 # wash at the size a wall display actually shows this at.
@@ -123,7 +134,7 @@ def odometer(value, decimals: int = 0, uid: str = "n") -> str:
                 f'overflow:hidden; vertical-align:bottom;">'
                 f'<span id="od{key}{i}" style="display:block; '
                 f'transform:translateY(-{int(ch)}em); '
-                f'transition:transform 0.75s cubic-bezier(0.22,0.61,0.36,1) '
+                f'transition:transform {SLOW} {EASE} '
                 f'{i * 0.04:.2f}s;">{strip}</span></span>')
         else:
             out.append(f'<span style="display:inline-block; '
@@ -167,7 +178,7 @@ def build_finale(done_units=None, target_units=None, unit: str = "L",
         f'color:#10B981; border:2px solid #10B981; border-radius:10px; '
         f'padding:14px 20px; margin:6px 0 14px 0; '
         f'background:rgba(16,185,129,0.12); '
-        f'animation:fin{key} 0.5s ease-out 1 forwards;">'
+        f'animation:fin{key} {ENTER} ease-out 1 forwards;">'
         f'<span style="font-size:2.1rem; font-weight:800; letter-spacing:0.22em; '
         f'white-space:nowrap;">BUILD COMPLETE</span>{line}</div>')
 
@@ -196,7 +207,7 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
             f'<div style="position:absolute; left:-6%; right:-6%; '
             f'bottom:calc({pct:.2f}% - 1px); height:2px; background:{LASER}; '
             f'box-shadow:0 0 10px 2px {LASER_GLOW}; '
-            f'transition:bottom 1.2s ease-in-out; z-index:4;"></div>')
+            f'transition:bottom {SLOW} {EASE}; z-index:4;"></div>')
 
     # One pass of the laser down the finished part, on the run where the
     # build completes and no other. Once, forwards, then gone - the same rule
@@ -208,7 +219,7 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
             f'82%{{opacity:1;}} 100%{{bottom:-2%; opacity:0;}}}}</style>'
             f'<div style="position:absolute; left:-6%; right:-6%; height:2px; '
             f'background:{LASER}; box-shadow:0 0 12px 3px {LASER_GLOW}; '
-            f'animation:fpass{key} 2.4s ease-in-out 1 forwards; z-index:4;"></div>')
+            f'animation:fpass{key} {SWEEP} ease-in-out 1 forwards; z-index:4;"></div>')
 
     ghost = ""
     if not done:
@@ -222,7 +233,7 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
     layer_lines = (
         f'<div style="position:absolute; inset:0; z-index:3; '
         f'clip-path:{clip}; -webkit-clip-path:{clip}; '
-        f'transition:clip-path 1.2s ease-in-out; '
+        f'transition:clip-path {SLOW} {EASE}; '
         f'background:repeating-linear-gradient(to top, '
         f'rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 1px, '
         f'transparent 1px, transparent {max(3, height_px // LAYERS)}px); '
@@ -237,7 +248,7 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
         f'<img src="data:image/png;base64,{image_b64}" '
         f'style="position:absolute; inset:0; width:100%; height:100%; '
         f'object-fit:contain; z-index:2; clip-path:{clip}; '
-        f'-webkit-clip-path:{clip}; transition:clip-path 1.2s ease-in-out;"/>'
+        f'-webkit-clip-path:{clip}; transition:clip-path {SLOW} {EASE};"/>'
         f'{layer_lines}{laser}'
         f'</div></div>'
         f'<div style="text-align:center; margin-top:10px; font-family:monospace; '
@@ -266,7 +277,7 @@ def layer_bar(pct, height_px: int = 14, colour: str = "#00D2FF",
         f'background:repeating-linear-gradient(to right, '
         f'{colour} 0px, {colour} {slice_px - 1}px, '
         f'rgba(0,0,0,0.45) {slice_px - 1}px, rgba(0,0,0,0.45) {slice_px}px); '
-        f'transition:width 1s ease-in-out;"></div>'
+        f'transition:width {SLOW} {EASE};"></div>'
         f'</div>')
 
 
@@ -293,7 +304,7 @@ def laser_sweep(image_b64: str, height_px: int = 210, uid: str = "s") -> str:
         f'filter:drop-shadow(0 14px 26px rgba(0,0,0,0.65));"/>'
         f'<div style="position:absolute; left:8%; right:8%; height:2px; '
         f'background:{LASER}; box-shadow:0 0 14px 3px {LASER_GLOW}; '
-        f'animation:sweep{key} 2.6s ease-in-out 1 forwards;"></div>'
+        f'animation:sweep{key} {SWEEP} ease-in-out 1 forwards;"></div>'
         f'</div>')
 
 

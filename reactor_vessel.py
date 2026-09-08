@@ -248,8 +248,9 @@ def _graduations(capacity_l: float, x_from: float, x_to: float,
 # timer, so it has to glide when the litres actually change and sit perfectly
 # still when they do not. A browser that will not transition an SVG geometry
 # attribute snaps to the new level, which is what this did before.
-_EASE = ("transition:y 0.9s ease-in-out, height 0.9s ease-in-out, "
-         "cy 0.9s ease-in-out;")
+_CURVE = "cubic-bezier(0.22, 0.61, 0.36, 1)"
+_EASE = (f"transition:y 900ms {_CURVE}, height 900ms {_CURVE}, "
+         f"cy 900ms {_CURVE};")
 
 
 def _surface(x: float, w: float, y: float, uid: str, flat: bool = False) -> str:

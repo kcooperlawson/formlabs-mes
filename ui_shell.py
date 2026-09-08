@@ -25,6 +25,27 @@ except ImportError:
     THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; }</style>"}
 
 
+# What a phone needs to save this to a home screen and have it look like an
+# application rather than a bookmark: an icon at the size iOS asks for, and a
+# manifest so Android uses the same one and the right name underneath it. Both
+# are served out of static/ (see .streamlit/config.toml). Operators meet this
+# every shift before they have opened anything, which is why it is worth the
+# five files it costs.
+_HEAD_LINKS = """
+<link rel="apple-touch-icon" sizes="180x180" href="./app/static/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./app/static/favicon.png">
+<link rel="manifest" href="./app/static/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pouring Log">
+<meta name="theme-color" content="#0B1220">
+"""
+
+
+def inject_app_icons():
+    """Once per page render. Cheap, and idempotent if it happens twice."""
+    st.markdown(_HEAD_LINKS, unsafe_allow_html=True)
+
+
 def apply_display_preferences(cookie_manager=None):
     """Inject glove mode and night dimming for this render, if active.
 
@@ -33,7 +54,12 @@ def apply_display_preferences(cookie_manager=None):
     rather than relying on session state matters: an operator who lands
     straight on the workstation page has no session state from anywhere else,
     and glove mode is exactly the setting that must survive that.
+
+    The home-screen icons ride along here for the same reason: this is the one
+    function every page in the app reaches, including the seven that predate
+    the shell.
     """
+    inject_app_icons()
     try:
         if cookie_manager is not None:
             try:

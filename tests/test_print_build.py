@@ -218,7 +218,7 @@ check("and each lands on its own number",
 check("the thousands separator is kept", ">,<" in od, True)
 check("and does not roll, because it never changes",
       od.split(">,<")[0].count("transform:translateY("), 1)
-check("it moves by transition", "transition:transform 0.75s" in od, True)
+check("it moves by transition", "transition:transform 900ms" in od, True)
 check("and never by animation", "animation" in od, False)
 check("a decimal figure keeps its point", ">.<" in pb.odometer(12.5, decimals=1), True)
 check("nothing arriving does not take the card down", "0" in pb.odometer(None), True)

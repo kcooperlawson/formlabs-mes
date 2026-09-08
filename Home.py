@@ -126,8 +126,8 @@ APP_VERSION = "PT-V3.26.1"
 _signed_in = bool(st.session_state.get("authenticated", False))
 
 st.set_page_config(
-    page_title="Formlabs MES Live Dashboard",
-    page_icon="🧪",
+    page_title="Pouring Log | Formlabs",
+    page_icon="static/app-icon.png",
     layout="wide",
     # "auto", not "expanded". Expanded is a fixed instruction that ignores the
     # screen it lands on: on a phone the sidebar is an overlay about 320px

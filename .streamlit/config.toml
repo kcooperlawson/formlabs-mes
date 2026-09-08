@@ -19,5 +19,11 @@ showErrorDetails = "none"
 address = "0.0.0.0"
 headless = true
 
+# Serves the static/ folder at /app/static/. That folder holds the home-screen
+# icons and the manifest, which is how the app gets a proper Formlabs icon and
+# name when an operator saves it to their phone rather than a generic browser
+# glyph and a truncated address.
+enableStaticServing = true
+
 [browser]
 gatherUsageStats = false

@@ -105,7 +105,7 @@ def get_base64_image(image_path):
 
 logo_b64 = get_base64_image("assets/formlabs_logo.png")
 
-st.set_page_config(page_title="Operator Terminal | Formlabs MES", page_icon="📝", layout="wide")
+st.set_page_config(page_title="Pouring Log | Formlabs", page_icon="static/app-icon.png", layout="wide")
 
 
 st.logo("assets/formlabs_logo.png")
