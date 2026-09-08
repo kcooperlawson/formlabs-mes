@@ -39,19 +39,20 @@ BASE, PIN = "http://localhost:8501", "1234"
 # name, URL path, height in CSS px, optional (anchor text, pixels to scroll up)
 # Heights come from the aspect of the figure each one replaces.
 SHOTS = [
-    ("01_scada",        "/",                       950, None),
-    ("01b_scada_lower", "/",                       950, ("POURING OPERATIONS", -40)),
-    ("04_analytics",    "/Analytics_Hub",          950, None),
-    ("05_lotverify",    "/Mgr_Lot_Verification",   950, None),
-    ("06_scrap",        "/Mgr_Scrap_Intel",        795, None),
-    ("08_historical",   "/Mgr_Historical",         788, None),
-    ("09_admin",        "/Admin_Panel",            925, None),
-    ("17_logmgmt",      "/Mgr_Log_Management",     950, None),
+    # name, URL path, height, optional (anchor text, scroll), text that proves
+    # the right page is on screen.
+    ("01_scada",        "/",                     950, None,                        "TIME HORIZON"),
+    ("01b_scada_lower", "/",                     950, ("POURING OPERATIONS", -40),  "POURING OPERATIONS"),
+    ("05_lotverify",    "/Mgr_Lot_Verification", 950, None,                        "Cartridge Lot Verification"),
+    ("06_scrap",        "/Mgr_Scrap_Intel",      795, None,                        "Quality Ops Canvas"),
+    ("08_historical",   "/Mgr_Historical",       788, None,                        "Historical Plant Analytics"),
+    ("17_logmgmt",      "/Mgr_Log_Management",   950, None,                        "Log Management"),
 ]
 
 # Work orders are hidden unless the plant dispatches them, so this one needs
 # the mode switched for the length of the shot and switched back afterwards.
-WORK_ORDER_SHOT = ("03_workorders", "/Mgr_Assigned_Runs", 950, None)
+WORK_ORDER_SHOT = ("03_workorders", "/Mgr_Assigned_Runs", 950, None,
+                   "Fleet Production Progress")
 
 
 async def main():
@@ -88,9 +89,36 @@ async def main():
         await pg.get_by_text("INITIALIZE SESSION").first.click()
         await pg.wait_for_timeout(15000)
 
-        async def shot(name, path, height, anchor):
-            await pg.goto(BASE + path, wait_until="networkidle")
-            await pg.wait_for_timeout(13000)
+        async def shot(name, path, height, anchor, expect):
+            # A page reached by URL can render before the "remember this
+            # device" cookie has made it back, so the role check runs against
+            # a session that is not restored yet and the page answers Access
+            # Denied. It is not a permissions problem and it fixes itself on
+            # the next render, so this reloads once and looks again. The first
+            # version of this script did not, and quietly wrote five
+            # screenshots of a denial message into the handbook.
+            for attempt in range(3):
+                await pg.goto(BASE + path, wait_until="networkidle")
+                # Wait for the thing that proves the page is up, rather than
+                # sleeping a fixed number of seconds and hoping. The two
+                # heaviest screens took longer than the guess and were being
+                # written off as refusals.
+                try:
+                    await pg.get_by_text(expect, exact=False).first.wait_for(
+                        state="attached", timeout=45000)
+                    await pg.wait_for_timeout(3500)
+                except Exception:
+                    pass
+                body = await pg.inner_text("body")
+                if expect in body:
+                    break
+                why = ("refused" if "Access Denied" in body else
+                       "sent to the sign-in screen" if "INITIALIZE SESSION" in body else
+                       "showing some other page")
+                print(f"  . {name}: {why}, retrying")
+            else:
+                print(f"  ! {name}: never reached {expect!r}, NOT written")
+                return
             if anchor:
                 text, up = anchor
                 try:
@@ -106,17 +134,56 @@ async def main():
             # Off any control, so nothing is caught mid-hover.
             await pg.mouse.move(4, 4)
             await pg.wait_for_timeout(500)
+            # Checked again after the scroll, because the anchor step can
+            # itself trigger a re-render. Nothing is written unless the real
+            # page is on screen.
             body = await pg.inner_text("body")
-            if "INITIALIZE SESSION" in body:
-                print(f"  ! {name}: landed on the sign-in screen, session not kept")
+            if expect not in body:
+                print(f"  ! {name}: {expect!r} gone at capture time, NOT written")
                 return
             await pg.screenshot(path=f"{OUT}/{name}.png",
                                 clip={"x": 0, "y": 0, "width": 1500, "height": height})
             written.append(name)
             print(f"  {name}.png")
 
-        for name, path, height, anchor in SHOTS:
-            await shot(name, path, height, anchor)
+        for entry in SHOTS:
+            await shot(*entry)
+
+        # Analytics Hub and IT Admin render as an empty shell when they are
+        # opened by URL - see the note at the top of this file. Reached by the
+        # sidebar link, the way a person reaches them, they are fine.
+        async def click_shot(name, link, height, expect, up=None):
+            await pg.goto(BASE, wait_until="networkidle")
+            await pg.wait_for_timeout(9000)
+            await pg.get_by_text(link, exact=False).first.click()
+            try:
+                await pg.get_by_text(expect, exact=False).first.wait_for(
+                    state="attached", timeout=45000)
+                await pg.wait_for_timeout(3500)
+            except Exception:
+                pass
+            if expect not in await pg.inner_text("body"):
+                print(f"  ! {name}: never reached {expect!r}, NOT written")
+                return
+            if up is not None:
+                # The console's own content starts below a full screen of
+                # navigation, so a crop from the top of the page is a picture
+                # of the sidebar. Scroll to the heading first.
+                el = pg.get_by_text(expect, exact=False).first
+                await el.evaluate(
+                    "(e) => e.scrollIntoView({block:'start', behavior:'instant'})")
+                await pg.wait_for_timeout(1500)
+                await pg.evaluate("(u) => window.scrollBy(0, u)", up)
+                await pg.wait_for_timeout(1200)
+            await pg.mouse.move(4, 4)
+            await pg.wait_for_timeout(500)
+            await pg.screenshot(path=f"{OUT}/{name}.png",
+                                clip={"x": 0, "y": 0, "width": 1500, "height": height})
+            written.append(name)
+            print(f"  {name}.png")
+
+        await click_shot("04_analytics", "Analytics Hub", 950, "NEXUS ANALYTICS")
+        await click_shot("09_admin", "IT Admin", 925, "IT Admin Console", up=-90)
 
         db.update_plant_settings({"simple_mode": False})
         await shot(*WORK_ORDER_SHOT)
