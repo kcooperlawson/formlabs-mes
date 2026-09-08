@@ -22,6 +22,14 @@ class User(Base):
     # --- LOGIN LOCKOUT ---
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime, nullable=True)
+    # What this operator picked last time. Not a preference they set - it is
+    # simply the last answer, so the form can open on it instead of asking
+    # again twelve times a shift. On the account rather than in the browser,
+    # because a phone locking or a session dropping is the normal case on a
+    # floor and a memory in the tab does not survive either.
+    last_station = Column(String(50), nullable=True)
+    last_cartridge = Column(String(60), nullable=True)
+    last_resin = Column(String(100), nullable=True)
 
 class ProductionLog(Base):
     __tablename__ = "production_logs"

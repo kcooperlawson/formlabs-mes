@@ -420,9 +420,18 @@ if current_role in ["operator", "packer"]:
     else:
         _checklist_pumps = get_active_pumps() or ["New Pump #1"]
         if st.session_state.get("h_pump") not in _checklist_pumps:
+            # The account knows where they were last, and it knows it before
+            # any cookie comes back. This has to happen HERE rather than down
+            # in the logging tab: the checklist decides which pump it is
+            # certifying from this value, so seeding it later means an
+            # operator returning gets asked to redo the checklist for a pump
+            # they are not standing at.
+            _remembered = crud.get_last_picks(current_user).get("station", "")
             _saved_station = cookie_manager.get(f"op_station_{current_user.replace(' ', '')}")
-            st.session_state["h_pump"] = (_saved_station if _saved_station in _checklist_pumps
-                                          else _checklist_pumps[0])
+            st.session_state["h_pump"] = (
+                _remembered if _remembered in _checklist_pumps
+                else _saved_station if _saved_station in _checklist_pumps
+                else _checklist_pumps[0])
         checklist_station = st.session_state["h_pump"]
 
     if not has_completed_daily_checklist(current_user, current_shift, checklist_station):
@@ -436,6 +445,28 @@ if current_role in ["operator", "packer"]:
                 "📍 Which pump station are you starting at?", _checklist_pumps, key="h_pump",
                 help="Changing this switches which station's checklist you're completing — and "
                      "carries through to your logging tab, so you only answer it once.")
+
+            # The one fact about this pump the app cannot work out for itself:
+            # which physical tank it draws from. Asked here, once, where the
+            # operator is standing at the pump and can read the tag off the
+            # side of the vessel - and only when that pump has no tank on it
+            # yet. Answered once, it never appears again, and no manager ever
+            # has to open a settings page to link a reactor to a station.
+            _vessels_here = crud.vessels_on_pump(st.session_state.get("h_pump", ""))
+            if not _vessels_here:
+                _all_vessels = crud.get_all_reactors_df()
+                _free = ([] if _all_vessels.empty else
+                         [str(r["reactor_name"]) for _, r in _all_vessels.iterrows()
+                          if not str(r.get("assigned_pump") or "").strip()
+                          or str(r.get("assigned_pump")) == "None"])
+                if _free:
+                    st.selectbox(
+                        "🛢️ Which vessel does this pump draw from?",
+                        ["— I don't know —"] + _free, key="chk_vessel",
+                        help="Asked once per pump. It is how the tank level knows a pour "
+                             "came out of this vessel and not the one beside it. If you are "
+                             "not sure, leave it and tell your lead — your logs still record.")
+                    st.caption("Read the tag off the side of the tank if there is one.")
 
         # --- Cookie check to survive page refreshes ---
         # Keyed by station as well as operator: moving to a new pump means a
@@ -538,6 +569,10 @@ if current_role in ["operator", "packer"]:
                 if qr_check and mat_check:
                     if st.session_state.get(clean_flag_key):
                         submit_daily_checklist(current_user, current_shift, checklist_station)
+                        # Link the vessel on the way through, if they answered.
+                        _picked = st.session_state.get("chk_vessel", "")
+                        if _picked and not _picked.startswith("—"):
+                            crud.link_vessel_to_pump(_picked, checklist_station)
                         flash("Startup checklist recorded. Terminal unlocked.", "🔓")
 
                         # Clean up the session state flag
@@ -1109,6 +1144,20 @@ if tab1 is not None:
         # already seeded with the right default above, and this is the
         # single source of truth for "my station" — changing it here is
         # what updates Section 1's active-run list on the next rerun.
+        # Open on what they picked last time. Same station, same format and
+        # nearly always the same resin as the hour before, so asking for all
+        # three twelve times a shift is asking somebody at a pump to re-answer
+        # questions that have not changed since breakfast. Seeded once per
+        # session and only where the widget has no value yet, so it never
+        # fights an operator who has already changed something.
+        if not st.session_state.get("_picks_seeded"):
+            _last = crud.get_last_picks(current_user)
+            if _last["cartridge"] and _last["cartridge"] in format_choices(bulk_pour_enabled):
+                st.session_state.setdefault("h_cart", _last["cartridge"])
+            if _last["resin"]:
+                st.session_state["_last_resin_pick"] = _last["resin"]
+            st.session_state["_picks_seeded"] = True
+
         station = st.selectbox("Pump Station", active_pumps, key="h_pump")
 
         # "Bulk / Drum" only appears when the plant has switched it on. A floor
@@ -1132,6 +1181,11 @@ if tab1 is not None:
         # target-weight display; it never gates which resins are selectable.
         all_specs_df = get_all_resin_specs_df("ALL")
         resin_names = sorted(all_specs_df["resin_name"].unique().tolist()) if not all_specs_df.empty else []
+        # The resin is seeded here rather than above, because the list it has
+        # to be a member of is only built at this point.
+        _seed_resin = st.session_state.pop("_last_resin_pick", "")
+        if _seed_resin and _seed_resin in resin_names:
+            st.session_state.setdefault("h_resin", _seed_resin)
 
         resin = st.selectbox("Resin Formulation", resin_names, key="h_resin")
         # The selected formulation, in its own colour, directly under the
@@ -1153,11 +1207,35 @@ if tab1 is not None:
         if station and resin:
             _vessel = crud.reactor_for(station, resin)
             if _vessel is None:
-                st.warning(
-                    "**No vessel is linked to this station on this resin.** Your log still "
-                    "records and still counts — this only means the tank level will not "
-                    "move. Worth telling your lead: a reactor needs this pump and this "
-                    "resin set against it.")
+                # A tank IS on this pump, it is just recorded as holding
+                # something else. That is a changeover, and it is the one
+                # moment a vessel's level accounting starts again - so the
+                # operator confirms it rather than it happening silently
+                # behind a mis-picked resin.
+                _on_pump = crud.vessels_on_pump(station)
+                if len(_on_pump) == 1:
+                    _v = _on_pump[0]
+                    _was = str(_v.get("current_resin") or "").strip()
+                    _tag = str(_v.get("asset_tag") or "").strip() or _v["reactor_name"]
+                    st.warning(
+                        f"**{_tag} is recorded as holding "
+                        f"{_was or 'nothing yet'}, and you have picked {resin}.**")
+                    if st.button(f"✅ Yes — {_tag} was changed over to {resin}",
+                                 key="confirm_changeover", use_container_width=True):
+                        crud.record_changeover(_v["reactor_name"], resin,
+                                               operator=current_user,
+                                               shift=current_shift,
+                                               pump_station=station)
+                        flash(f"{_tag} is now on {resin}.", "🛢️")
+                        st.rerun()
+                    st.caption("If that is not right, check the resin above. Your log "
+                               "records either way — this only decides which tank the "
+                               "litres come off.")
+                else:
+                    st.warning(
+                        "**No vessel is linked to this station.** Your log still records "
+                        "and still counts — it only means the tank level will not move. "
+                        "The startup checklist asks which vessel this pump draws from.")
             elif _vessel.get("ambiguous"):
                 st.warning("More than one vessel is set to this station and resin ("
                            + ", ".join(_vessel["ambiguous"]) + "), so the level cannot "
@@ -1627,6 +1705,7 @@ if tab1 is not None:
 
             if verification and verification.get("result") in ("mismatch", "expired"):
                 flash("Logged and flagged for the manager — the lot did not check out.", "⚠️")
+                crud.save_last_picks(current_user, station, cartridge, resin)
             if weight_reading and weight_reading.get("status") in ("over", "under"):
                 flash(
                     f"Weight {weight_reading['measured']:.0f} g is outside the band for "
@@ -1634,12 +1713,14 @@ if tab1 is not None:
                     "⚖️")
             if matched_run:
                 flash(f"Recorded {bottles_filled} units of {resin}. Credited to your active run.", "🧪")
+                crud.save_last_picks(current_user, station, cartridge, resin)
             elif simple_mode:
                 # The log is the product here, not a contribution to a run, so
                 # a successful log is a success. It used to close with a
                 # warning triangle and a note about a progress bar that this
                 # plant does not have - every log, all shift.
                 flash(f"Recorded {bottles_filled} units of {resin}.", "🧪")
+                crud.save_last_picks(current_user, station, cartridge, resin)
             else:
                 flash(
                     f"Recorded {bottles_filled} units of {resin} to Analytics — "

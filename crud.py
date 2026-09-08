@@ -2445,3 +2445,145 @@ def resolve_error_report(report_id: int, resolved_by: str = "", note: str = "") 
         return False
     finally:
         session.close()
+
+
+# ------------------------------------------------ what they picked last --
+
+def get_last_picks(user_name: str) -> dict:
+    """The station, format and resin this operator last logged against.
+
+    Empty strings when they have never logged, so a first-time operator gets
+    the form's own defaults and nothing has to special-case them.
+    """
+    session = ScopedSession()
+    try:
+        u = session.query(User).filter(User.full_name == str(user_name or "").strip()).first()
+        if u is None:
+            return {"station": "", "cartridge": "", "resin": ""}
+        return {"station": str(u.last_station or ""),
+                "cartridge": str(u.last_cartridge or ""),
+                "resin": str(u.last_resin or "")}
+    except Exception:
+        return {"station": "", "cartridge": "", "resin": ""}
+    finally:
+        session.close()
+
+
+def save_last_picks(user_name: str, station: str = "", cartridge: str = "",
+                    resin: str = "") -> bool:
+    """Remember this hour's answers for the next one.
+
+    Called on the way out of a successful log, so it costs nothing extra -
+    there is already a write happening. Failures are swallowed: not being able
+    to remember a dropdown must never be the thing that loses somebody's log.
+    """
+    session = ScopedSession()
+    try:
+        u = session.query(User).filter(User.full_name == str(user_name or "").strip()).first()
+        if u is None:
+            return False
+        if station:
+            u.last_station = str(station)[:50]
+        if cartridge:
+            u.last_cartridge = str(cartridge)[:60]
+        if resin:
+            u.last_resin = str(resin)[:100]
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def link_vessel_to_pump(reactor_name: str, pump_station: str) -> bool:
+    """Record which tank a pump draws from, on the operator's say-so.
+
+    This is the one fact the app cannot work out for itself. The operator
+    picks the pump and the resin every hour, but which physical vessel is
+    plumbed to that pump is not in any log - and it used to be set only by
+    work-order dispatch, so a plant running without work orders could never
+    set it at all.
+
+    Asked at the startup checklist, where the operator is standing at the pump
+    and can read the tag off the side of the tank, and only when the pump has
+    no vessel on it yet.
+    """
+    session = ScopedSession()
+    try:
+        r = session.query(Reactor).filter(
+            Reactor.reactor_name == str(reactor_name or "").strip()).first()
+        if r is None:
+            return False
+        pump = str(pump_station or "").strip()
+        r.assigned_pump = pump or None
+        r.assigned_pump_id = _resolve_pump_id(session, pump) if pump else None
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def vessels_on_pump(pump_station: str) -> list:
+    """Every active vessel recorded as feeding this pump."""
+    pump = str(pump_station or "").strip().lower()
+    if not pump:
+        return []
+    session = ScopedSession()
+    try:
+        return [{"id": r.id, "reactor_name": r.reactor_name,
+                 "asset_tag": r.asset_tag, "current_resin": r.current_resin}
+                for r in session.query(Reactor).all()
+                if str(r.status or "").strip().lower() not in ("retired", "inactive")
+                and str(r.assigned_pump or "").strip().lower() == pump]
+    except Exception:
+        return []
+    finally:
+        session.close()
+
+
+def record_changeover(reactor_name: str, new_resin: str, operator: str = "",
+                      shift: str = "", pump_station: str = "") -> bool:
+    """Move a vessel onto a different resin, and say so in the record.
+
+    A changeover is a real event on the floor and it is the moment a tank's
+    level accounting starts again, so it is written down rather than being an
+    invisible edit to a settings row. The row carries no units, so it cannot
+    move an output figure, and its log type is outside the two the level
+    arithmetic reads.
+
+    Confirmed by the operator before this is called. An accidental resin pick
+    would otherwise reset a tank's history with nobody the wiser.
+    """
+    session = ScopedSession()
+    old = ""
+    try:
+        r = session.query(Reactor).filter(
+            Reactor.reactor_name == str(reactor_name or "").strip()).first()
+        if r is None:
+            return False
+        old = str(r.current_resin or "").strip() or "nothing recorded"
+        resin = str(new_resin or "").strip()
+        r.current_resin = resin or None
+        r.current_resin_id = _resolve_resin_id(session, resin) if resin else None
+        session.commit()
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+    try:
+        add_hourly_log(
+            operator or "System", pump_station or "", shift or "", "", new_resin, "",
+            0, 0, 0,
+            notes=f"Changeover on {reactor_name}: {old} to {new_resin}, "
+                  f"confirmed at the pump.",
+            log_type="Resin Changeover")
+    except Exception:
+        pass
+    return True

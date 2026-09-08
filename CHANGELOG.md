@@ -8,6 +8,25 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.30 — Tuesday, September 8, 2026
+**The floor sets it up, not a manager**
+
+We run this as a logging system, so a manager opening a settings page to make the app work is a design fault. The operator already picks the pump and the resin every hour. The only thing missing was which physical tank the pump draws from, and that is not in any log.
+
+- **The startup checklist asks which vessel this pump draws from.** One line, under the pump picker, where the operator is standing at the pump and can read the tag off the side of the tank. Asked only when that pump has no vessel on it yet. Answered once, never asked again, and the manager never touches it.
+- **A resin change is confirmed at the pump.** Pick a resin the tank is not recorded as holding and the form says so: "M-311 is recorded as holding Op Set A, and you have picked Op Set B." One tap confirms the changeover. It is a tap rather than automatic because a changeover restarts that tank's level accounting, and a mis-picked resin doing that silently is worse than a question.
+- The changeover is written down as its own row with no units on it, so it cannot move an output figure and the history says when a tank changed and who said so.
+
+**The form opens where you left it** (migration 0016)
+
+- Station, container format and resin are remembered and pre-filled. Twelve logs a shift and all three are the same every time.
+- Remembered against the account, not the browser. A phone locking, a session dropping, a dead battery or a different handset are the normal cases on a floor, and a memory that lives in the tab survives none of them.
+- The station is seeded before the checklist reads it. I had it in the wrong place first and an operator coming back would have been asked to redo the checklist for a pump they were not standing at.
+
+The lot check is what protects all of this. A pre-filled resin is a box that already holds a plausible answer, but the lot number is still typed off the container every hour, and that is what actually catches the wrong material.
+
+---
+
 ## 3.29 — Tuesday, September 8, 2026
 **Two from the first day of real use**
 

@@ -136,6 +136,24 @@ check("and it does not stop the operator logging",
 _link_reactor(_rid, RESIN, STATION)
 print("  the vessel line OK")
 
+# --- the form opens where the operator left it -----------------------------
+# Twelve logs a shift, and the station, the format and the resin are the same
+# every time. Remembered on the account rather than in the browser, because a
+# phone locking or a session dropping is the normal case on a floor.
+from crud import get_last_picks as _picks, save_last_picks as _save  # noqa: E402
+
+_save(OP, STATION, CART, RESIN)
+check("what the operator last logged is remembered against the account",
+      _picks(OP), {"station": STATION, "cartridge": CART, "resin": RESIN})
+
+at_s = run_as(OP)
+check("and the form opens on it instead of asking again",
+      at_s.selectbox(key="h_pump").value, STATION)
+check("including the container format", at_s.selectbox(key="h_cart").value, CART)
+check("and the resin", at_s.selectbox(key="h_resin").value, RESIN)
+check("the page still renders clean with all three pre-filled", at_s.exception, [])
+print("  remembered picks OK")
+
 # --- C. the lot gate, nothing typed yet -----------------------------------
 def gate(at):
     return {"lot_field": any(i.label.startswith("L-") for i in at.text_input),

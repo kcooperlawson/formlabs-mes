@@ -31,6 +31,8 @@ _boot.boot(fresh=True, db_name="formlabs_reactor_level")
 
 import crud  # noqa: E402
 from crud import (container_litres, reactor_draw_litres, reactor_for,  # noqa: E402
+                  link_vessel_to_pump, vessels_on_pump, record_changeover,
+                  get_last_picks, save_last_picks, get_all_reactors_df,
                   add_pump_station, add_resin_spec, add_reactor, add_hourly_log,
                   calculate_logged_units_for_resin)
 from db_core import ScopedSession  # noqa: E402
@@ -214,6 +216,61 @@ check("two vessels on one station and resin report the ambiguity",
       sorted(reactor_for("Pump 9", "Link Test V1")["ambiguous"]),
       ["Linked Tank", "Twin Tank"])
 print("  the vessel link OK")
+
+# --- the operator sets it up, not a manager --------------------------------
+# The plant runs in logging mode and the whole point is that a manager never
+# opens a settings page. The operator already picks the pump and the resin
+# every hour; the only thing missing is which physical tank that pump draws
+# from, and that is asked once at the startup checklist where they are
+# standing next to it.
+add_pump_station("Pump 11")
+add_resin_spec("V2", "SKU-OP1", "COP1", "Op Set A V1",
+               1110.0, 1100.0, 1115.0, "1100-1115", 1.0, 24)
+add_resin_spec("V2", "SKU-OP2", "COP2", "Op Set B V1",
+               1110.0, 1100.0, 1115.0, "1100-1115", 1.0, 24)
+add_reactor("Operator Tank", 5000, asset_tag="M-311")
+
+check("a tank nobody has placed is on no pump", vessels_on_pump("Pump 11"), [])
+check("the operator's answer at the checklist places it",
+      link_vessel_to_pump("Operator Tank", "Pump 11"), True)
+check("and it is on that pump from then on",
+      [v["reactor_name"] for v in vessels_on_pump("Pump 11")], ["Operator Tank"])
+check("the checklist never has to ask again",
+      len(vessels_on_pump("Pump 11")), 1)
+
+# The resin follows the pour, but only once the operator has confirmed it.
+# An accidental resin pick must not silently restart a tank's accounting.
+check("placing a tank does not guess what is in it",
+      reactor_for("Pump 11", "Op Set A V1"), None)
+check("the confirmed changeover puts it on that resin",
+      record_changeover("Operator Tank", "Op Set A V1", operator="Op",
+                        shift="Shift 1", pump_station="Pump 11"), True)
+check("and the pour now lands on the right tank",
+      reactor_for("Pump 11", "Op Set A V1")["asset_tag"], "M-311")
+
+add_hourly_log("Op", "Pump 11", "Shift 1", "V2", "Op Set A V1", "L-OPSET01", 60, 0, 0)
+check("the tank counts the pour", 
+      calculate_logged_units_for_resin("Op Set A V1", "", "Pump 11", ""), 60)
+
+# A changeover restarts the count rather than mixing two resins into one
+# number, and the changeover row itself carries no units.
+record_changeover("Operator Tank", "Op Set B V1", operator="Op",
+                  shift="Shift 1", pump_station="Pump 11")
+check("after a changeover the tank is on the new resin",
+      reactor_for("Pump 11", "Op Set B V1")["reactor_name"], "Operator Tank")
+check("the old resin no longer points at it",
+      reactor_for("Pump 11", "Op Set A V1"), None)
+check("and the changeover added no units of its own",
+      calculate_logged_units_for_resin("Op Set B V1", "", "Pump 11", ""), 0)
+print("  operator-led setup OK")
+
+# --- the form opens where they left it -------------------------------------
+check("an operator who has never logged has nothing remembered",
+      get_last_picks("Nobody At All"),
+      {"station": "", "cartridge": "", "resin": ""})
+save_last_picks("Op Remember", "Pump 11", "V2 (1L Cartridge)", "Op Set B V1")
+print("  (a name with no account saves nothing, and does not raise)")
+print("  remembered picks OK")
 
 print("\n" + "=" * 66)
 if FAILS:
