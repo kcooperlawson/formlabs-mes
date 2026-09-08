@@ -46,6 +46,40 @@ def inject_app_icons():
     st.markdown(_HEAD_LINKS, unsafe_allow_html=True)
 
 
+def _install_crash_reporting():
+    """Attach the crash reporter, once per process.
+
+    Here rather than in each page because Streamlit routes every uncaught page
+    exception through one function, so one patch covers all eighteen pages
+    including the seven that predate this shell, and no page has to remember
+    to wrap itself in anything.
+
+    Everything is inside the try. This runs on the way into every render, and
+    a crash reporter that crashes is strictly worse than no crash reporter.
+    """
+    try:
+        import error_report
+        import crud
+
+        def record(payload):
+            return crud.record_error_report(
+                payload,
+                user_name=st.session_state.get("user_name"),
+                user_role=st.session_state.get("user_role"),
+                app_version=st.session_state.get("app_version"),
+            )
+
+        def where():
+            try:
+                return st.context.url.rsplit("/", 1)[-1] or "Home"
+            except Exception:
+                return st.session_state.get("current_page") or ""
+
+        error_report.install(recorder=record, page_name=where)
+    except Exception:
+        pass
+
+
 def apply_display_preferences(cookie_manager=None):
     """Inject glove mode and night dimming for this render, if active.
 
@@ -60,6 +94,7 @@ def apply_display_preferences(cookie_manager=None):
     the shell.
     """
     inject_app_icons()
+    _install_crash_reporting()
     try:
         if cookie_manager is not None:
             try:

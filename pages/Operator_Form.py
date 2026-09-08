@@ -131,7 +131,7 @@ except Exception:
 st.markdown(f"""
 <div style="display:flex; align-items:center; margin-bottom: 5px;">
     <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain; margin-right: 15px;">
-    <h1 style="margin:0; padding:0; font-size: 2.2rem;">📝 Formlabs Operator Workstation Terminal</h1>
+    <h1 style="margin:0; padding:0; font-size: clamp(1.25rem, 4.2vw, 2.2rem); white-space: nowrap;">📝 Operator Workstation</h1>
 </div>
 """, unsafe_allow_html=True)
 

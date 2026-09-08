@@ -16,6 +16,7 @@ from sqlalchemy import desc, text, func, or_
 import bulk_pour as _bulk
 from db_core import engine, ScopedSession, Base
 from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor, SheetTarget,
+                    ErrorReport,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
                     LotVerification)
@@ -2284,7 +2285,107 @@ seed_initial_data()
 backfill_foreign_keys()
 
 
+# ---------------------------------------------------------------- crashes --
+
+def record_error_report(payload: dict, user_name=None, user_role=None,
+                        app_version=None) -> str:
+    """File a crash and return the code to show the person in front of it.
+
+    One row per KIND of fault. The same break on the same page increments the
+    count and moves the timestamp rather than adding a row, because a page
+    that fails on every refresh writes one every ten seconds otherwise and
+    buries everything else under itself.
+
+    Swallows its own failures and returns "" on the way out. This runs inside
+    an exception handler, and a reporter that raises replaces a real bug with
+    its own - so the worst case here has to be that the report is lost, not
+    that the screen breaks twice.
+    """
+    import error_report
+
+    try:
+        page = str(payload.get("page") or "")[:120]
+        etype = str(payload.get("error_type") or "Unknown")[:120]
+        message = payload.get("message") or ""
+        ref = error_report.reference_code(page, etype, message)
+        now = datetime.utcnow()
+
+        session = ScopedSession()
+        try:
+            row = (session.query(ErrorReport)
+                   .filter(ErrorReport.ref_code == ref,
+                           ErrorReport.resolved == 0)
+                   .first())
+            if row is not None:
+                row.hits = int(row.hits or 1) + 1
+                row.last_seen_at = now
+                # Refresh the trace: the newest one is the one that can still
+                # be reproduced, and an older copy of the same fault teaches
+                # nothing the newer one does not.
+                row.traceback = payload.get("traceback") or row.traceback
+            else:
+                session.add(ErrorReport(
+                    occurred_at=now, last_seen_at=now, ref_code=ref, page=page,
+                    user_name=(str(user_name)[:120] if user_name else None),
+                    user_role=(str(user_role)[:40] if user_role else None),
+                    app_version=(str(app_version)[:40] if app_version else None),
+                    error_type=etype, message=message,
+                    traceback=payload.get("traceback") or "", hits=1, resolved=0))
+            session.commit()
+        finally:
+            session.close()
+
+        try:
+            logger.error("Page crash %s on %s: %s: %s", ref, page, etype, message)
+        except Exception:
+            pass
+        return ref
+    except Exception:
+        return ""
 
 
+def get_error_reports_df(include_resolved: bool = False):
+    """The crash list, newest first. Empty frame rather than a raise."""
+    session = ScopedSession()
+    try:
+        q = session.query(ErrorReport)
+        if not include_resolved:
+            q = q.filter(ErrorReport.resolved == 0)
+        rows = q.order_by(ErrorReport.last_seen_at.desc(),
+                          ErrorReport.occurred_at.desc()).all()
+        return pd.DataFrame([{
+            "id": r.id, "ref_code": r.ref_code, "occurred_at": r.occurred_at,
+            "last_seen_at": r.last_seen_at, "page": r.page,
+            "user_name": r.user_name, "user_role": r.user_role,
+            "app_version": r.app_version, "error_type": r.error_type,
+            "message": r.message, "traceback": r.traceback,
+            "hits": int(r.hits or 1), "resolved": int(r.resolved or 0),
+            "resolved_at": r.resolved_at, "resolved_by": r.resolved_by,
+            "note": r.note,
+        } for r in rows])
+    except Exception:
+        return pd.DataFrame()
+    finally:
+        session.close()
 
 
+def resolve_error_report(report_id: int, resolved_by: str = "", note: str = "") -> bool:
+    """Mark one closed. It stays in the table, because a fault that comes back
+    after being closed is a different and more interesting fact than a fault
+    nobody ever looked at."""
+    session = ScopedSession()
+    try:
+        row = session.query(ErrorReport).filter(ErrorReport.id == int(report_id)).first()
+        if row is None:
+            return False
+        row.resolved = 1
+        row.resolved_at = datetime.utcnow()
+        row.resolved_by = str(resolved_by or "")[:120] or None
+        row.note = str(note or "") or row.note
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()

@@ -329,6 +329,39 @@ class LotVerification(Base):
                                nullable=True, index=True)
 
 
+
+class ErrorReport(Base):
+    """One row per KIND of crash, not per occurrence.
+
+    A page that breaks on every refresh would otherwise write a row every ten
+    seconds all afternoon and bury every other fault under it. So the same
+    fault increments `hits` and moves `last_seen_at`, and the table stays a
+    list of distinct problems - which is what somebody triaging it needs.
+
+    The person is stored as the name they had at the time rather than a link
+    to their account. A crash report has to keep making sense after somebody
+    leaves, and it must never be the thing that stops a user record being
+    deleted.
+    """
+    __tablename__ = "error_reports"
+    id = Column(Integer, primary_key=True)
+    occurred_at = Column(DateTime, nullable=False, index=True)
+    ref_code = Column(String(12), nullable=False, index=True)
+    page = Column(String(120), nullable=True)
+    user_name = Column(String(120), nullable=True)
+    user_role = Column(String(40), nullable=True)
+    app_version = Column(String(40), nullable=True)
+    error_type = Column(String(120), nullable=True)
+    message = Column(Text, nullable=True)
+    traceback = Column(Text, nullable=True)
+    hits = Column(Integer, default=1)
+    last_seen_at = Column(DateTime, nullable=True)
+    resolved = Column(Integer, default=0)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(String(120), nullable=True)
+    note = Column(Text, nullable=True)
+
+
 # Generic public placeholders (Safe for source code)
 MASTER_FORMLABS_CATALOG = (
     ("V2", "RS-C2-GPCL-05", "FLGPCL05", "24", "Standard Clear V5", 1110.0, 1100.0, 1115.0, "1100-1115", 1.0, None),

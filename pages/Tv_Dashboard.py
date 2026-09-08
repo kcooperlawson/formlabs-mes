@@ -233,7 +233,7 @@ st.markdown("""
     .tv-card { background: linear-gradient(180deg, #0D1627 0%, #080D1A 100%); border: 1px solid #1E2B45; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.5); height: 100%; }
     .tv-value { font-size: 3.5rem; font-weight: 900; color: #FFFFFF; line-height: 1.1; margin-top: 10px; }
     .tv-label { font-size: 1rem; font-weight: 700; color: #94A3B8; letter-spacing: 0.1em; text-transform: uppercase; }
-    .tv-header { font-size: 2.2rem; font-weight: 900; color: #FFFFFF; border-bottom: 2px solid #1E2B45; padding-bottom: 10px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; }
+    .tv-header { font-size: clamp(1.3rem, 3.4vw, 2.2rem); flex-wrap: wrap; gap: 8px; font-weight: 900; color: #FFFFFF; border-bottom: 2px solid #1E2B45; padding-bottom: 10px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; }
     .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1E2B45; font-size: 1.15rem; }
 </style>
 """, unsafe_allow_html=True)

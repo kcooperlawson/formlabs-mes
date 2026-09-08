@@ -366,10 +366,10 @@ st.markdown(f"""
 
 # ===================== UI LAYOUT =====================
 st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 30px;">
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom: var(--mes-sp-3, 24px);">
     <div style="display:flex; align-items:center; gap: 15px;">
         <img src="data:image/png;base64,{logo_b64}" style="height: 50px; object-fit: contain; filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.4));">
-        <h1 style="margin:0; padding:0; font-size: 2.2rem; font-weight: 900; background: linear-gradient(to right, #FFFFFF, #94A3B8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NEXUS ANALYTICS</h1>
+        <h1 style="margin:0; padding:0; font-size: clamp(1.25rem, 4.2vw, 2.2rem); font-weight: 800; white-space: nowrap; background: linear-gradient(to right, #FFFFFF, #94A3B8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NEXUS ANALYTICS</h1>
     </div>
     <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); padding: 8px 16px; border-radius: 8px; color: #A78BFA; font-weight: bold; letter-spacing: 0.1em; font-size: 0.8rem;">
         ROLLING 7-DAY INTELLIGENCE

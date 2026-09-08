@@ -121,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.26.1"
+APP_VERSION = "PT-V3.27"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -291,7 +291,7 @@ if not st.session_state["authenticated"]:
                 <div style="display:flex; justify-content:center; align-items:center; margin-bottom:10px;">
                     <img src="data:image/png;base64,{logo_b64}" style="height: 66px; object-fit: contain; filter: drop-shadow(0px 0px 10px rgba(0, 210, 255, 0.5));">
                 </div>
-                <h1 style="color:#FFFFFF; font-weight:900; margin-top: 15px; font-size: 2.8rem; letter-spacing: 0.02em;">{_title_lead} <span style="color:#00D2FF; font-weight:300;">{_title_tail}</span></h1>
+                <h1 style="color:#FFFFFF; font-weight:800; margin-top: 15px; font-size: clamp(1.5rem, 6vw, 2.8rem); letter-spacing: 0.02em;">{_title_lead} <span style="color:#00D2FF; font-weight:300;">{_title_tail}</span></h1>
                 <p style="color:#00D2FF; font-family: monospace; letter-spacing: 0.15em; font-size: 0.85rem; text-transform: uppercase; border-top: 1px solid #1E293B; border-bottom: 1px solid #1E293B; padding: 8px 0; display: inline-block;">{_title_sub}</p>
             </div>
             """,

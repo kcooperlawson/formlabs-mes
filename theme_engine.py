@@ -204,7 +204,11 @@ def build(p: Palette) -> str:
                   font-family: {p.font} !important; }}
         header[data-testid="stHeader"] {{ background: transparent !important; }}
 
-        .brand-header {{ display: flex; align-items: center; justify-content: space-between;
+        /* wrap, so on a 390px phone the badge on the right drops onto its own
+       line instead of squeezing the title into a narrow column where a long
+       word breaks and the heading stacks on top of itself. */
+    .brand-header {{ display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: var(--mes-sp-1);
             padding: var(--mes-sp-2) var(--mes-sp-3); background: {header_bg};
             border: 1px solid {p.line};
             border-radius: {p.radius}; margin-bottom: var(--mes-sp-2);

@@ -22,6 +22,7 @@ from database import (
 )
 from backup_policy import backup_state, DUE_AFTER_HOURS, KEEP_BACKUPS
 from database import esc
+import crud
 from shifts import picker_options as shift_picker_options
 import external_links
 import shift_clock
@@ -220,7 +221,7 @@ st.markdown("---")
 st.markdown(f'''
 <div style="display:flex; align-items:center; margin-bottom: 5px;">
     <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain; margin-right: 15px;">
-    <h1 style="margin:0; padding:0; font-size: 2.2rem;">🛡️ IT Administrator Console</h1>
+    <h1 style="margin:0; padding:0; font-size: clamp(1.25rem, 4.2vw, 2.2rem); white-space: nowrap;">🛡️ IT Admin Console</h1>
 </div>
 ''', unsafe_allow_html=True)
 
@@ -237,12 +238,74 @@ st.markdown(
     """<style>[data-testid="stTabs"] [data-baseweb="tab-highlight"]{display:none !important;} [data-testid="stTabs"] [data-baseweb="tab-list"]{display:flex !important; gap:8px !important; overflow-x:auto !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important;} [data-testid="stTabs"] button[data-baseweb="tab"]{background:rgba(255,255,255,0.05) !important; border:1px solid rgba(255,255,255,0.12) !important; border-radius:20px !important; padding:8px 18px !important; white-space:nowrap !important;} [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"]{background:rgba(234,88,12,0.25) !important; border:1px solid #EA580C !important; box-shadow:0 0 12px rgba(234,88,12,0.4) !important;} [data-testid="stTabs"] button[data-baseweb="tab"] p{color:#94A3B8 !important; font-weight:700 !important;} [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] p{color:#FFFFFF !important;}</style>""",
     unsafe_allow_html=True)
 
-tab_roster, tab_sug, tab_db, tab_settings = st.tabs((
+tab_roster, tab_sug, tab_crash, tab_db, tab_settings = st.tabs((
     "👥 User Management & Roster",
     "💡 Suggestions & Issue Inbox",
+    "🐞 Crash Reports",
     "📜 System & Database Utilities",
     "⚙️ Plant Configuration"
 ))
+
+with tab_crash:
+    # Where a broken screen ends up. Floor terminals are configured not to
+    # show tracebacks, which is right, so before this the only trace of a
+    # crash was a line in a log file on the plant PC and whether somebody
+    # remembered to mention it three days later.
+    st.subheader("Crashes the app caught")
+    _open = crud.get_error_reports_df(include_resolved=False)
+    _all = crud.get_error_reports_df(include_resolved=True)
+
+    if _open.empty:
+        st.success("No open crash reports. Nothing has failed since the last one was closed.")
+        st.caption(
+            "When a page does fail, whoever was on it sees a short reference "
+            "code instead of a stack trace, and the fault lands here with the "
+            "page, the account, the app version and the real traceback. They "
+            "read you the code, you open it."
+        )
+    else:
+        st.caption(
+            f"{len(_open)} open. One row per KIND of fault - a page failing on "
+            f"every refresh counts up rather than filling the list."
+        )
+        for _, r in _open.iterrows():
+            _seen = r.get("hits", 1)
+            _times = "once" if _seen == 1 else f"{_seen} times"
+            with st.expander(
+                    f"**{r['ref_code']}** · {r.get('error_type') or 'Error'} "
+                    f"on {r.get('page') or 'unknown page'} · seen {_times}"):
+                cc1, cc2 = st.columns(2)
+                cc1.markdown(f"**First seen:** {r.get('occurred_at')}")
+                cc2.markdown(f"**Last seen:** {r.get('last_seen_at')}")
+                cc1.markdown(f"**Who was on it:** {r.get('user_name') or '—'} "
+                             f"({r.get('user_role') or '—'})")
+                cc2.markdown(f"**App version:** {r.get('app_version') or '—'}")
+                st.markdown(f"**Message:** {r.get('message') or '—'}")
+                st.code(r.get("traceback") or "No traceback recorded.",
+                        language="python")
+                _note = st.text_input("Note (optional)", key=f"crashnote_{r['id']}")
+                if st.button("Mark resolved", key=f"crashfix_{r['id']}",
+                             use_container_width=True):
+                    if crud.resolve_error_report(
+                            int(r["id"]),
+                            resolved_by=st.session_state.get("user_name", ""),
+                            note=_note):
+                        st.rerun()
+                    else:
+                        st.error("Could not close that one.")
+
+    _closed = 0 if _all.empty else int((_all["resolved"] == 1).sum())
+    if _closed:
+        # Closed ones are kept rather than deleted: a fault that comes back
+        # after being closed is a more interesting fact than one nobody ever
+        # looked at, and it only reads as "came back" if the first one is
+        # still there.
+        with st.expander(f"Closed ({_closed})"):
+            st.dataframe(
+                _all[_all["resolved"] == 1][
+                    ["ref_code", "page", "error_type", "hits",
+                     "last_seen_at", "resolved_by", "note"]],
+                use_container_width=True, hide_index=True)
 
 with tab_roster:
     st.subheader("System Access & User Roster")

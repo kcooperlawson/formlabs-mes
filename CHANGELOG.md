@@ -2,9 +2,43 @@
 
 What got added and what got fixed, newest first. One entry per day, and where a day had several releases in it the version numbers are marked inside the entry.
 
-Three version numbers are missing. 3.16, 3.26 and 3.26.1 only changed the handbook, the operator guide and this file. Nothing in the app moved on any of them, so there is nothing to write down here. The app currently reads 3.26.1, and the newest release that actually changed it is 3.25.1.
+Three version numbers are missing. 3.16, 3.26 and 3.26.1 only changed the handbook, the operator guide and this file. Nothing in the app moved on any of them, so there is nothing to write down for them here.
 
 Anything before August 31 is written up from the short notes I made at the time. Some days had two or three releases in them.
+
+---
+
+## 3.27 — Tuesday, September 8, 2026
+**A wall worth looking up at, and somewhere for a crash to go**
+
+- **The shift finishing is a moment now.** When the pour reaches the shift target, a green band goes across the full width of the wall display and the laser makes one last pass down the finished cartridge. It holds for about twenty-five seconds and then it is gone for the rest of that shift. Second shift gets its own.
+- The first version faded itself out after seven seconds and that was wrong. The timer starts when the browser inserts the element, not when the frame carrying it reaches the screen, so on a display nobody is standing in front of it could reach zero opacity having never been seen. What takes the band away now is the next refresh not sending it.
+- **The big numbers roll to their new value** instead of snapping. Volume poured, units packed, floor WIP. Digits roll, the thousands separator does not, and none of it moves at all when the figure has not changed.
+- **The reactors look like tanks instead of bar charts.** The liquid surface is an ellipse with a highlight where the light would catch it, there is a sheen down one side, and the level glides to its new height rather than jumping. The tote keeps a flat surface, because a square bottle has no cylinder in it.
+- At 99.7% the build card read "LAYER 46 / 46", which says finished on the one card whose job is saying whether it is. The last layer belongs to the finished build now.
+
+**The database connection**
+
+- `pool_pre_ping`. After a network blip, a Postgres restart or a laptop waking from sleep, the pool is holding connections that are already dead and nobody has been told. The next page got one of those and errored, so an operator saw a broken screen for a fault that had already fixed itself. Now that connection is thrown away and a fresh one opened, and the page never finds out.
+- Connections are retired at thirty minutes, because plant networks and firewalls quietly drop idle ones and tell neither end.
+- And the ceiling went from fifteen simultaneous queries to thirty. Postgres here allows a hundred, so the app was the narrower one.
+
+**When a page does break**
+
+- **Crash reports.** Floor terminals do not show tracebacks, which is right, but the consequence was that a page breaking gave whoever was standing there a generic red box, put the detail in a log file on the plant PC, and left me to find out only if they remembered to mention it three days later in their own words about a screen they could not name.
+- Now the fault is caught, written down with the page, the account, the role, the app version and the real traceback, and the person gets a short code. They say "reference K7F2" and it is already in IT Admin under a new Crash Reports tab.
+- One row per KIND of fault, not per occurrence. A page failing on every refresh would otherwise write a row every ten seconds all afternoon and bury everything else under it, so the same fault counts up instead.
+- The code comes from the fault rather than a random number, so three managers reporting K7F2 are visibly reporting one bug. Row numbers and memory addresses are stripped before grouping, or the same bug reads as a hundred.
+- **Tracebacks are redacted on the way in.** A connection failure prints the database URL and the URL carries the password, and this table gets rendered on a screen. That had to happen on the write path, not somewhere a future me could forget it.
+- The reporter swallows its own failures. It runs inside an exception handler, and one that raises replaces a real bug with its own.
+- This is not an auto-fix and there is no such thing. A total adding up wrong looks exactly like a total adding up right from the inside. What the app can repair by itself it already does: the schema migrates on startup, a stale backup takes a new one, a dead connection gets reopened. Everything else needs a person, so the thing worth automating is telling that person.
+
+**How it looks**
+
+- **The Analytics header was stacking on top of itself on a phone.** A flex row with a fixed 2.2rem heading, a logo and a badge, none of it allowed to wrap. On a 390 px screen the heading got a column about 120 px wide and broke mid-phrase. Every page title is sized with `clamp()` now, so it is 2.2rem on a desktop and about 1.3rem on a phone, and the badges drop onto their own line instead of squeezing the title.
+- **One type scale.** Five sizes, two weights, one 8 px spacing step, defined once and applied to the shared cards. These had grown page by page as raw HTML, so sizes and paddings drifted a few pixels between screens. Nobody can name what is wrong with that, they just feel it.
+- **One rhythm for movement.** Everything that moves used to run at 0.2s, 0.3s, 0.5s, 0.75s, 0.9s, 1s, 1.2s or 2.6s depending on the day I wrote it. Three durations and one curve now: fast for feedback, slow for a value actually changing, and one length for a laser crossing the part.
+- **The app gets a proper icon and name on a phone.** Saving it to a home screen used to give a generic browser glyph and a truncated address. It is the Formlabs mark on the app's own dark ground now, at every size iOS and Android ask for, with **Pouring Log** underneath it. Operators meet that every shift before they have opened anything.
 
 ---
 
