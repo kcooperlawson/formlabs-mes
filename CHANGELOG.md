@@ -8,6 +8,30 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.35 — Tuesday, September 8, 2026
+**The handbook link was only on two screens, and the machine gateway has a switch now**
+
+I added the handbook link and then could not find it. The operator guide showed up on the form the way it should, but the manager one was missing from every page I actually work on.
+
+Six screens build their own sidebar menu instead of using the shared one. I wrote the link into the shared menu, so it landed on the SCADA page and the ten manager report pages and nowhere else. The Manager Cockpit, Analytics Hub, Live Reactors and IT Admin all missed it, and that is most of a manager's day.
+
+- The link is one function now, called from all of them. One copy of it in the code instead of a snippet I paste and forget.
+- A test checks it. If somebody builds a seventh sidebar and does not call it, that comes back as a failure instead of me hunting for a missing link again in a month.
+
+**The machine gateway**
+
+We built the gateway in August. It reads a bench scale or a pump controller and writes what it reads into the production log, the same way a typed entry goes in, so the reports and the reactor levels already understand it. It has never been connected to real equipment here, so I left the setup screen unlinked. You could only get to it by typing the address.
+
+That was the wrong way to say "not yet". A plant that did want to wire something in had no way to find the screen or to know it existed.
+
+- **A switch in Plant Settings.** Off unless somebody turns it on, under IT Admin with the rest of the plant switches.
+- **When it is on the Device Gateway appears in the Manager Cockpit menu**, and in IT Admin. When it is off neither shows it.
+- **The setup screen says where the switch is.** Open it with the gateway off and it tells you to turn it on in Plant Settings, instead of showing an empty registry that looks broken.
+- That screen used to be administrators only while the menu it sits in is open to managers as well. Both use the same rule now, so nobody clicks a link and gets told they are not allowed.
+- Turning the switch on registers nothing and polls nothing. The gateway process still has to be running and a device still has to be added by hand.
+
+---
+
 ## 3.34 — Tuesday, September 8, 2026
 **Operators get one screen, and both documents are one tap away**
 

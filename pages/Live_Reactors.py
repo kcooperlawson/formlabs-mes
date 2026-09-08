@@ -171,6 +171,9 @@ with st.sidebar:
     if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
 
+    from ui_shell import handbook_link
+    handbook_link()
+
     st.markdown("---")
     # ---------------------------
 

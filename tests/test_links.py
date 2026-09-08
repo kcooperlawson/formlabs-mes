@@ -33,16 +33,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # Pages deliberately not in the sidebar. Each is reachable some other way, and
 # each is named here so a genuinely stranded page still stands out.
-KNOWN_ORPHANS = {
-    # The Device Gateway screen: register a floor machine, point it at the pump
-    # station it sits on, map its raw tags. It is written and it works, and the
-    # gateway behind it has never been tested against real equipment - see the
-    # handbook's Appendix D. Deliberately unreachable until somebody connects a
-    # machine, so that an administrator cannot arrive at a configuration screen
-    # for a capability the plant has not decided on. Unlinked rather than
-    # deleted: nothing is lost if it is ever wanted.
-    "pages/Device_Registry.py",
-}
+KNOWN_ORPHANS = set()
+# The Device Gateway screen used to be listed here as an orphan on purpose. It
+# is linked now, from the Manager Cockpit and IT Admin sidebars, behind the
+# Plant Settings switch that turns the gateway on. The reason it was unlinked
+# has not changed - the gateway has never run against real equipment - but a
+# switch that defaults to off says that better than a missing link did.
 
 
 

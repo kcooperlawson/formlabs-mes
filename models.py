@@ -237,6 +237,9 @@ class PlantSettings(Base):
     # Off by default: a floor that never decants into drums should not
     # have to look at a control for it.
     enable_bulk_pour = Column(Integer, default=0)  # 1 = True, 0 = False
+    # The machine gateway. Built since August, never connected to real
+    # equipment here, and off for every plant until one decides otherwise.
+    enable_device_gateway = Column(Integer, default=0)  # 1 = True, 0 = False
     # Which weekdays this plant runs, Monday first, as seven "1"/"0"
     # characters. Every day by default so an existing install does not change
     # behaviour; see migration 0014 and shift_clock.parse_operating_days.

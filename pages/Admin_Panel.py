@@ -103,21 +103,23 @@ with st.sidebar:
     # crud.can_administer.
     if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-    # There was a link to pages/Device_Registry.py here, and it is gone on
-    # purpose rather than because that page is missing - it exists, it works,
-    # and it is listed in tests/test_links.py's KNOWN_ORPHANS with the reason.
-    # The Device Gateway behind it has never been tested against real
-    # equipment, so an administrator should not be able to arrive at a
-    # configuration screen for it by clicking. Link it back here on the day
-    # somebody connects a machine.
-    #
-    # A correction to what used to be written here: this line was removed
-    # after st.page_link raised on the target, and that was recorded as "the
-    # page has never existed". It had; the working copy the check ran in did
-    # not have it in pages/. The lesson stands anyway - st.page_link raises on
-    # a target it cannot find, and because the navigation renders near the top
-    # of the page, one bad line takes the whole console down. The page sweep
-    # cannot see it because that harness stubs st.page_link out.
+
+        # The Device Gateway registry. This link was deliberately absent for a
+        # long time: the gateway has never been run against real equipment, and
+        # an administrator should not be able to arrive at a configuration
+        # screen for hardware nobody has connected. The Plant Settings switch
+        # is what changed - the link is back, and it appears only for a plant
+        # that has turned the gateway on.
+        #
+        # Worth keeping in mind here: st.page_link raises on a target it cannot
+        # find, and this navigation renders near the top of the page, so one
+        # bad line takes the whole console down. The page sweep will not catch
+        # it either, because that harness stubs st.page_link out.
+        if bool(get_plant_settings().get("enable_device_gateway", 0)):
+            st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+
+    from ui_shell import handbook_link
+    handbook_link()
 
     st.markdown("---")
     # ---------------------------
@@ -522,6 +524,24 @@ with tab_settings:
                                        "reactor page. Leave off if everything here is poured "
                                        "into cartridges and jugs.")
 
+            # The machine gateway. It has been built since August and has never
+            # been connected to real equipment here, so the page that
+            # configures it was unlinked - findable only by typing its address.
+            # That is not the same as optional: it meant a plant that DID want
+            # to wire a bench scale in had no way to find the screen, or to
+            # know it existed. Off by default, and when it is on the registry
+            # appears in the manager's console.
+            en_gateway = st.checkbox("🔌 Machine gateway (bench scales, pump controllers)",
+                                     value=current_settings.get("enable_device_gateway", False),
+                                     key="en_gateway_input",
+                                     help="Puts the Device Gateway registry in the Manager "
+                                          "Cockpit, for registering equipment and mapping what "
+                                          "it reports. Readings written by a machine go through "
+                                          "the same path an operator's typed entry does, so "
+                                          "every figure in the app already understands them. "
+                                          "Nothing on the floor changes until a device is "
+                                          "actually registered.")
+
 
 
         # Full width, outside the three columns: seven checkboxes squeezed into a
@@ -639,6 +659,7 @@ with tab_settings:
                 "shift_count": int(s_count),
                 "target_lph": t_lph, "yield_target_pct": t_yield, "enable_packing": en_pack,
                 "enable_bulk_pour": en_bulk,
+                "enable_device_gateway": en_gateway,
                 "operating_days": op_days,
                 # Stored as the negative of the picker: the column is named for
                 # the smaller configuration, so the default value of a row

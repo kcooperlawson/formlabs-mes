@@ -121,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.34"
+APP_VERSION = "PT-V3.35"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -505,16 +505,11 @@ with st.sidebar:
     if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
 
-    # The handbook, for the people who run this. A small grey line at the
-    # bottom of the menu rather than a button: it is something you go and find
-    # once, not something you need in front of you. This page is already
-    # manager and admin only, so there is nobody here it is not meant for.
-    st.markdown(
-        '<div style="margin-top:10px; font-size:0.78rem; opacity:0.55;">'
-        '<a href="./app/static/Formlabs_MES_Handbook.pdf" target="_blank" '
-        'style="color:inherit; text-decoration:none;">'
-        '📘 Operations handbook</a></div>',
-        unsafe_allow_html=True)
+    # The handbook, for the people who run this. Operators and packers are
+    # sent to the form before this sidebar is ever drawn, so everyone who
+    # sees this line is someone it is meant for.
+    from ui_shell import handbook_link
+    handbook_link()
 
     st.markdown("---")
     # --------------------------

@@ -46,6 +46,27 @@ def inject_app_icons():
     st.markdown(_HEAD_LINKS, unsafe_allow_html=True)
 
 
+def handbook_link():
+    """The operations handbook, as a grey line rather than a button.
+
+    One definition, called from every sidebar. It was written inline the first
+    time and only reached two of the six sidebars in the app - Manager
+    Cockpit, Analytics, Live Reactors and IT Admin all build their own, so a
+    manager spent their whole day on pages that did not have it. That is what
+    a copied snippet does; this is why it is a function.
+
+    Discreet on purpose: it is something you go and find once, not something
+    you need in front of you. Discreet is not invisible though, so it sits at
+    0.7 rather than the 0.55 it started at.
+    """
+    st.markdown(
+        '<div style="margin-top:8px; font-size:0.8rem; opacity:0.7;">'
+        '<a href="./app/static/Formlabs_MES_Handbook.pdf" target="_blank" '
+        'style="color:inherit; text-decoration:none;">'
+        '📘 Operations handbook (PDF)</a></div>',
+        unsafe_allow_html=True)
+
+
 def _install_crash_reporting():
     """Attach the crash reporter, once per process.
 
@@ -214,12 +235,7 @@ def render_shell(show_settings: bool = True):
         # line at the bottom of the menu rather than a button: it is a thing
         # you go and find once, not a thing you need in front of you.
         if _nav_role not in ("operator", "packer"):
-            st.markdown(
-                '<div style="margin-top:10px; font-size:0.78rem; opacity:0.55;">'
-                '<a href="./app/static/Formlabs_MES_Handbook.pdf" target="_blank" '
-                'style="color:inherit; text-decoration:none;">'
-                '📘 Operations handbook</a></div>',
-                unsafe_allow_html=True)
+            handbook_link()
 
         st.markdown("---")
         # ---------------------------

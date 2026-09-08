@@ -2213,6 +2213,7 @@ def get_plant_settings() -> dict:
                 # a new one. A floor that never decants into drums should not
                 # have to look at a control for it.
                 "enable_bulk_pour": bool(getattr(settings, 'enable_bulk_pour', 0)),
+                "enable_device_gateway": bool(getattr(settings, 'enable_device_gateway', 0)),
                 # Every day on a row written before this column existed: the
                 # alarm keeps the reach it had rather than quietly losing days.
                 "operating_days": (getattr(settings, 'operating_days', None) or "1111111"),
@@ -2231,7 +2232,8 @@ def get_plant_settings() -> dict:
             "yield_target_pct": 99.0, "packing_yield_target_pct": 99.5, "shift_1_break_mins": 60.0,
             "shift_2_break_mins": 60.0, "shift_3_break_mins": 60.0, "enable_packing": True,
             "shift_count": 2, "pump_form_url": "", "pump_form_label": "",
-            "simple_mode": True, "enable_bulk_pour": False, "operating_days": "1111111"
+            "simple_mode": True, "enable_bulk_pour": False,
+            "enable_device_gateway": False, "operating_days": "1111111"
         }
     finally:
         session.close()
@@ -2265,7 +2267,8 @@ def update_plant_settings(values: dict) -> bool:
         # here rather than at each call site, because the next checkbox added
         # to that form would hit this again and the failure names a column
         # rather than the pattern.
-        int_flags = {"enable_packing", "simple_mode", "enable_bulk_pour"}
+        int_flags = {"enable_packing", "simple_mode", "enable_bulk_pour",
+                     "enable_device_gateway"}
         for key, value in (values or {}).items():
             if hasattr(settings, key) and key not in ("id",):
                 if key in int_flags and isinstance(value, bool):

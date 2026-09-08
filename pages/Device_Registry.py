@@ -26,6 +26,7 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 
 from database import (
     get_active_pumps, get_all_pumps_df, get_all_reactors_df, check_authentication, do_logout,
+    get_plant_settings, role_can_administer,
 )
 from database import esc
 from device_crud import (
@@ -53,8 +54,20 @@ check_authentication(cookie_manager)
 if not st.session_state.get("authenticated", False):
     st.switch_page("Home.py")
 
-if st.session_state.get("user_role") != "admin":
+if not role_can_administer(st.session_state.get("user_role")):
     st.error("🔒 Access Denied: Restricted to IT Administrators.")
+    st.stop()
+
+# The gateway is off in most plants. Turning it on is a decision somebody
+# makes in Plant Settings, not something you fall into by opening a page, so
+# this says where the switch is instead of showing an empty registry.
+if not bool(get_plant_settings().get("enable_device_gateway", 0)):
+    st.warning("🔌 The hardware gateway is switched off for this plant.")
+    st.caption(
+        "Turn it on in IT Admin under Plant Settings, then come back here to "
+        "register machines. Nothing is polled until the gateway process is "
+        "running as well.")
+    st.page_link("pages/Admin_Panel.py", label="Open IT Admin", icon="🛡️")
     st.stop()
 
 with st.sidebar:

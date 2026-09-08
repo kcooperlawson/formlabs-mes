@@ -91,6 +91,17 @@ with st.sidebar:
     if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
 
+        # The hardware gateway is off in most plants and the registry is a
+        # confusing page to land on when nothing is wired up, so it only
+        # appears once somebody has turned the gateway on in Plant Settings.
+        # Same permission as the page itself, so this never shows a link that
+        # answers Access Denied.
+        if bool(get_plant_settings().get("enable_device_gateway", 0)):
+            st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+
+    from ui_shell import handbook_link
+    handbook_link()
+
     st.markdown("---")
     # ---------------------------
 
