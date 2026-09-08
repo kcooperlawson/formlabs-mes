@@ -702,14 +702,35 @@ with tab_settings:
     # ------------------ 🛢️ REACTOR MANAGEMENT ------------------
     with col_reactors:
         st.markdown("#### 🛢️ Reactor Fleet")
+        # The pump and the resin are on this form for a reason. A vessel's
+        # level is worked out from the logs that match its pump and its resin,
+        # and until now this form captured neither - so a tank added here was
+        # never linked to anything, never registered a pour, and read full for
+        # ever. Both can be changed later on the Live Reactors page.
+        _pumps_for_r = ["— not set yet —"] + [str(x) for x in crud.get_active_pumps()]
+        _specs_for_r = crud.get_all_resin_specs_df()
+        _resins_for_r = ["— not set yet —"] + (
+            sorted(_specs_for_r["resin_name"].dropna().astype(str).unique().tolist())
+            if not _specs_for_r.empty else [])
         with st.form("admin_add_reactor_form", clear_on_submit=True):
             new_r_name = st.text_input("Reactor Name", placeholder="e.g. Reactor 5")
             new_r_cap = st.number_input("Max Capacity (Liters)", value=5000, step=500)
+            new_r_pump = st.selectbox("Feeds which pump station?", _pumps_for_r)
+            new_r_resin = st.selectbox("Resin currently in it", _resins_for_r)
+            new_r_tag = st.text_input("Asset tag", placeholder="e.g. M-205")
+            new_r_bay = st.text_input("Bay marker", placeholder="e.g. E2", max_chars=2)
+            st.caption("The pump and the resin are what tell the app a pour came out of "
+                       "**this** tank. Leave them unset and the level will not move.")
             if st.form_submit_button("➕ Add Reactor", type="primary", use_container_width=True):
                 if new_r_name.strip():
                     from database import add_reactor
 
-                    add_reactor(new_r_name, new_r_cap)
+                    add_reactor(
+                        new_r_name, new_r_cap,
+                        asset_tag=new_r_tag,
+                        bay_marker=new_r_bay,
+                        assigned_pump="" if new_r_pump.startswith("—") else new_r_pump,
+                        current_resin="" if new_r_resin.startswith("—") else new_r_resin)
                     st.toast(f"✅ Added {new_r_name}!")
                     st.rerun()
 

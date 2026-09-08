@@ -96,6 +96,46 @@ at.selectbox(key="h_cart").set_value(CART).run()
 at.selectbox(key="h_resin").set_value(RESIN).run()
 print(f"  unlocked render OK ({len(at.tabs)} tabs, {STATION} / {CART} / lot {GOOD_LOT})")
 
+# --- the vessel this pour comes off ---------------------------------------
+# Reported on the first day of real use: "there is no reactor selector so it
+# has no idea what reactor I am pouring from." Nobody picks it - it is derived
+# from the station and the resin, the same way the level arithmetic derives it
+# - but a derived link nobody can see is one nobody can tell is wrong. So the
+# form says which tank it thinks this is, or says plainly that there is none.
+#
+# Both directions are checked against a vessel this test creates, not against
+# whatever the shared fixture happens to be carrying. The first version of
+# this check passed or failed depending on whether it had been run before.
+from crud import (add_reactor as _add_reactor,  # noqa: E402
+                  update_reactor_config as _link_reactor,
+                  get_all_reactors_df as _reactors_df)
+
+_existing = _reactors_df()
+if _existing.empty or "UI Vessel" not in set(_existing["reactor_name"]):
+    _add_reactor("UI Vessel", 5000)
+    _existing = _reactors_df()
+_rid = int(_existing[_existing["reactor_name"] == "UI Vessel"]["id"].iloc[0])
+_link_reactor(_rid, RESIN, STATION)
+
+at_v = run_as(OP, h_pump=STATION)
+at_v.selectbox(key="h_cart").set_value(CART).run()
+at_v.selectbox(key="h_resin").set_value(RESIN).run()
+check("the form names the vessel this pour comes off", "UI Vessel" in texts(at_v), True)
+check("and does not warn when there is one", "No vessel is linked" in texts(at_v), False)
+
+# Now break the link and look again. Same station, same form, nothing else
+# changed - so a warning here can only be about the vessel.
+_link_reactor(_rid, "", "")
+at_n = run_as(OP, h_pump=STATION)
+at_n.selectbox(key="h_cart").set_value(CART).run()
+at_n.selectbox(key="h_resin").set_value(RESIN).run()
+check("with nothing linked the form says so rather than staying quiet",
+      "No vessel is linked" in texts(at_n), True)
+check("and it does not stop the operator logging",
+      at_n.exception, [])
+_link_reactor(_rid, RESIN, STATION)
+print("  the vessel line OK")
+
 # --- C. the lot gate, nothing typed yet -----------------------------------
 def gate(at):
     return {"lot_field": any(i.label.startswith("L-") for i in at.text_input),

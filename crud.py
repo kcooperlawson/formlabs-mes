@@ -717,22 +717,78 @@ def get_all_reactors_df() -> pd.DataFrame:
 
 
 def add_reactor(reactor_name: str, max_capacity_l: int, vessel_type: str = "",
-                asset_tag: str = "", bay_marker: str = ""):
+                asset_tag: str = "", bay_marker: str = "",
+                assigned_pump: str = "", current_resin: str = ""):
     """Register a physical vessel.
 
     The vessel type falls back to the capacity band rather than to nothing, so
     a tank added in a hurry still draws as something sensible and a manager
     only has to correct the ones that guessed wrong.
+
+    The pump and the resin are here for a reason that cost a day of testing.
+    A vessel's level is worked out from the logs that match its pump and its
+    resin - that is the whole of how the app knows a pour came out of this
+    tank and not the one next to it. The only code that had ever set those two
+    fields was work-order dispatch. This plant runs with work orders off, so a
+    vessel created in IT Admin was never linked to anything, never registered
+    a single pour, and sat at full capacity for ever while the floor emptied
+    it. Both are optional and both can be changed later on the reactor page.
     """
     session = ScopedSession()
     try:
         if not session.query(Reactor).filter(Reactor.reactor_name == reactor_name.strip()).first():
+            pump = str(assigned_pump or "").strip()
+            resin = str(current_resin or "").strip()
             session.add(Reactor(
                 reactor_name=reactor_name.strip(), max_capacity_l=max_capacity_l,
                 vessel_type=resolve_vessel_type(vessel_type, max_capacity_l),
                 asset_tag=str(asset_tag or "").strip() or None,
-                bay_marker=str(bay_marker or "").strip().upper() or None))
+                bay_marker=str(bay_marker or "").strip().upper() or None,
+                assigned_pump=pump or None,
+                current_resin=resin or None,
+                assigned_pump_id=_resolve_pump_id(session, pump) if pump else None,
+                current_resin_id=_resolve_resin_id(session, resin) if resin else None))
             session.commit()
+    finally:
+        session.close()
+
+
+def reactor_for(pump_station: str, resin_name: str):
+    """The vessel a pour at this station on this resin will be credited to.
+
+    The same match the level arithmetic uses, asked out loud. It exists so the
+    operator's form can say which tank it thinks they are drawing from - the
+    link is derived rather than chosen, and a derived link nobody can see is
+    one nobody can tell is wrong.
+
+    Returns a dict, or None when nothing matches. Two matches is its own
+    answer: the caller says so instead of picking one, because guessing which
+    of two tanks a pour came out of is worse than admitting it cannot tell.
+    """
+    pump = str(pump_station or "").strip().lower()
+    resin = str(resin_name or "").strip().lower()
+    if not pump or not resin:
+        return None
+    session = ScopedSession()
+    try:
+        hits = []
+        for r in session.query(Reactor).all():
+            if str(r.status or "").strip().lower() in ("retired", "inactive"):
+                continue
+            if str(r.assigned_pump or "").strip().lower() != pump:
+                continue
+            if str(r.current_resin or "").strip().lower() != resin:
+                continue
+            hits.append({"id": r.id, "reactor_name": r.reactor_name,
+                         "asset_tag": r.asset_tag, "bay_marker": r.bay_marker,
+                         "max_capacity_l": r.max_capacity_l})
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            return {"ambiguous": [h["reactor_name"] for h in hits]}
+        return None
+    except Exception:
+        return None
     finally:
         session.close()
 

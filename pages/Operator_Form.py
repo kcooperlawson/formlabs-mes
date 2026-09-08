@@ -59,6 +59,7 @@ from database import (
     undo_own_log, UNDO_WINDOW_SECONDS,
 )
 from database import esc
+import crud
 from components import empty_state, save_state
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
 from shifts import picker_options as shift_picker_options
@@ -1141,6 +1142,33 @@ if tab1 is not None:
         if resin:
             st.markdown(resin_chip(resin, resin_colour_map.get(str(resin)), size="lg"),
                         unsafe_allow_html=True)
+
+        # Which tank this hour will come off. Nobody picks it - it is worked
+        # out from the station and the resin, the same way the level
+        # arithmetic works it out. It is printed because a link nobody can see
+        # is a link nobody can tell is wrong: reported from the floor as "there
+        # is no reactor selector so it has no idea what I am pouring from",
+        # and on that install it genuinely had no idea, because the vessel had
+        # never been given a pump or a resin.
+        if station and resin:
+            _vessel = crud.reactor_for(station, resin)
+            if _vessel is None:
+                st.warning(
+                    "**No vessel is linked to this station on this resin.** Your log still "
+                    "records and still counts — this only means the tank level will not "
+                    "move. Worth telling your lead: a reactor needs this pump and this "
+                    "resin set against it.")
+            elif _vessel.get("ambiguous"):
+                st.warning("More than one vessel is set to this station and resin ("
+                           + ", ".join(_vessel["ambiguous"]) + "), so the level cannot "
+                           "tell which one this came out of. Your lead can fix that on "
+                           "the reactor page.")
+            else:
+                _tag = str(_vessel.get("asset_tag") or "").strip()
+                _bay = str(_vessel.get("bay_marker") or "").strip()
+                _where = f" · bay {_bay}" if _bay else ""
+                _name = f"{_tag} ({_vessel['reactor_name']})" if _tag else _vessel["reactor_name"]
+                st.caption(f"🛢️ Drawing from **{_name}**{_where}")
 
         cart_matched = get_all_resin_specs_df(cart_code)
         cart_matched = cart_matched[cart_matched["resin_name"] == resin] if not cart_matched.empty else cart_matched

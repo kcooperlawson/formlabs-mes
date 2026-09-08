@@ -327,6 +327,10 @@ if st.session_state.get("user_role") in ["manager", "admin"]:
             # trying to check whether the screen is telling the truth.
             st.caption("Permanent physical vessels. The type decides how each one is drawn on "
                        "the wall; the tag and bay marker are what it is called on the floor.")
+            _fleet_specs = get_all_resin_specs_df("ALL")
+            _fleet_resin_names = (sorted(_fleet_specs["resin_name"].dropna()
+                                         .astype(str).unique().tolist())
+                                  if not _fleet_specs.empty else [])
             if not df_reactors.empty:
                 for _, r in df_reactors.iterrows():
                     r_id = r['id']
@@ -354,9 +358,39 @@ if st.session_state.get("user_role") in ["manager", "admin"]:
                         bay = f3.text_input("Bay", value=r.get("bay_marker") or "",
                                             placeholder="F3", max_chars=3, key=f"vb_{r_id}",
                                             label_visibility="collapsed")
+                        # The two fields that decide whether this tank counts
+                        # for anything. A vessel's level is worked out from the
+                        # logs that match its pump and its resin, and until now
+                        # the only code that ever set them was work-order
+                        # dispatch - so on a plant running with work orders off
+                        # there was no way to link a tank at all, and every one
+                        # of them read full for ever while the floor emptied
+                        # them. update_reactor_config already existed and was
+                        # imported into this page. Nothing ever called it.
+                        g1, g2 = st.columns(2)
+                        _pump_opts = ["— not set —"] + [str(x) for x in get_active_pumps()]
+                        _pump_now = str(r.get("assigned_pump") or "").strip()
+                        _resin_opts = ["— not set —"] + _fleet_resin_names
+                        _resin_now = str(r.get("current_resin") or "").strip()
+                        pump_pick = g1.selectbox(
+                            "Feeds pump station", _pump_opts,
+                            index=_pump_opts.index(_pump_now) if _pump_now in _pump_opts else 0,
+                            key=f"vp_{r_id}")
+                        resin_pick = g2.selectbox(
+                            "Resin in it now", _resin_opts,
+                            index=_resin_opts.index(_resin_now) if _resin_now in _resin_opts else 0,
+                            key=f"vr_{r_id}")
+                        if not _pump_now or not _resin_now:
+                            st.caption("⚠️ Not linked yet, so this tank's level will not move. "
+                                       "Set the pump and the resin and it starts counting from "
+                                       "the pours already logged against them.")
                         if f4.form_submit_button("💾 Save", use_container_width=True):
                             update_reactor_identity(int(r_id), vessel_type=kind,
                                                     asset_tag=tag, bay_marker=bay)
+                            update_reactor_config(
+                                int(r_id),
+                                "" if resin_pick.startswith("—") else resin_pick,
+                                "" if pump_pick.startswith("—") else pump_pick)
                             st.rerun()
                     st.markdown("<hr style='margin: 5px 0; border-color: #1E2B45;'>", unsafe_allow_html=True)
             else:

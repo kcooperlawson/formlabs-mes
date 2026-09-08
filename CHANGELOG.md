@@ -8,6 +8,21 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.29 — Tuesday, September 8, 2026
+**Two from the first day of real use**
+
+**A tank could not be linked to anything.** I created a reactor in IT Admin and the level never moved. It turns out a vessel's level is worked out from the logs matching its pump and its resin, and the only code that ever set those two fields was work-order dispatch. We run with work orders off. So the add form asked for a name and a capacity, nothing set the other two ever, and every tank sat at full while the floor emptied it.
+
+- The add form asks for the pump, the resin, the asset tag and the bay marker now, and says what happens if you leave the first two blank.
+- `update_reactor_config` had been written months ago and imported into the reactor page. Nothing ever called it. There is a control for it now, so a tank already created can be linked without deleting it.
+- **The pouring form says which vessel it thinks you are drawing from.** "Drawing from M-205 · bay E2". Nobody picks it, it comes off the station and the resin. If nothing matches it says so, and if two tanks match it says that instead of guessing. Your log records either way.
+
+**The confirmation was drawing where you could not see it.** It goes at the top of the page and the form is four phone screens tall, so after submitting you were at the bottom looking at nothing and scrolling up every hour to check the entry saved. Which is the thing the banner exists to stop you doing.
+
+- On a phone it is pinned to the bottom of the screen now, where the thumb already is. On anything wider it stays where it was.
+
+---
+
 ## 3.28 — Tuesday, September 8, 2026
 **Eleven manager pages refused a refresh**
 

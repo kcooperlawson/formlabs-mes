@@ -422,9 +422,35 @@ def flash(message, icon="✅"):
 
 
 def draw_flashes():
-    """Render and clear anything flash() queued on a previous run."""
-    for message, icon in st.session_state.pop("_flash_queue", []):
-        st.success(f"{icon} {message}")
+    """Render and clear anything flash() queued on a previous run.
+
+    Pinned to the bottom of the screen on a phone, and only on a phone.
+    Reported from the floor: the confirmation was drawing correctly at the top
+    of the page, but the operator form is four phone screens tall and the
+    operator is at the bottom of it when they submit. So the banner appeared
+    somewhere they could not see, and they were scrolling up every hour to
+    check the entry had saved - which is the exact thing the banner was added
+    to stop them doing.
+
+    Bottom rather than top, because that is where the thumb and the eye
+    already are after pressing Submit. On anything wider than a phone it stays
+    an ordinary banner in the flow of the page.
+    """
+    queued = st.session_state.pop("_flash_queue", [])
+    if not queued:
+        return
+    st.markdown(
+        "<style>"
+        ".mes-flash{background:#065F46; color:#ECFDF5; border-left:5px solid #34D399;"
+        "border-radius:8px; padding:12px 14px; margin:6px 0 14px 0; font-weight:600;"
+        "font-size:1rem; line-height:1.35;}"
+        "@media (max-width: 640px){"
+        ".mes-flash{position:fixed; left:10px; right:10px; bottom:14px; z-index:9999;"
+        "box-shadow:0 10px 28px rgba(0,0,0,0.45);}}"
+        "</style>"
+        + "".join(f'<div class="mes-flash">{esc(icon)} {esc(message)}</div>'
+                  for message, icon in queued),
+        unsafe_allow_html=True)
 
 
 def do_logout(cookie_manager):

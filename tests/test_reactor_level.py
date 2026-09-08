@@ -30,7 +30,9 @@ import _boot  # noqa: E402  (throwaway database, refuses the .env connection)
 _boot.boot(fresh=True, db_name="formlabs_reactor_level")
 
 import crud  # noqa: E402
-from crud import container_litres, reactor_draw_litres  # noqa: E402
+from crud import (container_litres, reactor_draw_litres, reactor_for,  # noqa: E402
+                  add_pump_station, add_resin_spec, add_reactor, add_hourly_log,
+                  calculate_logged_units_for_resin)
 from db_core import ScopedSession  # noqa: E402
 from models import ProductionLog, Reactor  # noqa: E402
 
@@ -174,6 +176,44 @@ crud.reconcile_reactor_liters("Tank D", 900.0, "Ana Ruiz", notes="")
 drawn, _ = reactor_draw_litres("Fresh Resin", "Pump 8")
 check("a tank with no pours behind it calibrates too", 1000.0 - drawn, 900.0)
 print("  calibration OK")
+
+# --- a tank has to be linked to something, and there has to be a way ---------
+# Reported from the floor on the first day of real use: "I created the reactor
+# and all, but there is no reactor selector so it has no idea what I am
+# pouring from." He was right, and it was worse than a missing picker. A
+# vessel's level is worked out from the logs matching its pump and its resin,
+# and the ONLY code that had ever set those two fields was work-order
+# dispatch. This plant runs with work orders off, so a vessel created in the
+# admin console was linked to nothing, counted nothing, and read full for ever
+# while the floor emptied it.
+add_pump_station("Pump 9")
+add_resin_spec("V2", "SKU-LINK", "CLINK", "Link Test V1",
+               1110.0, 1100.0, 1115.0, "1100-1115", 1.0, 24)
+
+add_reactor("Unlinked Tank", 5000)
+add_reactor("Linked Tank", 5000, assigned_pump="Pump 9",
+            current_resin="Link Test V1", asset_tag="M-909", bay_marker="Z1")
+
+add_hourly_log("Op", "Pump 9", "Shift 1", "V2", "Link Test V1", "L-LINK01", 100, 0, 0)
+
+check("a tank created with a pump and a resin sees the pour",
+      calculate_logged_units_for_resin("Link Test V1", "", "Pump 9", ""), 100)
+check("a tank created without them is linked to nothing",
+      reactor_for("Pump 9", "Link Test V1")["reactor_name"], "Linked Tank")
+check("and the operator's form can name it",
+      reactor_for("Pump 9", "Link Test V1")["asset_tag"], "M-909")
+check("a station and resin with no vessel behind them says so rather than guessing",
+      reactor_for("Pump 9", "Some Other Resin"), None)
+check("so does a blank station", reactor_for("", "Link Test V1"), None)
+
+# Two tanks on the same station and resin cannot be told apart, and saying so
+# is the only honest answer - crediting a pour to whichever one came back
+# first would put litres on the wrong vessel and look completely normal.
+add_reactor("Twin Tank", 5000, assigned_pump="Pump 9", current_resin="Link Test V1")
+check("two vessels on one station and resin report the ambiguity",
+      sorted(reactor_for("Pump 9", "Link Test V1")["ambiguous"]),
+      ["Linked Tank", "Twin Tank"])
+print("  the vessel link OK")
 
 print("\n" + "=" * 66)
 if FAILS:
