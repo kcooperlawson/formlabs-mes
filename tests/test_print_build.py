@@ -153,6 +153,20 @@ print("  the bars OK")
 # --- the sign-in sweep ------------------------------------------------------------
 sweep = pb.laser_sweep(IMG, uid="signin")
 check("the sweep plays once and stops", "1 forwards" in sweep, True)
+# Reported as a double glitch. The sign-in screen renders, the cookie
+# component answers a moment later and re-runs the script, and the second
+# render's laser started from the top while the first was a third of the way
+# down. Two half-strokes. The delay means the first one is still waiting when
+# it is replaced, so only one is ever seen moving.
+check("the stroke waits out the settling render", "1.4s" in sweep, True)
+check("and the machine is still drawn when the stroke is not asked for",
+      "img src" in pb.laser_sweep(IMG, play=False), True)
+check("with no laser on it", "sweep" in pb.laser_sweep(IMG, play=False), False)
+# The machine has to occupy exactly the same space either way, or the whole
+# screen nudges at the moment the laser stops.
+check("so nothing on the screen moves when it stops",
+      "height:132px" in pb.laser_sweep(IMG, height_px=132, play=True)
+      and "height:132px" in pb.laser_sweep(IMG, height_px=132, play=False), True)
 check("rather than looping forever", "infinite" in sweep, False)
 check("two sweeps on one page do not share a keyframe name",
       "sweepsignin" in sweep and "sweepsignin" not in pb.laser_sweep(IMG, uid="tv"), True)

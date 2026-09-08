@@ -50,6 +50,10 @@ EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)"
 SLOW = "900ms"
 ENTER = "500ms"
 SWEEP = "2.4s"
+# The sign-in screen re-runs once as soon as the cookie component answers.
+# The stroke waits out that settling render so only one of the two is ever
+# seen moving. utils.COOKIE_SETTLE_SECONDS is 1.2, so this clears it.
+SWEEP_DELAY = "1.4s"
 
 # How many layer lines a full part is drawn with. High enough to read as
 # layers from across a room, low enough that they do not merge into a grey
@@ -281,19 +285,41 @@ def layer_bar(pct, height_px: int = 14, colour: str = "#00D2FF",
         f'</div>')
 
 
-def laser_sweep(image_b64: str, height_px: int = 210, uid: str = "s") -> str:
-    """The printer, with a laser passing over it once on load.
+def laser_sweep(image_b64: str, height_px: int = 210, uid: str = "s",
+                play: bool = True) -> str:
+    """The printer, with a laser passing over it once as the screen arrives.
 
-    Plays once rather than looping. The sign-in screen re-runs on its own
-    timer, so "once each time the page runs" turns into a sweep every few
-    seconds without any of it being on a repeating timer that could restart
-    halfway through and look broken.
+    Reported as a double glitch, and it was. The sign-in screen renders, the
+    cookie component comes back a moment later with what it found, and that
+    returning value re-runs the script. So the sweep started, got about a
+    third of the way down, and was replaced by a fresh one starting from the
+    top. Two half-strokes instead of one, which reads as a fault rather than
+    an effect.
+
+    Two things fix it and both are needed. The stroke waits before it starts,
+    long enough that the first render's laser is still sitting in its delay
+    when the second render replaces it - so only one of them is ever seen
+    moving. And the caller stops asking for it after the screen has settled,
+    with `play=False`, so typing a PIN or ticking a box does not set it off
+    again. A login screen that keeps moving is one people learn to look away
+    from.
+
+    With `play=False` the machine is still drawn, and drawn identically. Only
+    the laser is missing, so nothing on the screen shifts when it stops.
     """
     key = "".join(c for c in str(uid) if c.isalnum()) or "s"
+    laser = ""
+    if play:
+        laser = (
+            f'<style>@keyframes sweep{key}{{'
+            f'0%{{top:-6%; opacity:0;}} 10%{{opacity:1;}}'
+            f'90%{{opacity:1;}} 100%{{top:104%; opacity:0;}}}}</style>'
+            f'<div style="position:absolute; left:8%; right:8%; height:2px; '
+            f'top:-6%; opacity:0; background:{LASER}; '
+            f'box-shadow:0 0 14px 3px {LASER_GLOW}; '
+            f'animation:sweep{key} {SWEEP} ease-in-out {SWEEP_DELAY} 1 forwards;">'
+            f'</div>')
     return (
-        f'<style>@keyframes sweep{key}{{'
-        f'0%{{top:-6%; opacity:0;}} 12%{{opacity:1;}}'
-        f'88%{{opacity:1;}} 100%{{top:104%; opacity:0;}}}}</style>'
         f'<div style="position:relative; height:{height_px}px; '
         f'display:flex; align-items:center; justify-content:center; '
         f'overflow:hidden;">'
@@ -302,9 +328,7 @@ def laser_sweep(image_b64: str, height_px: int = 210, uid: str = "s") -> str:
         f'<img src="data:image/png;base64,{image_b64}" '
         f'style="height:100%; object-fit:contain; '
         f'filter:drop-shadow(0 14px 26px rgba(0,0,0,0.65));"/>'
-        f'<div style="position:absolute; left:8%; right:8%; height:2px; '
-        f'background:{LASER}; box-shadow:0 0 14px 3px {LASER_GLOW}; '
-        f'animation:sweep{key} {SWEEP} ease-in-out 1 forwards;"></div>'
+        f'{laser}'
         f'</div>')
 
 

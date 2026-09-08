@@ -8,6 +8,19 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.31 — Tuesday, September 8, 2026
+**The sign-in laser was striking twice**
+
+Reported as a double glitch, and that is exactly what it was. The screen renders, the cookie component answers a moment later with what it found, and that answer re-runs the script. So the laser started, got about a third of the way down, and was replaced by a fresh one starting from the top. Two half-strokes.
+
+- The stroke waits 1.4 seconds before it starts, which is longer than the cookie takes to come back. The first render's laser is still sitting in its delay when the second replaces it, so only one of them is ever seen moving.
+- It is only asked for on the first two renders. From then on the machine is drawn without it, so typing a PIN or ticking the box does not set it off again.
+- The machine occupies the same space either way, so nothing on the screen nudges at the moment the laser stops.
+
+Measured rather than eyeballed: sampling the laser's position every 150 ms, it holds still, then runs top to bottom once, with no upward jumps.
+
+---
+
 ## 3.30 — Tuesday, September 8, 2026
 **The floor sets it up, not a manager**
 

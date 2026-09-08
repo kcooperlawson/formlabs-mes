@@ -121,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.30"
+APP_VERSION = "PT-V3.31"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -282,7 +282,18 @@ if not st.session_state["authenticated"]:
         # and stops, because a login screen that never settles is a login
         # screen people learn to look away from.
         if printer_b64:
-            st.markdown(laser_sweep(printer_b64, height_px=132, uid="signin"),
+            # The stroke is asked for on the first two renders and no more.
+            # Render one is the page arriving; render two is the cookie
+            # component coming back with what it found, which re-runs the
+            # script. The laser's own delay means render one's is still
+            # waiting when render two replaces it, so exactly one stroke is
+            # ever seen moving. From render three on - typing a PIN, ticking
+            # the box - the machine is drawn without it, and the screen
+            # settles instead of glitching every time somebody touches it.
+            _sweeps = st.session_state.get("_signin_renders", 0) + 1
+            st.session_state["_signin_renders"] = _sweeps
+            st.markdown(laser_sweep(printer_b64, height_px=132, uid="signin",
+                                    play=_sweeps <= 2),
                         unsafe_allow_html=True)
 
         st.markdown(
