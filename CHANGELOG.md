@@ -8,6 +8,21 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.33 — Tuesday, September 8, 2026
+**The SCADA page was answering the question fifth**
+
+Six controls sat above every number on it: the time horizon, a date picker, then pump, resin, operator and shift. A manager opens that page to find out how the shift is going, and the first full screen was a control panel. The figures started below the fold.
+
+Nobody touches those controls on most visits. Live Today, all pumps, all resins, all operators, all shifts is the question they came to ask. The filters are for an investigation that happens maybe one visit in ten.
+
+- **The answer goes first.** One line at the top: how much has been poured this shift and whether that is ahead of or behind pace, with the shift, how far through it is, and what was expected by now underneath. You used to assemble that yourself out of four cards and a chart.
+- **The six filters are one line and a closed drawer.** The line says what is applied. When anything is set away from its default it turns amber and says so outright, because reading filtered numbers without realising they are filtered is the one genuinely dangerous thing a dashboard can do to you.
+- **The three-way view radio is gone.** Packing is a plant setting, not a view somebody picks. Its "Master" option showed exactly what the other two showed together, so it was three states and a decision in front of a page whose whole job is one glance.
+
+The headline, the filter line and all four telemetry cards now fit above the fold on a 1400 px screen. Nothing was removed except the radio.
+
+---
+
 ## 3.32 — Tuesday, September 8, 2026
 **More of the thing the sign-in screen does**
 

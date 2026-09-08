@@ -121,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.32"
+APP_VERSION = "PT-V3.33"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -631,81 +631,117 @@ st.markdown(
 # sees. The point of a palette is that a component takes its colour from the
 # theme instead of assuming one, so this inherits and the caption is dimmed by
 # opacity, which works in both directions.
-st.markdown(
-    '<div class="filter-section-card"><div style="display:flex;'
-    ' justify-content:space-between; align-items:center;'
-    ' margin-bottom:8px;"><b style="font-size:0.95rem; color:inherit;">🔍 TIME'
-    ' HORIZON &amp; PRODUCTION FILTERS</b><span style="font-size:0.75rem;'
-    ' color:inherit; opacity:0.72;">All top statistics and tables calculate'
-    " based on these filters.</span></div></div>",
-    unsafe_allow_html=True,
-)
+# Six controls used to sit here, permanently open, above every number on the
+# page. On the overwhelming majority of visits nobody touches any of them -
+# Live Today, all pumps, all resins, all operators, all shifts IS the question
+# a manager came to ask. So the whole first screen was a control panel for an
+# investigation that happens maybe one visit in ten, and the figures started
+# below the fold.
+#
+# They are all still here and all still work. What changed is that they are
+# folded away and the page says in one line what is currently applied - and
+# says it loudly when something is set away from its default, because reading
+# filtered numbers without realising they are filtered is the one genuinely
+# dangerous thing a dashboard can do to you.
+# The one thing this page exists to say, said first. Until now a manager had
+# to assemble it themselves out of four cards and a chart: how the shift is
+# going against target, right now. Reserved here and filled in further down,
+# because the figures do not exist until the logs have been filtered.
+_headline = st.empty()
+_filter_line = st.empty()
 
-f1_col1, f1_col2 = st.columns((2, 3))
-with f1_col1:
-    time_horizon = st.selectbox(
-        "⏱️ Select Time Horizon Mode:",
-        (
-            "⚡ Live Today (Active Shift)",
-            "📅 Specific Single Day",
-            "📆 Past 7 Days (Week)",
-            "📊 Past 30 Days (Month)",
-            "🌐 All Time History",
-        ),
-    )
-
-with f1_col2:
-    if time_horizon == "📅 Specific Single Day":
-        selected_specific_date = st.selectbox(
-            "Choose Exact Production Date:", all_dates, index=0 if all_dates else 0
+with st.expander("🔍 Filters and time horizon", expanded=False):
+    f1_col1, f1_col2 = st.columns((2, 3))
+    with f1_col1:
+        time_horizon = st.selectbox(
+            "⏱️ Select Time Horizon Mode:",
+            (
+                "⚡ Live Today (Active Shift)",
+                "📅 Specific Single Day",
+                "📆 Past 7 Days (Week)",
+                "📊 Past 30 Days (Month)",
+                "🌐 All Time History",
+            ),
         )
-    elif time_horizon == "⚡ Live Today (Active Shift)":
-        st.markdown(
-            f"""<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:6px;">
-                <span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; white-space: nowrap;">
-                    ● PLANT FLOOR LIVE SYNC
-                </span>
-                <span style="color:#94A3B8; font-size:0.85rem;">Showing live production for today ({date.today().strftime('%Y-%m-%d')}).</span>
-            </div>""",
-            unsafe_allow_html=True,
-        )
-    elif time_horizon == "📆 Past 7 Days (Week)":
-        st.caption("Aggregating all runs over the rolling 7-day window.")
-    elif time_horizon == "📊 Past 30 Days (Month)":
-        st.caption("Aggregating all runs over the rolling 30-day window.")
-    else:
-        st.caption("Aggregating full plant lifetime history.")
 
-d1, d2, d3, d4 = st.columns(4)
-with d1:
-    selected_pump = st.selectbox(
-        "Pump Station",
-        ["All Pumps"] + sorted(df_logs["pump_station"].dropna().unique().tolist())
-        if not df_logs.empty
-        else ["All Pumps"],
-    )
-with d2:
-    selected_resin = st.selectbox(
-        "Resin Formula",
-        ["All Resins"] + sorted(df_logs["resin_type"].dropna().unique().tolist())
-        if not df_logs.empty
-        else ["All Resins"],
-    )
-with d3:
-    selected_operator = st.selectbox(
-        "Operator",
-        ["All Operators"]
-        + sorted(df_logs["operator_name"].dropna().unique().tolist())
-        if not df_logs.empty
-        else ["All Operators"],
-    )
-with d4:
-    selected_shift = st.selectbox(
-        "Shift",
-        ["All Shifts"] + sorted(df_logs["shift"].dropna().unique().tolist())
-        if not df_logs.empty
-        else ["All Shifts"],
-    )
+    with f1_col2:
+        if time_horizon == "📅 Specific Single Day":
+            selected_specific_date = st.selectbox(
+                "Choose Exact Production Date:", all_dates, index=0 if all_dates else 0
+            )
+        elif time_horizon == "⚡ Live Today (Active Shift)":
+            st.markdown(
+                f"""<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:6px;">
+                    <span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; white-space: nowrap;">
+                        ● PLANT FLOOR LIVE SYNC
+                    </span>
+                    <span style="color:#94A3B8; font-size:0.85rem;">Showing live production for today ({date.today().strftime('%Y-%m-%d')}).</span>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        elif time_horizon == "📆 Past 7 Days (Week)":
+            st.caption("Aggregating all runs over the rolling 7-day window.")
+        elif time_horizon == "📊 Past 30 Days (Month)":
+            st.caption("Aggregating all runs over the rolling 30-day window.")
+        else:
+            st.caption("Aggregating full plant lifetime history.")
+
+    d1, d2, d3, d4 = st.columns(4)
+    with d1:
+        selected_pump = st.selectbox(
+            "Pump Station",
+            ["All Pumps"] + sorted(df_logs["pump_station"].dropna().unique().tolist())
+            if not df_logs.empty
+            else ["All Pumps"],
+        )
+    with d2:
+        selected_resin = st.selectbox(
+            "Resin Formula",
+            ["All Resins"] + sorted(df_logs["resin_type"].dropna().unique().tolist())
+            if not df_logs.empty
+            else ["All Resins"],
+        )
+    with d3:
+        selected_operator = st.selectbox(
+            "Operator",
+            ["All Operators"]
+            + sorted(df_logs["operator_name"].dropna().unique().tolist())
+            if not df_logs.empty
+            else ["All Operators"],
+        )
+    with d4:
+        selected_shift = st.selectbox(
+            "Shift",
+            ["All Shifts"] + sorted(df_logs["shift"].dropna().unique().tolist())
+            if not df_logs.empty
+            else ["All Shifts"],
+        )
+
+# Written after the widgets, because their values do not exist until they have
+# rendered. The placeholder above is where it lands.
+_narrowed = [x for x in (
+    None if selected_pump == "All Pumps" else f"pump {selected_pump}",
+    None if selected_resin == "All Resins" else selected_resin,
+    None if selected_operator == "All Operators" else selected_operator,
+    None if selected_shift == "All Shifts" else selected_shift,
+) if x]
+_horizon_text = time_horizon.split(" ", 1)[-1]
+if _narrowed:
+    _filter_line.markdown(
+        f'<div class="filter-section-card" style="border-color:#F59E0B; '
+        f'padding:10px 14px; margin:0 0 14px 0;">'
+        f'<b style="color:#F59E0B;">⚠️ Filtered view</b> &nbsp;·&nbsp; '
+        f'{esc(_horizon_text)} &nbsp;·&nbsp; {esc(", ".join(_narrowed))}'
+        f'<span style="opacity:0.7;"> — every figure below counts only these '
+        f'rows. Open the filters above to clear them.</span></div>',
+        unsafe_allow_html=True)
+else:
+    _filter_line.markdown(
+        f'<div class="filter-section-card" style="padding:10px 14px; '
+        f'margin:0 0 14px 0; opacity:0.85;">'
+        f'🔍 <b>{esc(_horizon_text)}</b> &nbsp;·&nbsp; all pumps, resins, '
+        f'operators and shifts.</div>',
+        unsafe_allow_html=True)
 
 filtered_df = df_logs.copy() if not df_logs.empty else pd.DataFrame()
 today_d = date.today()
@@ -840,6 +876,33 @@ else:
     variance_display = "—"
     status_badge = "⏸️ Floor Idle"
 
+# Fill the headline reserved at the top of the page.
+if is_shift_active and time_horizon == "⚡ Live Today (Active Shift)":
+    _ahead = pace_variance_l >= 0
+    _tone = "#10B981" if _ahead else "#F59E0B"
+    _word = "ahead of" if _ahead else "behind"
+    _headline.markdown(
+        f'<div style="border-left:5px solid {_tone}; background:rgba(16,185,129,0.07); '
+        f'border-radius:8px; padding:14px 18px; margin:0 0 12px 0;">'
+        f'<div style="font-size:1.45rem; font-weight:800; line-height:1.3;">'
+        f'{liters_output:,.0f} L poured this shift, '
+        f'<span style="color:{_tone};">{abs(pace_variance_l):,.0f} L {_word} pace</span>'
+        f'</div>'
+        f'<div style="opacity:0.75; font-size:0.9rem; margin-top:4px;">'
+        f'{esc(active_shift_name)} · {shift_pct:.0f}% through · '
+        f'{expected_display} expected by now</div></div>',
+        unsafe_allow_html=True)
+else:
+    _headline.markdown(
+        f'<div style="border-left:5px solid #475569; background:rgba(71,85,105,0.10); '
+        f'border-radius:8px; padding:14px 18px; margin:0 0 12px 0;">'
+        f'<div style="font-size:1.45rem; font-weight:800;">'
+        f'{liters_output:,.0f} L</div>'
+        f'<div style="opacity:0.75; font-size:0.9rem; margin-top:4px;">'
+        f'{esc(status_badge)} · no shift running, so there is no pace to be '
+        f'ahead of</div></div>',
+        unsafe_allow_html=True)
+
 remaining_hours = shift_status["remaining_hours"]
 blended_rate = run_velocity_lh if operating_hours > 0.5 else target_rate_lh
 projected_total = liters_output + (blended_rate * remaining_hours)
@@ -852,55 +915,18 @@ packing_enabled = settings.get("enable_packing", True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-if not packing_enabled:
-    # If Packing is disabled globally in Plant Settings, force Pouring view only
-    view_mode = "💧 Pouring Operations"
-    st.markdown(
-        "<h4 style='color:#00D2FF;'>💧 POURING OPERATIONS DASHBOARD</h4>",
-        unsafe_allow_html=True,
-    )
-else:
-    # Normal role-based view selection when packing IS enabled
-    if current_role == "manager":
-        view_mode = st.radio(
-            "📊 SELECT DASHBOARD VIEW:",
-            ["💧 Pouring Operations", "📦 Packing Operations", "🌐 Master Combined View"],
-            horizontal=True,
-        )
-    elif current_role == "packer":
-        view_mode = "📦 Packing Operations"
-        st.markdown(
-            "<h4 style='color:#A855F7;'>📦 PACKING OPERATIONS DASHBOARD</h4>",
-            unsafe_allow_html=True,
-        )
-    else:
-        view_mode = "💧 Pouring Operations"
-        st.markdown(
-            "<h4 style='color:#00D2FF;'>💧 POURING OPERATIONS DASHBOARD</h4>",
-            unsafe_allow_html=True,
-        )
-
-show_pouring = view_mode in [
-    "🌐 Master Combined View",
-    "💧 Pouring Operations",
-]
-show_packing = view_mode in [
-    "🌐 Master Combined View",
-    "📦 Packing Operations",
-]
-
-show_pouring = view_mode in [
-    "🌐 Master Combined View",
-    "💧 Pouring Operations",
-]
-show_packing = view_mode in [
-    "🌐 Master Combined View",
-    "📦 Packing Operations",
-]
+# Whether this plant packs is a plant setting, not a view somebody picks. The
+# three-way radio that used to sit here was a setting dressed as navigation:
+# it put a decision in front of a page whose whole job is one glance, and its
+# "Master" option showed exactly what the other two showed together anyway.
+# Now the page shows the operations this plant actually runs.
+show_pouring = current_role != "packer"
+show_packing = bool(packing_enabled) and current_role in ("manager", "admin", "packer")
+view_mode = "📦 Packing Operations" if current_role == "packer" else "💧 Pouring Operations"
 
 # ===================== 💧 POURING UI =====================
 if show_pouring:
-    if current_role == "manager" or view_mode == "🌐 Master Combined View":
+    if current_role in ("manager", "admin"):
         st.markdown(
             "<h4 style='color:#00D2FF; margin-top:10px;'>💧 POURING TELEMETRY</h4>",
             unsafe_allow_html=True,
@@ -1037,7 +1063,7 @@ if show_pouring:
 
 # ===================== 📦 PACKING UI =====================
 if show_packing:
-    if current_role == "manager" or view_mode == "🌐 Master Combined View":
+    if current_role in ("manager", "admin"):
         st.markdown(
             "<br><h4 style='color:#A855F7; margin-top:10px;'>📦 PACKING"
             " TELEMETRY</h4>",
