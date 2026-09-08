@@ -19,7 +19,7 @@ from playwright.async_api import async_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "figs_print")
 BASE = "http://localhost:8501"
-USER, PIN = "keagan", "1234"
+USER, PIN = "jrivera", "1234"
 
 LIGHT = [("Paper White", "theme_paper_white.png"),
          ("Daylight", "theme_daylight.png"),

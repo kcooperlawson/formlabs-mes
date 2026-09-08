@@ -193,7 +193,9 @@ PAGES.append(page(
     + '<div class="row">'
     + '<div>'
     + step(1, "Open the plant address in your phone's browser",
-           "Your lead will give you the address. Add it to your home screen the first time and "
+           "Your lead will give you the address. Add it to your home screen the first time &mdash; "
+           "it saves as <b>Pouring Log</b> with the Formlabs mark, so it sits with your other "
+           "apps &mdash; and "
            "it becomes one tap after that &mdash; there is no app to download.")
     + step(2, "Enter your operator ID and PIN",
            "Both come from your lead. If you have never signed in, ask them to set you up.")
@@ -415,16 +417,18 @@ PAGES.append(page(
     + fix("The screen says my log was not saved",
           "Then it was not, and nothing was recorded. Submit again. This is the app being honest "
           "rather than pretending &mdash; the network drops in parts of the building.")
+    + fix("The screen says something went wrong, with a code on it",
+        "Nothing you did caused it, and nothing you already logged is lost. <b>Read the code "
+        "to your lead</b> &mdash; four letters and numbers, like K7F2 &mdash; then carry on. "
+        "The rest of the app still works.")
     + fix("I cannot read the screen properly",
           "Under <em>Account &amp; Preferences</em> there is a <b>Display</b> section: "
-          "<em>Glove mode</em> makes every button and box bigger for gloved hands, and there are "
-          "light themes for working under bright shop lighting. Both are remembered.")
+          "<em>Glove mode</em> makes every button and box bigger for gloved hands, and there "
+          "are light themes for bright shop lighting. Both are remembered.")
     + fix("I keep losing my place while pouring",
           "If there is a <em>Focus mode</em> toggle at the top of the logging tab, turn it on: it "
           "strips the screen down to the four things you need mid-run &mdash; resin, lot, count "
-          "so far, how many left &mdash; big enough to read from across the station. It only "
-          "appears in plants that assign work to stations, because those four numbers come off "
-          "the assignment.")
+          "so far, how many left &mdash; big enough to read from across the station.")
 , 10))
 
 # ------------------------------------------------------------- what else -----

@@ -38,7 +38,7 @@ async def sign_in(b):
     pg = await ctx.new_page()
     await pg.goto(BASE, wait_until="networkidle")
     await pg.wait_for_timeout(5000)
-    await pg.locator('input[type="text"]').first.fill("keagan")
+    await pg.locator('input[type="text"]').first.fill("jrivera")
     await pg.locator('input[type="password"]').first.fill(PIN)
     await pg.wait_for_timeout(400)
     await pg.get_by_text("INITIALIZE SESSION").first.click()
@@ -68,7 +68,7 @@ async def main():
     # ground: rendered in a light theme and then lifted for print, its heading
     # disappears into the page.
     users = crud.get_all_users_df()
-    admin = users[users["username"] == "keagan"]
+    admin = users[users["username"] == "jrivera"]
     admin_id = int(admin["id"].iloc[0])
     admin_theme = str(admin["preferred_theme"].iloc[0])
     crud.update_user_theme(admin_id, "Default Dark")

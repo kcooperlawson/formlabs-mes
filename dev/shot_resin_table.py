@@ -21,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 OUT = os.path.join(ROOT, "docs", "figs_print")
 BASE = "http://localhost:8501"
-USER, PIN = "keagan", "1234"
+USER, PIN = "jrivera", "1234"
 
 
 async def main():

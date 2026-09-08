@@ -13,7 +13,7 @@ async def main():
         pg=await ctx.new_page()
         await pg.goto(BASE, wait_until="networkidle"); await pg.wait_for_timeout(5000)
         await pg.screenshot(path=f"{OUT}/01_login.png"); print("login")
-        await pg.locator('input[type="text"]').first.fill("keagan")
+        await pg.locator('input[type="text"]').first.fill("jrivera")
         await pg.locator('input[type="password"]').first.fill("1234")
         await pg.wait_for_timeout(400)
         await pg.get_by_text("INITIALIZE SESSION").first.click(); await pg.wait_for_timeout(10000)

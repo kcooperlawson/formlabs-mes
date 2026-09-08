@@ -175,7 +175,7 @@ td.k{font-weight:600; color:var(--ink);}
   operator guide covering a shift start to finish &mdash; so nothing here is written for an
   operator to follow.</div>
   <div class="meta">
-    <div>Release<b>Version 3.26.1</b></div>
+    <div>Release<b>Version 3.27</b></div>
     <div>Platform<b>Streamlit &middot; PostgreSQL</b></div>
     <div>Scope<b>Resin Pouring</b></div>
     <div>Issued<b>September 2026</b></div>
@@ -605,19 +605,20 @@ td.k{font-weight:600; color:var(--ink);}
       <li><strong>Bulk deletion is deliberately hard.</strong> Disabled until the word DELETE is typed into a confirmation box.</li>
       <li><strong>Corrections are visible.</strong> A plant-level correction is written as a labelled system adjustment, not by editing an operator's entries.</li>
       <li><strong>Credentials are kept out of the application itself.</strong> Connection strings and passwords live in a configuration file on the machine, not written into the program.</li>
+      <li><strong>A page that breaks is recorded.</strong> Whoever was on it gets a short reference code to quote, and the fault is filed in IT Admin with the page, the account and the detail.</li>
     </ul></div>
   </div>
-  <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management">
+  <figure><img class="med" src="figs_print/17_logmgmt.png" alt="Log management" style="max-height:2.55in;">
     <figcaption><b>Log Management &amp; Cleanup.</b> Filter production and downtime logs by date, station,
     resin or operator, review, and delete with the work-order re-sync handled automatically.</figcaption></figure>
   <div class="note" style="margin-top:11pt;"><span class="eyebrow">When nothing is arriving at all</span>
-    <p>The failure worth planning for is not corruption, it is silence. If this machine reboots and
-    the database does not come back, or the application is closed and nobody reopens it, every
-    figure on every screen carries on looking entirely normal &mdash; because every figure is
-    computed from the log, and the last good hour is still the last good hour. So the system watches
-    its own intake: after roughly three hours with nothing logged <em>during a running shift</em>,
-    the main screen and the floor display both say so plainly. Quiet outside a shift is not treated
-    as a fault, because a warning that shouts all night is one people stop reading. Nor is a day the plant does not run: the days of the week this plant works are set once in the admin console, and a shift counts by the day it starts, so a Friday night shift is still watched into Saturday morning. An alarm that cries wolf every weekend is worse than no alarm at all &mdash; by Monday nobody reads it, and the one that means something looks exactly like the fifty that did not.</p></div>
+    <p>The failure worth planning for is not corruption, it is silence. If this machine reboots
+    and the database does not come back, every figure on every screen carries on looking normal,
+    because every figure is computed from the log and the last good hour is still the last good
+    hour. So the system watches its own intake: after roughly three hours with nothing logged
+    <em>during a running shift</em>, the main screen and the floor display both say so. Quiet
+    outside a shift is not a fault, and nor is a day the plant does not run &mdash; the working
+    days are set in the admin console, and a shift counts by the day it starts.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
 </section>
 

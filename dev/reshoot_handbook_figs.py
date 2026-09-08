@@ -57,7 +57,7 @@ async def main():
             crud.submit_daily_checklist(op_name, op_shift, station)
     print(f"  checklist cleared for {op_name} at {len(pumps)} station(s)")
 
-    admin = users[users["username"] == "keagan"]
+    admin = users[users["username"] == "jrivera"]
     admin_id = int(admin["id"].iloc[0])
     admin_theme = str(admin["preferred_theme"].iloc[0])
     crud.update_user_theme(admin_id, "Default Dark")
@@ -108,7 +108,7 @@ async def main():
         await ctx.close()
 
         # --- 2. the manager cockpit, with its current heading ---------------
-        ctx, pg = await session("keagan")
+        ctx, pg = await session("jrivera")
         await pg.get_by_text("Manager", exact=False).first.click()
         await pg.wait_for_timeout(14000)
         await frame(pg, "02_cockpit", "Plant Manager", -150, 804)
@@ -118,7 +118,7 @@ async def main():
         # Shot as an admin: the tab is built for packer, manager and admin,
         # and an operator's tab strip does not carry it at all.
         db.update_plant_settings({"enable_packing": True})
-        ctx, pg = await session("keagan")
+        ctx, pg = await session("jrivera")
         for label in ("Workstation", "Operator"):
             try:
                 await pg.get_by_text(label, exact=False).first.click(timeout=8000)
@@ -135,7 +135,7 @@ async def main():
         await ctx.close()
 
         # --- 4. what reporting out actually is, now the handover is gone -----
-        ctx, pg = await session("keagan")
+        ctx, pg = await session("jrivera")
         await pg.get_by_text("Manager", exact=False).first.click()
         await pg.wait_for_timeout(14000)
         try:

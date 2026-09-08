@@ -17,7 +17,7 @@ from playwright.async_api import async_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 OUT = os.path.join(ROOT, "docs", "figs_print")
-BASE, USER, PIN = "http://localhost:8501", "keagan", "1234"
+BASE, USER, PIN = "http://localhost:8501", "jrivera", "1234"
 
 
 async def main():

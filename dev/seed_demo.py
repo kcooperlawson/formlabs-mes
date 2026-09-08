@@ -57,7 +57,7 @@ for c, sku, code, name, spec, lo, hi, ups in RESINS:
     add_resin_spec(c, sku, code, name, spec, lo, hi, units_per_skid=ups)
 
 PEOPLE = [
-    ("keagan", "Keagan Whitfield", "admin",    "Shift 1"),
+    ("jrivera", "J. Rivera", "admin",    "Shift 1"),
     ("mvega",  "Maria Vega",       "manager",  "Shift 1"),
     ("aruiz",  "Ana Ruiz",         "operator", "Shift 1"),
     ("bchen",  "Bo Chen",          "operator", "Shift 1"),
