@@ -134,6 +134,17 @@ st.markdown(f"""
 <div style="display:flex; align-items:center; margin-bottom: 5px;">
     <img src="data:image/png;base64,{logo_b64}" style="height: 60px; object-fit: contain; margin-right: 15px;">
     <h1 style="margin:0; padding:0; font-size: clamp(1.25rem, 4.2vw, 2.2rem); white-space: nowrap;">📝 Operator Workstation</h1>
+    <!-- The guide, one tap away and out of the way. Top right, small, opens in
+         its own tab so nothing half-typed on this page is lost. It is the
+         eleven-page guide written to be read at the pump, not the handbook -
+         an operator has no use for the manager's document. -->
+    <a href="./app/static/Formlabs_MES_Operator_Guide.pdf" target="_blank"
+       title="Operator guide — how to log an hour, and what to do when something is not right"
+       style="margin-left:auto; flex:0 0 auto; width:38px; height:38px;
+              display:flex; align-items:center; justify-content:center;
+              border-radius:50%; border:1px solid currentColor; opacity:0.45;
+              color:inherit; text-decoration:none; font-weight:800;
+              font-size:1.05rem;">?</a>
 </div>
 """, unsafe_allow_html=True)
 

@@ -49,3 +49,14 @@ async def main():
 
 asyncio.run(main())
 print("written", OUT)
+
+# A copy where the running app can serve it. Streamlit serves static/ and
+# nothing else, and the help links inside the app point at these - so a
+# rebuild that only wrote docs/ would leave the app handing people last
+# month's document with no sign that it had.
+_served = DOCS.parent / "static" / OUT.name
+try:
+    _served.write_bytes(OUT.read_bytes())
+    print("served copy", _served)
+except OSError as exc:
+    print("could not write the served copy:", exc)

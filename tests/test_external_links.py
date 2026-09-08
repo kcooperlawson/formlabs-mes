@@ -136,6 +136,32 @@ check(external_links.normalise(settings.get("pump_form_url", ""))[0] == "",
       "cleared settings mean no button, not a button to nowhere")
 
 
+# --- the documents the app hands people ------------------------------------
+# Two links now point at files rather than at a page: the question mark on the
+# operator form, and the handbook line in the manager menu. Both go into
+# static/, which is the only folder Streamlit serves.
+#
+# A help link that 404s is worse than no help link. It tells an operator the
+# guide does not exist, and nothing in the application would ever say
+# otherwise - the browser just shows a not-found and they stop asking.
+import re as _re  # noqa: E402
+
+_served = ROOT / "static"
+_doc_links = set()
+for _f in list(ROOT.glob("*.py")) + list((ROOT / "pages").glob("*.py")):
+    _doc_links |= set(_re.findall(r"\./app/static/([A-Za-z0-9_.\-]+\.pdf)",
+                                  _f.read_text(encoding="utf-8")))
+
+check(len(_doc_links) >= 2, f"the app links to at least two documents (found {len(_doc_links)})")
+for _name in sorted(_doc_links):
+    _path = _served / _name
+    check(_path.is_file(), f"{_name} exists where the app serves it from")
+    check(_path.is_file() and _path.stat().st_size > 10000,
+          f"{_name} is a real document, not an empty file")
+check("enableStaticServing = true" in
+      (ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8"),
+      "static serving is switched on, or none of those links resolve at all")
+
 print(f"\n{COUNT - len(FAILURES)}/{COUNT} passed")
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILED:")

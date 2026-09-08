@@ -121,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.33"
+APP_VERSION = "PT-V3.34"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -420,6 +420,17 @@ if not st.session_state["authenticated"]:
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
 
+# Operators do not come here. Not because plant figures are secret - their own
+# numbers are on their own form and update as they log, and the operator guide
+# promises those are the same figures management sees. It is the leaderboard.
+# It ranks people by name against litres an hour, and a visible ranking pushes
+# toward speed - which is exactly what the lot check exists to slow down. A
+# system whose most valuable feature asks somebody to stop and turn a cartridge
+# over should not put a scoreboard on the next screen.
+if current_role in ("operator", "packer"):
+    st.switch_page("pages/Operator_Form.py")
+
+
 st.markdown("<br>", unsafe_allow_html=True)
 if role_can_administer(current_role):
     # God Mode (Now 6 Columns)
@@ -493,6 +504,17 @@ with st.sidebar:
     # crud.can_administer.
     if role_can_administer(st.session_state.get("user_role")):
         st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
+
+    # The handbook, for the people who run this. A small grey line at the
+    # bottom of the menu rather than a button: it is something you go and find
+    # once, not something you need in front of you. This page is already
+    # manager and admin only, so there is nobody here it is not meant for.
+    st.markdown(
+        '<div style="margin-top:10px; font-size:0.78rem; opacity:0.55;">'
+        '<a href="./app/static/Formlabs_MES_Handbook.pdf" target="_blank" '
+        'style="color:inherit; text-decoration:none;">'
+        '📘 Operations handbook</a></div>',
+        unsafe_allow_html=True)
 
     st.markdown("---")
     # --------------------------

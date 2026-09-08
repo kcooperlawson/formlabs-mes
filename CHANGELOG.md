@@ -8,6 +8,24 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.34 — Tuesday, September 8, 2026
+**Operators get one screen, and both documents are one tap away**
+
+Operators had the full SCADA page. Not the plant figures that bothered me — their own numbers are on their own form and the guide promises those are the same ones management sees. It was the leaderboard. It ranks people by name against litres an hour, and a visible ranking pushes toward speed, which is exactly what the lot check exists to slow down. A system whose best feature asks somebody to stop and turn a cartridge over should not put a scoreboard on the next screen.
+
+- The SCADA page is manager and admin only. An operator who lands on it is sent to their workstation.
+- Their nav is two links instead of three.
+- The sidebar menu is role-aware now. It used to list every page to everybody and let each page refuse them at the door, so an operator was offered five links and could open two.
+
+**The documents**
+
+- **A question mark, top right of the operator form.** Opens the eleven-page guide in its own tab, so nothing half-typed is lost. Small and grey — there when you want it, invisible when you do not. The guide, not the handbook: an operator has no use for the manager's document.
+- **A grey line at the bottom of the manager menu** for the operations handbook. Deliberately not a button. It is something you go and find once.
+- Both are served out of `static/`, and `dev/topdf.py` writes a copy there on every rebuild — otherwise the app would keep handing people last month's document with no sign that it had.
+- A test now checks that every document the app links to actually exists where it serves it from, and is not an empty file. A help link that 404s is worse than no help link: it tells an operator the guide does not exist.
+
+---
+
 ## 3.33 — Tuesday, September 8, 2026
 **The SCADA page was answering the question fifth**
 
