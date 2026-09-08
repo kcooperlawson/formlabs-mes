@@ -8,6 +8,30 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.36 — Tuesday, September 8, 2026
+**Logging a pour into a container the app has never heard of**
+
+Today I poured out of a drum into brown 1L bottles. There is no SKU for those bottles and no spec on file, and the Container Format dropdown only offers things the app knows the size of, so there was no honest way to log it. I know how many bottles I filled and how much went in. That should be enough.
+
+It nearly was. The measured-amount option already existed and does exactly this, and I scrolled past it, because it was called "Drum / Tote" and I was not filling a drum.
+
+- **The option is called "Other container (measured amount)" now.** Same option, same stored code, nothing recorded under the old name needs touching. It asks for the amount in each container, the unit, how many, and a line saying what it went into in your own words. Nothing has to be registered and nothing has to match a list.
+- **The container count goes to 999.** It stopped at 99, and a drum into 1L bottles is more than that, so one pour became three entries and a sum at the end of the shift.
+- **The "Poured into" box says what it is for.** The placeholder used to list drums and totes only.
+
+**Where the resin came from**
+
+The bigger problem was quieter. Every log takes its litres off the tank on that station, because until now every log was a cartridge being filled from one. Resin poured out of a drum already left the tank, whenever that drum was filled. Charging the bottles to the tank as well takes the same litres off twice, and the wall display shows a vessel emptying that nobody has touched.
+
+- **A measured pour asks where it came from.** The tank on this station, or a drum that was already filled.
+- **An off-tank pour counts everywhere production is counted** and leaves the tank level alone. Your shift total, your own numbers, the run it belongs to, the exports, all the same. The level is the one reader that skips it.
+- **The tank checks stop applying to it.** More litres than the vessel holds is not evidence of a typo when the pour did not come out of that vessel. The check that a number is not impossible stays.
+- The form no longer prints "Drawing from RX-1" over a pour that did not come from RX-1.
+
+Every log written before today is recorded as coming off the tank, which is what they were.
+
+---
+
 ## 3.35 — Tuesday, September 8, 2026
 **The handbook link was only on two screens, and the machine gateway has a switch now**
 

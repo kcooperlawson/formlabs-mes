@@ -1225,7 +1225,19 @@ if tab1 is not None:
         # is no reactor selector so it has no idea what I am pouring from",
         # and on that install it genuinely had no idea, because the vessel had
         # never been given a pump or a resin.
-        if station and resin:
+        #
+        # None of it applies to a pour the operator has said came off a drum
+        # rather than the tank. There is no vessel to name, no changeover to
+        # confirm, and no missing link to warn about, so the whole block is
+        # skipped rather than printing a tank this pour has nothing to do
+        # with. The pick is read out of session state because the question
+        # itself is asked further down the form, and a radio answers on the
+        # rerun it causes.
+        _said_off_tank = is_bulk and str(
+            st.session_state.get("h_bulk_src", "")).startswith("A drum")
+        if _said_off_tank:
+            st.caption("🛢️ No tank on this one — you said it came out of a drum.")
+        if station and resin and not _said_off_tank:
             _vessel = crud.reactor_for(station, resin)
             if _vessel is None:
                 # A tank IS on this pump, it is just recorded as holding
@@ -1549,6 +1561,7 @@ if tab1 is not None:
         # small field here, because it is almost always 1.
         bulk_litres = None
         bulk_note = ""
+        bulk_off_tank = False
         bulk_verdict = {"blocked": False, "message": ""}
 
         if is_bulk:
@@ -1559,11 +1572,33 @@ if tab1 is not None:
             with bk2:
                 bulk_unit = st.radio("Unit", BULK_UNITS, horizontal=True, key="h_bulk_unit")
             with bk3:
-                bottles_filled = st.number_input("Containers", min_value=1, max_value=99,
+                # Was 99. A drum decanted into 1 L bottles is a couple of
+                # hundred of them, and a cap that stops at 99 turns one pour
+                # into three log entries and an arithmetic problem at the end
+                # of the shift.
+                bottles_filled = st.number_input("Containers", min_value=1, max_value=999,
                                                  value=1, step=1, key="h_bulk_count")
 
-            bulk_note = st.text_input("Poured into", placeholder="55 gal drum, blue tote, pail",
-                                      max_chars=60, key="h_bulk_what")
+            bulk_note = st.text_input(
+                "Poured into", placeholder="brown 1L bottles, 55 gal drum, blue tote, pail",
+                max_chars=60, key="h_bulk_what",
+                help="Whatever it was, in your own words. Nothing has to be registered "
+                     "or match a list - this is for the person reading the log later.")
+
+            # Where it came from. Every other log on this form comes off the
+            # tank on this station, because that is what filling a cartridge
+            # is. This one might not: resin decanted out of a drum left the
+            # tank whenever that drum was filled, so charging it to the tank
+            # again takes the same litres off twice and empties a vessel
+            # nobody has touched. The operator is the only one who knows
+            # which it was, so this asks, rather than a report being wrong
+            # in a way that looks fine.
+            _src = st.radio(
+                "Where did it come from?",
+                ("The tank on this station",
+                 "A drum or container already off the tank"),
+                horizontal=False, key="h_bulk_src")
+            bulk_off_tank = _src.startswith("A drum")
 
             _dens = resin_density(resin, bulk_densities)
             bulk_litres = pour_litres(bottles_filled, bulk_each, bulk_unit, _dens)
@@ -1571,15 +1606,24 @@ if tab1 is not None:
             # The tank this came out of, so an amount that cannot be true gets
             # caught here rather than showing up as an empty vessel on the wall
             # display an hour later. 1800 typed instead of 180 looks perfectly
-            # ordinary in a number box.
-            _cap, _left = bulk_vessel_state(resin, station)
-            bulk_verdict = check_pour(bulk_litres, capacity_l=_cap, remaining_l=_left)
+            # ordinary in a number box. An off-tank pour has no vessel to
+            # measure against, so it keeps the size check and drops the two
+            # that are about this tank.
+            if bulk_off_tank:
+                bulk_verdict = check_pour(bulk_litres)
+            else:
+                _cap, _left = bulk_vessel_state(resin, station)
+                bulk_verdict = check_pour(bulk_litres, capacity_l=_cap, remaining_l=_left)
 
             # The conversion stated out loud before the submit. The operator
             # knows they poured 200 kg; that it is 180 litres is the
             # application's claim, not theirs.
             if bulk_litres > 0:
-                st.markdown(f"**{describe_pour(bottles_filled, bulk_each, bulk_unit, _dens, bulk_note)}**")
+                st.markdown(f"**{describe_pour(bottles_filled, bulk_each, bulk_unit, _dens, bulk_note, from_tank=not bulk_off_tank)}**")
+            if bulk_off_tank:
+                st.caption("This counts toward your shift and the plant's totals. "
+                           "The tank level stays where it is, because that resin "
+                           "came off it when the drum was filled.")
             if bulk_verdict["message"]:
                 (st.error if bulk_verdict["blocked"] else st.warning)(bulk_verdict["message"])
         else:
@@ -1679,6 +1723,7 @@ if tab1 is not None:
                     weight=weight_reading,
                     litres_poured=bulk_litres,
                     pour_note=bulk_note,
+                    off_tank=bulk_off_tank,
                 )
             except Exception as _e:
                 _save_ok, _save_err = False, str(_e)[:160]

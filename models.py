@@ -58,6 +58,13 @@ class ProductionLog(Base):
     litres_poured = Column(Float, nullable=True)
     # What it was poured into, in the operator's own words. Never parsed.
     pour_note = Column(String(120), nullable=True)
+    # 1 when the resin did not come out of the tank on this station - decanted
+    # from a drum that was filled earlier, say. The row is production like any
+    # other and counts everywhere production is counted. The level arithmetic
+    # is the single exception: it skips these, because those litres already
+    # left the tank when the drum was filled and counting them twice empties a
+    # vessel nobody has touched.
+    off_tank = Column(Integer, default=0)
     scrap_empty = Column(Integer, default=0)
     scrap_filled = Column(Integer, default=0)
     notes = Column(Text, nullable=True)

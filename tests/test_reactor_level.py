@@ -49,13 +49,15 @@ def check(label, got, exp):
         FAILS.append(f"  x {label}\n      got:      {got!r}\n      expected: {exp!r}")
 
 
-def log(resin, pump, fmt, lot, units, kind="Hourly Bottle Count"):
+def log(resin, pump, fmt, lot, units, kind="Hourly Bottle Count",
+        litres=None, off_tank=0):
     """One production log, each a minute after the last so order is defined."""
     _CLOCK[0] += timedelta(minutes=1)
     session = ScopedSession()
     session.add(ProductionLog(
         log_type=kind, operator_name="Ana Ruiz", pump_station=pump, shift="Shift 1",
         resin_type=resin, cartridge_type=fmt, lot_number=lot, bottles_filled=units,
+        litres_poured=litres, off_tank=off_tank,
         date=date.today(), timestamp=_CLOCK[0]))
     session.commit()
     session.close()
@@ -110,6 +112,28 @@ log("Mixed Resin", "Pump 4", "Pigment", "2504D0004", 50)  # 6.2 L
 drawn, _ = reactor_draw_litres("Mixed Resin", "Pump 4")
 check("a mixed batch sums each log by its own format", round(drawn, 3), 156.2)
 print("  per-log volumes OK")
+
+# --- resin that had already left the tank ---------------------------------
+# Reported from the floor: bottles filled off a drum, and the drum was filled
+# days earlier. Those litres came off the tank when the drum was filled, so
+# counting the bottles against it as well takes the same resin off twice and
+# empties a vessel nobody has touched. The row is production either way.
+_before, _lot_before = reactor_draw_litres("Mixed Resin", "Pump 4")
+log("Mixed Resin", "Pump 4", "Bulk", "2504D0004", 60, litres=60.0, off_tank=1)
+_after, _lot_after = reactor_draw_litres("Mixed Resin", "Pump 4")
+check("a pour that did not come off the tank does not draw it down",
+      _after, _before)
+check("and does not read as a new batch either", _lot_after, _lot_before)
+check("while the units are still credited as production",
+      calculate_logged_units_for_resin("Mixed Resin", "", "Pump 4", ""), 220)
+
+# The same pour without the marker is exactly the old behaviour, so the flag
+# is what changed and nothing else.
+log("Mixed Resin", "Pump 4", "Bulk", "2504D0004", 60, litres=60.0)
+check("the same pour off the tank does draw it down",
+      round(reactor_draw_litres("Mixed Resin", "Pump 4")[0], 3),
+      round(_before + 60.0, 3))
+print("  off-tank pours OK")
 
 # --- a lot that comes back later is a new batch, not the old one ----------
 log("Clear V5", "Pump 1", "V2", "2501A0001", 200)

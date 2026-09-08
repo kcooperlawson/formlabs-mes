@@ -363,9 +363,15 @@ def reactor_draw_litres(resin_name: str, pump_station: str = "") -> tuple[float,
             ProductionLog.log_type.in_(["Hourly Bottle Count", "System Calibration"])
         ).order_by(ProductionLog.timestamp.asc(), ProductionLog.id.asc()).all()
 
+        # Pours the operator marked as not coming off the tank are dropped
+        # here and nowhere else. They are production and they count everywhere
+        # production is counted; they just did not come out of this vessel, so
+        # subtracting them from it would take the same litres off twice - once
+        # when the drum was filled and again when it was decanted.
         mine = [r for r in rows
                 if str(r.resin_type or "").strip().lower() == t_name
-                and (not t_pump or str(r.pump_station or "").strip().lower() == t_pump)]
+                and (not t_pump or str(r.pump_station or "").strip().lower() == t_pump)
+                and not int(getattr(r, "off_tank", 0) or 0)]
         if not mine:
             return 0.0, ""
 
@@ -1182,9 +1188,14 @@ CONTAINER_FORMATS = {
     "V1 (1L Cartridge)": "V1",
     "RPS (5L Bulk Jug)": "RPS",
     "Pigment": "Pigment",
+    "Other container (measured amount)": "Bulk",
+    # The name this option was given when it was written, kept so that a saved
+    # pick or an old export still resolves to the same stored code. Not offered
+    # in the dropdown - see format_choices.
     "Drum / Tote (measured amount)": "Bulk",
 }
-BULK_FORMAT_LABEL = "Drum / Tote (measured amount)"
+BULK_FORMAT_LABEL = "Other container (measured amount)"
+RETIRED_FORMAT_LABELS = ("Drum / Tote (measured amount)",)
 
 
 def format_choices(bulk_enabled: bool = False) -> tuple:
@@ -1193,8 +1204,17 @@ def format_choices(bulk_enabled: bool = False) -> tuple:
     The measured-amount option is absent unless the plant has switched it on,
     so a floor that only ever fills cartridges and jugs sees exactly the four
     entries it has always seen.
+
+    Retired names are in the mapping but never in this list. The measured
+    option was first called "Drum / Tote", which described the one case it was
+    written for and read as the wrong thing to everybody else: an operator
+    decanting a drum into unlabelled bottles scrolled straight past the option
+    that was for exactly that, because the name said drum and the bottles were
+    not drums. The stored code did not change, so nothing recorded under the
+    old name has to be touched.
     """
-    labels = [k for k in CONTAINER_FORMATS if k != BULK_FORMAT_LABEL]
+    skip = {BULK_FORMAT_LABEL, *RETIRED_FORMAT_LABELS}
+    labels = [k for k in CONTAINER_FORMATS if k not in skip]
     if bulk_enabled:
         labels.append(BULK_FORMAT_LABEL)
     return tuple(labels)
@@ -1389,7 +1409,7 @@ def add_hourly_log(
         resin_type: str, lot_number: str, bottles: int, scrap_empty: int,
         scrap_filled: int, notes: str = "", log_type: str = "Hourly Bottle Count",
         verification: dict = None, weight: dict = None,
-        litres_poured: float = None, pour_note: str = ""
+        litres_poured: float = None, pour_note: str = "", off_tank: bool = False
 ) -> bool:
     """Returns True if this log was matched to (and credited toward) an
     active AssignedRun's live progress tracker, False otherwise — the
@@ -1422,6 +1442,13 @@ def add_hourly_log(
     every existing caller - the Admin Panel, reconciliation, and the Device
     Gateway writer - keeps working untouched.
 
+    `off_tank` says this resin did not come out of the vessel on that station.
+    It is production either way and counts wherever production is counted; the
+    level arithmetic is the only reader that cares, and it skips these rows so
+    that resin decanted out of a drum is not subtracted from a tank it left
+    days ago. False by default, which is what every pour was until somebody
+    filled bottles off a drum on the floor.
+
     `weight` is the fill-weight reading for this log, as returned by
     fill_weight.judge(), or None when the operator did not take one - which
     is the common case and is fine. Unlike the lot check it is purely a
@@ -1452,6 +1479,7 @@ def add_hourly_log(
                            if litres_poured is not None and float(litres_poured) > 0
                            else None),
             pour_note=(str(pour_note).strip()[:120] or None) if pour_note else None,
+            off_tank=1 if off_tank else 0,
         )
         session.add(log_row)
 

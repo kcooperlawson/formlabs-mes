@@ -515,14 +515,18 @@ with tab_settings:
             # Container Format list holds exactly the four entries it always
             # has, which is the point of it being a setting rather than a
             # feature everybody has to scroll past.
-            en_bulk = st.checkbox("🛢️ Allow bulk pours (drum, tote, pail)",
+            en_bulk = st.checkbox("🛢️ Allow measured pours (any container the app doesn't know)",
                                   value=current_settings.get("enable_bulk_pour", False),
                                   key="en_bulk_input",
-                                  help="Adds a 'Bulk / Drum' container format that takes a "
-                                       "measured amount in litres or kilograms instead of a "
-                                       "container count, on the operator's form and on the "
-                                       "reactor page. Leave off if everything here is poured "
-                                       "into cartridges and jugs.")
+                                  help="Adds an 'Other container (measured amount)' format to "
+                                       "the operator's form and the reactor page. It takes an "
+                                       "amount in litres or kilograms and a count, instead of "
+                                       "a container the app has a size for, so a pour into "
+                                       "unlabelled bottles, a drum, a tote or a pail can be "
+                                       "logged without registering anything first. It also "
+                                       "asks whether the resin came off the tank or out of a "
+                                       "drum that was already filled. Leave off if everything "
+                                       "here is poured into cartridges and jugs.")
 
             # The machine gateway. It has been built since August and has never
             # been connected to real equipment here, so the page that

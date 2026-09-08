@@ -151,12 +151,17 @@ def check_pour(litres, capacity_l=None, remaining_l=None) -> dict:
 
 
 def describe_pour(containers, amount_each, unit="L",
-                  density=DEFAULT_DENSITY_KG_L, note="") -> str:
+                  density=DEFAULT_DENSITY_KG_L, note="", from_tank=True) -> str:
     """One line saying what is about to be written, in litres.
 
     Shown before the submit rather than after, because the conversion is the
     part an operator cannot check in their head: they know they poured 200 kg,
     and whether that is 180 litres is the application's claim, not theirs.
+
+    `from_tank` is False when the resin had already left the vessel, decanted
+    out of a drum somebody filled earlier. The litres are the same. What
+    changes is the end of the sentence, because "off this vessel" is the one
+    part of it that would not be true.
     """
     count = max(1, int(_num(containers, 1)))
     each = _num(amount_each)
@@ -167,8 +172,8 @@ def describe_pour(containers, amount_each, unit="L",
     head = (f"{each:,.10g} {unit_label} into {what}" if count == 1
             else f"{count} x {each:,.10g} {unit_label} into {what}")
 
-    if unit_label == "kg":
-        return f"{head} = {total:,.1f} L off this vessel"
+    if not from_tank:
+        return f"{head} = {total:,.1f} L, recorded without moving a tank"
     return f"{head} = {total:,.1f} L off this vessel"
 
 

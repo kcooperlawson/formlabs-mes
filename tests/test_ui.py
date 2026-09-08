@@ -411,13 +411,19 @@ try:
     at_off = run_as(OP, h_pump=STATION)
     _opts_off = list(at_off.selectbox(key="h_cart").options)
     check("a plant that has not switched it on sees no bulk option",
-          any("Drum" in o for o in _opts_off), False)
+          any("measured amount" in o for o in _opts_off), False)
     check("and sees the four formats it always saw", len(_opts_off), 4)
 
     _db.update_plant_settings({"enable_bulk_pour": True})
     at_on = run_as(OP, h_pump=STATION)
     _opts_on = list(at_on.selectbox(key="h_cart").options)
-    check("switching it on adds the option", any("Drum" in o for o in _opts_on), True)
+    check("switching it on adds the option",
+          any("measured amount" in o for o in _opts_on), True)
+    # The name it was given first said "Drum / Tote", which is one of the
+    # things it is for and reads as an exclusion of everything else. The
+    # operator who needed it was filling unlabelled bottles off a drum.
+    check("and the option does not name one container type",
+          any(o.startswith("Drum") for o in _opts_on), False)
     check("and moves none of the ones already there", _opts_on[:4], _opts_off)
 
     # The trap this section exists for: "RPS (5L Bulk Jug)" contains the word
@@ -437,7 +443,7 @@ try:
         submit_daily_checklist(OP, "Shift 1", _pump)
 
         at_b = run_as(OP, h_pump=_pump)
-        at_b.selectbox(key="h_cart").set_value("Drum / Tote (measured amount)").run()
+        at_b.selectbox(key="h_cart").set_value("Other container (measured amount)").run()
         at_b.selectbox(key="h_resin").set_value(_resin).run()
 
         # The count field is replaced by an amount field, not added to.
@@ -470,6 +476,26 @@ try:
         _sub = [b for b in at_b.button if "SUBMIT POURING LOG" in b.label][0]
         check("and an amount larger than anything on the floor is stopped too",
               _sub.disabled, True)
+        # Resin that came out of a drum rather than the tank. The vessel
+        # checks are about this tank, and this pour did not come off it, so
+        # an amount over the tank's capacity is not evidence of anything and
+        # must not block the log. The size check stays.
+        at_b.number_input(key="h_bulk_each").set_value(_cap + 400).run()
+        at_b.radio(key="h_bulk_src").set_value(
+            "A drum or container already off the tank").run()
+        _sub = [b for b in at_b.button if "SUBMIT POURING LOG" in b.label][0]
+        check("an off-tank pour is not judged against the tank's capacity",
+              _sub.disabled, False)
+        check("and the line stops claiming the litres came off a vessel",
+              any("without moving a tank" in str(m.value) for m in at_b.markdown), True)
+        check("and the tank is not named as the source",
+              "Drawing from" in texts(at_b), False)
+
+        at_b.number_input(key="h_bulk_each").set_value(50000.0).run()
+        _sub = [b for b in at_b.button if "SUBMIT POURING LOG" in b.label][0]
+        check("an off-tank pour is still stopped when the amount is impossible",
+              _sub.disabled, True)
+
         print(f"  bulk pours OK ({_resin} / {_pump}, {_cap:,.0f} L vessel)")
     else:
         check(False, "no reactor on file to check a bulk pour against")
