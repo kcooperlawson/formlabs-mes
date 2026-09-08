@@ -396,6 +396,16 @@ if st.session_state.get("user_role") in ["manager", "admin"]:
             else:
                 st.caption("No permanent reactors added yet.")
 
+# The fleet reads in once, when the page arrives. Every tank fills from empty
+# to what it actually holds, and then holds still. Only on arrival: this page
+# re-runs whenever anybody touches a control on it, and tanks that refilled
+# themselves every time somebody pressed Save would be movement that means
+# nothing. Two renders, for the same reason the sign-in laser gets two - the
+# first one is often replaced before it is painted.
+_fleet_renders = st.session_state.get("_fleet_renders", 0) + 1
+st.session_state["_fleet_renders"] = _fleet_renders
+_fleet_arriving = _fleet_renders <= 2
+
 # --- a pour that is an amount, not a count ----------------------------------
 # Most of what leaves these tanks goes into a cartridge and is counted. Some of
 # it is decanted: a specific amount into a drum, a tote, a pail. There was no
@@ -547,7 +557,8 @@ if not df_reactors.empty:
                 asset_tag=reactor.get("asset_tag") or "",
                 bay_marker=reactor.get("bay_marker") or "",
                 idle=not (r_resin and r_resin != "None"),
-                key=f"{reactor.get('id', i)}_{j}")
+                key=f"{reactor.get('id', i)}_{j}",
+                reveal=_fleet_arriving)
 
             html_card = (
                 f'<div style="width:100%; margin-bottom:24px;">'

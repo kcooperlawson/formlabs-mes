@@ -60,6 +60,7 @@ from database import (
 )
 from database import esc
 import crud
+from print_build import screen_sweep
 from components import empty_state, save_state
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
 from shifts import picker_options as shift_picker_options
@@ -402,6 +403,9 @@ st.markdown("---")
 # logging tabs, so it is in the same place whichever state the operator is in
 # and cannot be missed by somebody who has scrolled. See utils.flash: these
 # used to be toasts, which a phone lost entirely.
+if st.session_state.pop("_unlock_sweep", False):
+    st.markdown(screen_sweep(uid="unlock", seconds="1.5s"), unsafe_allow_html=True)
+
 draw_flashes()
 
 # ===================== THE HARD GATE: DAILY STARTUP CHECKLIST =====================
@@ -574,6 +578,12 @@ if current_role in ["operator", "packer"]:
                         if _picked and not _picked.startswith("—"):
                             crud.link_vessel_to_pump(_picked, checklist_station)
                         flash("Startup checklist recorded. Terminal unlocked.", "🔓")
+                        # The station is certified and the screen opens up.
+                        # That is a real event, once a shift, so the laser
+                        # passes down the form as it happens. Set here and
+                        # consumed on the next render, so it plays exactly
+                        # once and never on an ordinary log.
+                        st.session_state["_unlock_sweep"] = True
 
                         # Clean up the session state flag
                         del st.session_state[clean_flag_key]

@@ -213,6 +213,17 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
             f'box-shadow:0 0 10px 2px {LASER_GLOW}; '
             f'transition:bottom {SLOW} {EASE}; z-index:4;"></div>')
 
+    # A finished print gets taken off the plate, so the finished part lifts.
+    # Only on the run that completes the build, and only far enough to read as
+    # a lift rather than a layout shift - the caption underneath must not move.
+    lift = ""
+    if done and finale:
+        lift = (f'<style>@keyframes lift{key}{{'
+                f'0%{{transform:translateY(0); filter:drop-shadow(0 2px 3px '
+                f'rgba(0,0,0,0.35));}}'
+                f'100%{{transform:translateY(-10px); filter:drop-shadow(0 16px 22px '
+                f'rgba(0,0,0,0.55));}}}}</style>')
+
     # One pass of the laser down the finished part, on the run where the
     # build completes and no other. Once, forwards, then gone - the same rule
     # as the sign-in sweep, for the same reason.
@@ -246,8 +257,11 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
     return (
         f'<div style="position:relative; width:100%; height:{height_px}px; '
         f'display:flex; align-items:flex-end; justify-content:center;">'
+        + lift +
         f'<div id="pb{key}" style="position:relative; height:100%; aspect-ratio:0.42; '
-        f'max-width:100%;">'
+        f'max-width:100%;'
+        + (f' animation:lift{key} 1.1s {EASE} 1.4s 1 forwards;' if (done and finale) else '')
+        + f'">'
         f'{ghost}'
         f'<img src="data:image/png;base64,{image_b64}" '
         f'style="position:absolute; inset:0; width:100%; height:100%; '
@@ -330,6 +344,34 @@ def laser_sweep(image_b64: str, height_px: int = 210, uid: str = "s",
         f'filter:drop-shadow(0 14px 26px rgba(0,0,0,0.65));"/>'
         f'{laser}'
         f'</div>')
+
+
+def screen_sweep(uid: str = "scr", seconds: str = "1.8s") -> str:
+    """One laser pass down the whole screen, as it arrives.
+
+    The same move as the sign-in machine, at the scale of a wall. It is here
+    because a screen that prints itself in is the right first impression for a
+    printing company's floor display - and because it is over in under two
+    seconds and then the board is just a board.
+
+    Fixed to the viewport rather than to the page, so it crosses everything
+    regardless of how far the content scrolls, and it ignores the mouse
+    entirely so it cannot swallow a click on its way past.
+
+    The caller decides when: once, on arrival. The wall display re-runs itself
+    every ten seconds, and a laser crossing the room every ten seconds all
+    shift is not an effect, it is a fault nobody can switch off.
+    """
+    key = "".join(c for c in str(uid) if c.isalnum()) or "scr"
+    return (
+        f'<style>@keyframes scan{key}{{'
+        f'0%{{top:-4vh; opacity:0;}} 8%{{opacity:0.95;}}'
+        f'92%{{opacity:0.95;}} 100%{{top:104vh; opacity:0;}}}}'
+        f'.scan{key}{{position:fixed; left:0; right:0; height:2px; top:-4vh; '
+        f'opacity:0; z-index:998; pointer-events:none; background:{LASER}; '
+        f'box-shadow:0 0 22px 5px {LASER_GLOW}; '
+        f'animation:scan{key} {seconds} ease-in-out {SWEEP_DELAY} 1 forwards;}}'
+        f'</style><div class="scan{key}"></div>')
 
 
 def esc(text) -> str:

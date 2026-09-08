@@ -28,7 +28,8 @@ from database import esc
 from resin_palette import resin_chip, stored_color_map
 from record_health import record_state
 from shift_clock import compute_shift_status
-from print_build import build_finale, cartridge_build, layer_bar, odometer
+from print_build import (build_finale, cartridge_build, layer_bar, odometer,
+                         screen_sweep)
 import base64
 
 def get_base64_image(image_path):
@@ -405,6 +406,15 @@ elif _health["state"] == "quiet":
         f" padding:10px 18px; margin-bottom:14px; text-align:center;"
         f" font-size:1.3rem; font-weight:800; color:#FDE68A;'>"
         f"{_health['message']}</div>", unsafe_allow_html=True)
+
+# The board prints itself in when it first opens. Once, on arrival, and then
+# it is a board. This page re-runs itself every ten seconds all shift, so a
+# laser crossing the room on every one of those would not be an effect, it
+# would be a fault nobody could switch off.
+_tv_renders = st.session_state.get("_tv_renders", 0) + 1
+st.session_state["_tv_renders"] = _tv_renders
+if _tv_renders <= 2:
+    st.markdown(screen_sweep(uid="tvarrive"), unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class='tv-header'>

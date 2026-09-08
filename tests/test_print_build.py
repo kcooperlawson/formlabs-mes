@@ -241,6 +241,35 @@ check("two odometers on one page do not share an element id",
       "odtvvol0" in od and "odtvvol0" not in pb.odometer(1234, uid="tvpack"), True)
 print("  the odometer OK")
 
+# --- the screen printing itself in -----------------------------------------
+# The sign-in laser is the move people liked, so the wall display and the
+# moment a terminal unlocks get it too. Every one of these has the same job:
+# play once, on arrival, and then be over. The wall re-runs every ten seconds
+# all shift, so a laser crossing the room on each of those would not be an
+# effect - it would be a fault nobody could switch off.
+scr = pb.screen_sweep(uid="tvarrive")
+check("the screen sweep plays once", "1 forwards" in scr, True)
+check("and never loops", "infinite" in scr, False)
+check("it waits out the settling render like the sign-in one does",
+      "1.4s" in scr, True)
+check("it is fixed to the viewport, so it crosses the whole board",
+      "position:fixed" in scr, True)
+check("and cannot swallow a click on the way past",
+      "pointer-events:none" in scr, True)
+check("two sweeps on one page do not share a keyframe name",
+      "scantvarrive" in scr and "scantvarrive" not in pb.screen_sweep(uid="unlock"), True)
+
+# --- the finished part lifting off the plate --------------------------------
+done_lift = pb.cartridge_build(100, IMG, uid="z", finale=True)
+check("a finished build lifts off the plate", "@keyframes liftz" in done_lift, True)
+check("once, and it stays where it lifted to",
+      "liftz 1.1s" in done_lift and "1 forwards" in done_lift, True)
+check("an unfinished build never lifts",
+      "lift" in pb.cartridge_build(80, IMG, uid="z", finale=True), False)
+check("and neither does a finished one on every refresh after the first",
+      "lift" in pb.cartridge_build(100, IMG, uid="z"), False)
+print("  arrival effects OK")
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} PRINT-BUILD CHECKS FAILED:\n" + "\n".join(FAILS))

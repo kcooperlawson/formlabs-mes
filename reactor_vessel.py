@@ -253,6 +253,32 @@ _EASE = (f"transition:y 900ms {_CURVE}, height 900ms {_CURVE}, "
          f"cy 900ms {_CURVE};")
 
 
+def _fill_keyframes(uid: str, floor_y: float, surface_y: float, reveal: bool) -> str:
+    """The level rising from empty to where it actually is, once, on arrival.
+
+    A page carrying these arrives with the fleet's state already decided, and
+    watching it read in is worth the second it takes: you see the tanks fill
+    to what they hold rather than finding them already there. It plays on
+    arrival and never again, because a wall that re-runs every ten seconds
+    would otherwise refill every tank all shift.
+
+    A browser that will not animate an SVG geometry property just draws the
+    level, which is the right answer anyway - the attributes already carry it,
+    so nothing depends on the animation running.
+    """
+    if not reveal:
+        return ""
+    return (f'<style>@keyframes fill{uid}{{'
+            f'0%{{y:{floor_y:.1f}px; height:0px;}}'
+            f'100%{{y:{surface_y:.1f}px; height:{max(0.0, floor_y - surface_y):.1f}px;}}'
+            f'}}</style>')
+
+
+def _fill_anim(uid: str, reveal: bool) -> str:
+    return (f" animation:fill{uid} 1.1s cubic-bezier(0.22,0.61,0.36,1) 0.25s 1 forwards;"
+            if reveal else "")
+
+
 def _surface(x: float, w: float, y: float, uid: str, flat: bool = False) -> str:
     """The top of the liquid, drawn as a surface rather than a cut edge.
 
@@ -341,7 +367,7 @@ def _bay_bollard(x: float, y_top: float, y_bottom: float, marker: str) -> str:
 
 
 def _fabricated(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker,
-                idle, *, x, w, y_top, barrel_h, cone_h, scale, ribs, legs_out) -> str:
+                idle, reveal, *, x, w, y_top, barrel_h, cone_h, scale, ribs, legs_out) -> str:
     """A fabricated reactor: barrel, dark joint band, cone bottom, steel frame.
 
     Every fabricated vessel on this floor is this shape. What separates M-205
@@ -416,8 +442,10 @@ def _fabricated(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_mark
         f'<path d="{cone}"/>'
         f'</clipPath>'
         f'<g clip-path="url(#clipfab{uid})">'
+        + _fill_keyframes(uid, y_tip, surface_y, reveal) +
         f'<rect x="{x:.1f}" y="{surface_y:.1f}" width="{w:.1f}" '
-        f'height="{y_tip - surface_y:.1f}" fill="url(#lvl{uid})" style="{_EASE}"/>'
+        f'height="{y_tip - surface_y:.1f}" fill="url(#lvl{uid})" '
+        f'style="{_EASE}{_fill_anim(uid, reveal)}"/>'
         + _sheen(x, w, surface_y, y_tip - surface_y)
         + _surface(x, w, surface_y, uid)
         + f'</g>'
@@ -453,7 +481,8 @@ def _cone_mixer(uid, *args) -> str:
                        scale=False, ribs=True, legs_out=34)
 
 
-def _ibc_tote(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker, idle) -> str:
+def _ibc_tote(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker,
+              idle, reveal) -> str:
     """The caged bottle on a pallet, with the ball valve at the front corner."""
     cage = "#2A7F8C"
     cage_dark = "#1B5A66"
@@ -477,8 +506,9 @@ def _ibc_tote(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker
         f'<clipPath id="clipibc{uid}"><rect x="{x:.1f}" y="{y_top:.1f}" width="{w:.1f}" '
         f'height="{body_h:.1f}" rx="9"/></clipPath>'
         f'<g clip-path="url(#clipibc{uid})">'
+        + _fill_keyframes(uid, y_bot, fill_y, reveal) +
         f'<rect x="{x:.1f}" y="{fill_y:.1f}" width="{w:.1f}" height="{fill_h + 2:.1f}" '
-        f'fill="url(#lvl{uid})" style="{_EASE}"/>'
+        f'fill="url(#lvl{uid})" style="{_EASE}{_fill_anim(uid, reveal)}"/>'
         + _sheen(x, w, fill_y, fill_h)
         + _surface(x, w, fill_y, uid, flat=True)
         + f'</g>'
@@ -522,7 +552,7 @@ _RENDERERS = {
 
 def vessel_svg(vessel_type: str, fill_pct: float, capacity_l: float,
                resin_colour: str = "", asset_tag: str = "", bay_marker: str = "",
-               idle: bool = False, key: str = "") -> str:
+               idle: bool = False, key: str = "", reveal: bool = False) -> str:
     """One vessel, drawn as the kind of thing it is.
 
     fill_pct is what remains in it, 0-100. capacity_l only sets the spacing of
@@ -547,7 +577,7 @@ def vessel_svg(vessel_type: str, fill_pct: float, capacity_l: float,
 
     body = _RENDERERS[kind](uid, pct, cap, top, bottom, ink,
                             str(asset_tag or "").strip(), str(bay_marker or "").strip(),
-                            bool(idle))
+                            bool(idle), bool(reveal))
 
     return (
         f'<svg viewBox="0 0 {VIEW_W} {VIEW_H}" width="100%" '

@@ -8,6 +8,22 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.32 — Tuesday, September 8, 2026
+**More of the thing the sign-in screen does**
+
+The move people liked is an object revealed once as the screen arrives, and then stillness. It only works where there is a real arrival, so it went on the three screens that have one and nowhere else.
+
+- **The wall display prints itself in.** One laser pass down the whole board when it first opens. Checked in a browser across three refresh cycles: it appears once and does not come back.
+- **The fleet reads in.** Every tank fills from empty to what it actually holds, then holds still. It reuses the glide that was already there. A browser that will not animate an SVG level just draws the level, which is the right answer anyway.
+- **The terminal comes to life.** Clear the startup checklist and the laser passes down the form as the tabs unlock. Once a shift, at the moment something actually changed.
+- **The finished part lifts off the plate.** At BUILD COMPLETE the cartridge rises and its shadow deepens, the way you take a print off. It happens inside the twenty-five seconds the band is already up.
+
+Every one of them plays once and then stops. The wall re-runs every ten seconds and the reactor page re-runs whenever somebody touches a control on it, so a sweep on every render would not be an effect, it would be a fault nobody could switch off.
+
+Nothing went on Analytics or the Cockpit. A sweep works because it is rare, and a screen somebody is trying to read quickly is the wrong place to put a second of theatre.
+
+---
+
 ## 3.31 — Tuesday, September 8, 2026
 **The sign-in laser was striking twice**
 

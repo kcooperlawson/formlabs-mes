@@ -246,6 +246,25 @@ check("the sheen is clipped to the liquid, so an empty vessel has none",
       True)
 print("  the liquid OK")
 
+# --- the fleet reading in ---------------------------------------------------
+# On arrival every tank fills from empty to what it actually holds, then
+# holds still. The important half is the second one: this page re-runs
+# whenever anybody touches a control on it, and tanks that refilled
+# themselves on every one of those would be movement that means nothing.
+arriving = draw(fill_pct=60, reveal=True)
+settled = draw(fill_pct=60)
+check("on arrival the level rises from empty", "@keyframes fillt1" in arriving, True)
+check("it plays once and stays where it got to", "1 forwards" in arriving, True)
+check("and it does not loop", "infinite" in arriving, False)
+check("after arrival there is no animation at all", "@keyframes" in settled, False)
+check("the level itself is identical either way",
+      surface_y(arriving), surface_y(settled))
+check("so a browser that will not animate it still draws the right level",
+      surface_y(arriving), 150.0)
+check("a tote reads in too",
+      "@keyframes fillt1" in draw(vessel_type="ibc_tote", fill_pct=50, reveal=True), True)
+print("  the fleet reading in OK")
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} VESSEL CHECKS FAILED:\n" + "\n".join(FAILS))
