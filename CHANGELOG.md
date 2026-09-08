@@ -8,6 +8,21 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.37 — Tuesday, September 8, 2026
+**The submit button goes away for five seconds after a log lands**
+
+On the run where the confirmation was not showing up, I kept pressing Submit because I could not tell whether anything had happened. Every one of those presses wrote a real log with a real photo attached. Nothing looked wrong afterwards, which is the problem with a duplicate hourly count.
+
+The banner is fixed and it sits at the bottom of the screen on a phone now. This is the second answer to the same question, and it is in the one place I am definitely looking after I press Submit.
+
+- **For five seconds after a log saves, the button is not on the screen.** A green block stands where it was.
+- **The block says what was recorded.** How many units of which resin, at which station, and the time. For a measured pour it says the litres and what they went into. It does not say "saved", because "saved" is the word I doubt when I cannot see the entry.
+- **It counts itself down** so the screen does not look frozen, and the button comes back on its own.
+- **Packing gets the same lock.** A packing count is as easy to send twice.
+- Five seconds because a second press after that is a decision rather than a reflex, and because two real pours back to back should not leave anybody standing there waiting.
+
+---
+
 ## 3.36 — Tuesday, September 8, 2026
 **Logging a pour into a container the app has never heard of**
 

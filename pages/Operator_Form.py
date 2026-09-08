@@ -61,7 +61,7 @@ from database import (
 from database import esc
 import crud
 from print_build import screen_sweep
-from components import empty_state, save_state
+from components import empty_state, save_state, submit_gate, lock_submit
 from resin_palette import resin_chip, resin_colors, stored_color_map, style_resin_column
 from shifts import picker_options as shift_picker_options
 import external_links
@@ -1688,8 +1688,15 @@ if tab1 is not None:
         _can_submit = gate_ok and not (is_bulk and bulk_verdict["blocked"])
         if gate_blockers:
             st.caption("Before you can submit: " + "; ".join(gate_blockers) + ".")
-        if st.button("🚀 SUBMIT POURING LOG", type="primary", use_container_width=True,
-                     disabled=not _can_submit):
+        # For the few seconds after a log lands, the button is not here at all
+        # - a green block saying what was recorded stands in its place. See
+        # components.submit_gate. This is the one screen where a second press
+        # writes a second real pour, and on a shift where the confirmation was
+        # not drawing, that is exactly what happened.
+        _submit_free = submit_gate("pour")
+        if _submit_free and st.button("🚀 SUBMIT POURING LOG", type="primary",
+                                      use_container_width=True,
+                                      disabled=not _can_submit):
             # Written to disk here rather than on every rerun while they type.
             if verification is not None and pending_photo is not None:
                 verification["photo_filename"] = save_lot_photo(pending_photo)
@@ -1792,6 +1799,16 @@ if tab1 is not None:
                     f"Recorded {bottles_filled} units of {resin} to Analytics — "
                     f"no active run matched this station/resin/lot, so it won't move a progress bar above.",
                     "⚠️")
+
+            # What the operator sees where the button was, for the next few
+            # seconds. It names the pour rather than saying "saved", because
+            # "saved" is what an operator doubts when they cannot see the log.
+            if is_bulk and bulk_litres:
+                _landed = (f"{bulk_litres:,.1f} L of {resin} into "
+                           f"{bulk_note or 'containers'} at {station}")
+            else:
+                _landed = f"{bottles_filled} units of {resin} at {station}"
+            lock_submit("pour", f"{_landed}, {datetime.now():%H:%M}")
             st.rerun()
 
 # --- PACKING TAB ---
@@ -1841,7 +1858,10 @@ if tab_pack is not None:
                                   key="p_notes")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("📦 SUBMIT PACKING LOG", type="primary", use_container_width=True):
+        # Same lock as the pouring tab. A packing count is as easy to send
+        # twice, and just as hard to spot afterwards.
+        if submit_gate("pack") and st.button("📦 SUBMIT PACKING LOG", type="primary",
+                                             use_container_width=True):
             add_hourly_log(
                 operator_name=current_user,
                 pump_station=pack_station,
@@ -1856,6 +1876,8 @@ if tab_pack is not None:
                 log_type="Packing Count"
             )
             flash(f"Packing saved. Recorded {units_packed} units.", "📦")
+            lock_submit("pack", f"{units_packed} units of {pack_resin} packed, "
+                                f"{datetime.now():%H:%M}")
             st.rerun()
 # --- TAB 2: DOWNTIME ---
 if tab2 is not None:

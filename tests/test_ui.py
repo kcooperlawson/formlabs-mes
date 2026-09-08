@@ -502,6 +502,41 @@ try:
 finally:
     _db.update_plant_settings({"enable_bulk_pour": False})
 
+# --- the submit button after a log actually lands --------------------------
+# Reported from the floor: on a run where the confirmation was not drawing,
+# the operator kept pressing Submit and logged the same pour several times.
+# Every one of those writes looked correct to the application, so nothing
+# stopped them. For a few seconds after a log lands the button is not on the
+# screen at all, and what stands in its place says what was recorded.
+import components as _comp  # noqa: E402
+import time  # noqa: E402
+
+at_s = run_as(OP, h_pump=STATION)
+at_s.selectbox(key="h_cart").set_value(CART).run()
+at_s.selectbox(key="h_resin").set_value(RESIN).run()
+at_s.text_input(key="h_lot_entered").set_value(f"L-{GOOD_LOT}").run()
+_before = [b for b in at_s.button if "SUBMIT POURING LOG" in b.label]
+check("the button is there before the log", len(_before), 1)
+
+_before[0].click().run()
+_after = texts(at_s)
+check("the button is gone for a moment after the log lands",
+      len([b for b in at_s.button if "SUBMIT POURING LOG" in b.label]), 0)
+check("and something in its place says the log went in", "Logged" in _after, True)
+check("naming what was recorded rather than saying 'saved'", RESIN in _after, True)
+check("with the wait stated, so the screen does not look stuck",
+      "You can submit again in" in _after, True)
+
+# The lock is time-based, not a flag somebody has to remember to clear. Wind
+# the clock back past the window and the real button is there again.
+at_s.session_state["_submit_lock_pour"] = {
+    "at": time.time() - (_comp.SUBMIT_LOCK_SECONDS + 1), "message": "x"}
+at_s.run()
+check("and it comes back once the seconds are up",
+      len([b for b in at_s.button if "SUBMIT POURING LOG" in b.label]), 1)
+check("with the green block gone", "You can submit again in" in texts(at_s), False)
+print("  the submit lock OK")
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} UI checks FAILED:\n" + "\n".join(FAILS))

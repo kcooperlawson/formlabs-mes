@@ -154,3 +154,95 @@ def save_state(status: str, message: str = "") -> None:
             "Nothing was recorded, so nothing is duplicated — check the connection "
             "and submit again."
         )
+
+
+# ----------------------------------------------------- the submit that landed --
+# How long a submit button stays out of use after a write that worked.
+#
+# Reported from the floor: on a run where the confirmation was not appearing,
+# the operator kept pressing Submit and logged the same pour several times
+# over. Every one of those writes was correct as far as the application was
+# concerned, which is why nothing stopped them.
+#
+# Five seconds is long enough that a second press is a decision rather than a
+# reflex, and short enough that somebody logging two real pours back to back
+# is not left waiting. The lock is only half of it though. What takes the
+# button's place is the other half: a green block saying what was recorded,
+# in the spot the thumb is already on, so the answer to "did that go in?" is
+# where the operator is looking instead of four screens up.
+SUBMIT_LOCK_SECONDS = 5
+
+
+def _lock_key(name: str) -> str:
+    return f"_submit_lock_{name}"
+
+
+def lock_submit(name: str, message: str = "") -> None:
+    """Take this submit button out of use for the next few seconds.
+
+    Called after a write that succeeded, immediately before the rerun. The
+    message is what stands in place of the button, so it says what was
+    actually recorded rather than the word "saved".
+    """
+    import time as _time
+    st.session_state[_lock_key(name)] = {"at": _time.time(), "message": str(message)}
+
+
+def submit_lock_left(name: str) -> float:
+    """Seconds still to run on this lock. 0.0 when the button is free."""
+    import time as _time
+    held = st.session_state.get(_lock_key(name))
+    if not held:
+        return 0.0
+    left = SUBMIT_LOCK_SECONDS - (_time.time() - float(held.get("at", 0)))
+    return left if left > 0 else 0.0
+
+
+def clear_submit_lock(name: str) -> None:
+    st.session_state.pop(_lock_key(name), None)
+
+
+@st.fragment(run_every="1s")
+def _submit_locked_panel(name: str) -> None:
+    """The green block that stands where the button was, counting itself down.
+
+    A fragment rather than a plain block because the countdown has to move on
+    its own. A number that only changes when the operator touches something is
+    a label, not a countdown. When the time is up this reruns the whole page
+    rather than only itself, and that is what brings the real button back.
+    """
+    left = submit_lock_left(name)
+    held = st.session_state.get(_lock_key(name)) or {}
+    if left <= 0:
+        clear_submit_lock(name)
+        st.rerun(scope="app")
+        return
+    what = esc(held.get("message") or "Logged.")
+    st.markdown(
+        f'<div style="background:#065F46;color:#ECFDF5;border-left:5px solid #34D399;'
+        f'border-radius:10px;padding:16px 18px;margin:4px 0 10px;">'
+        f'<div style="font-size:1.15rem;font-weight:800;letter-spacing:0.02em;">'
+        f'✅ Logged</div>'
+        f'<div style="font-size:0.95rem;margin-top:4px;line-height:1.4;">{what}</div>'
+        f'<div style="font-size:0.82rem;opacity:0.85;margin-top:8px;">'
+        f'You can submit again in {int(left) + 1}s</div></div>',
+        unsafe_allow_html=True)
+
+
+def submit_gate(name: str) -> bool:
+    """True when the submit button should be drawn, False while it is locked.
+
+    Draws the confirmation block itself in the locked case, so a caller is one
+    `if` away from having all of it:
+
+        if submit_gate("pour"):
+            if st.button("SUBMIT"):
+                ...
+                lock_submit("pour", "250 units of Draft Grey V5")
+                st.rerun()
+    """
+    if submit_lock_left(name) <= 0:
+        clear_submit_lock(name)
+        return True
+    _submit_locked_panel(name)
+    return False
