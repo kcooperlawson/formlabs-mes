@@ -166,6 +166,67 @@ check("a resin name with an ampersand in it does not break the markup",
 check("nor does a missing one", pb.esc(None), "")
 print("  escaping OK")
 
+check("a shift a whisker short of target does not say it is on its last layer",
+      "46 / 46" in pb.build_caption(99.7), False)
+check("and the shift that IS finished says so instead of counting layers",
+      pb.build_caption(100), "BUILD COMPLETE")
+
+# --- the finish ---------------------------------------------------------------
+# The moment the shift's build completes. Whether it has already been played
+# is the caller's to remember - this module has nowhere to keep that. What it
+# has to guarantee is that when it is asked for, it plays once and then takes
+# itself away, and that when it is not asked for it is silent. Getting that
+# second half wrong gives you a celebration every ten seconds, which is not a
+# celebration, it is a fault light.
+fin = pb.build_finale(3120, 3000, "L", uid="tvfin")
+check("the banner says what it is", "BUILD COMPLETE" in fin, True)
+check("and what the shift actually poured", "3,120 / 3,000 L" in fin, True)
+check("it plays once", "1 forwards" in fin, True)
+check("rather than looping", "infinite" in fin, False)
+# The first version faded itself out over seven seconds and reached zero
+# opacity without ever having been painted: the timer starts when the browser
+# inserts the element, not when the frame carrying it reaches the screen. On a
+# display nobody is standing in front of, that is the same as never playing.
+# What takes the band away now is the next refresh not sending it.
+check("the animation only brings it in, and never takes it out again",
+      "opacity:0" in fin.split("100%")[0] and "opacity:1" in fin.split("100%")[1],
+      True)
+check("so it cannot animate itself invisible",
+      fin.split("</style>")[0].count("opacity:0;"), 1)
+check("two of them on one page do not share a keyframe name",
+      "fintvfin" in fin and "fintvfin" not in pb.build_finale(1, 2, uid="other"), True)
+
+done_pass = pb.cartridge_build(100, IMG, uid="z", finale=True)
+check("a finished build gets one laser pass down the part",
+      "@keyframes fpassz" in done_pass, True)
+check("which also plays once",
+      "fpassz 2.4s ease-in-out 1 forwards" in done_pass, True)
+check("an unfinished build never gets the finale pass, however it is asked",
+      "fpass" in pb.cartridge_build(80, IMG, uid="z", finale=True), False)
+check("and a finished build without the flag is silent, which is every refresh "
+      "after the first",
+      "fpass" in pb.cartridge_build(100, IMG, uid="z"), False)
+print("  the finish OK")
+
+# --- the odometer -------------------------------------------------------------
+# Same rule as the build height: a plain value with a transition on it, so it
+# rolls when the figure changes and sits perfectly still when it does not.
+od = pb.odometer(1234, uid="tvvol")
+check("every digit is a strip to roll through", od.count("transform:translateY("), 4)
+check("and each lands on its own number",
+      [t.split("em")[0] for t in od.split("translateY(-")[1:]], ["1", "2", "3", "4"])
+check("the thousands separator is kept", ">,<" in od, True)
+check("and does not roll, because it never changes",
+      od.split(">,<")[0].count("transform:translateY("), 1)
+check("it moves by transition", "transition:transform 0.75s" in od, True)
+check("and never by animation", "animation" in od, False)
+check("a decimal figure keeps its point", ">.<" in pb.odometer(12.5, decimals=1), True)
+check("nothing arriving does not take the card down", "0" in pb.odometer(None), True)
+check("nor does text where a number was expected", "0" in pb.odometer("n/a"), True)
+check("two odometers on one page do not share an element id",
+      "odtvvol0" in od and "odtvvol0" not in pb.odometer(1234, uid="tvpack"), True)
+print("  the odometer OK")
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} PRINT-BUILD CHECKS FAILED:\n" + "\n".join(FAILS))

@@ -71,15 +71,110 @@ def build_caption(pct, done_units=None, target_units=None, unit="L") -> str:
     between a status line and a mess.
     """
     pct = clamp_pct(pct)
-    lead = "BUILD COMPLETE" if pct >= 99.95 else f"LAYER {layers_done(pct):02d} / {LAYERS}"
+    if pct >= 99.95:
+        lead = "BUILD COMPLETE"
+    else:
+        # A shift at 99.7% rounds to the last layer and the caption then reads
+        # "LAYER 46 / 46", which says finished on a card whose whole job is
+        # saying whether it is. The last layer belongs to the finished build.
+        lead = f"LAYER {min(layers_done(pct), LAYERS - 1):02d} / {LAYERS}"
     if done_units is not None and target_units:
         return (f"{lead}<br><span style=\"opacity:0.72;\">"
                 f"{done_units:,.0f} / {target_units:,.0f} {unit}</span>")
     return lead
 
 
+def odometer(value, decimals: int = 0, uid: str = "n") -> str:
+    """A number whose digits roll to their new value instead of snapping.
+
+    Each digit is a strip of 0 to 9 in a one-character window, moved by a
+    transform with a transition on it. So this obeys the same rule as the
+    build height: it is a plain value recomputed each run, not an animation on
+    a timer. The wall display re-runs every ten seconds, and a number that
+    re-rolled every ten seconds whether or not anything had changed would be
+    movement that means nothing.
+
+    Digits roll. Commas and the decimal point do not, because they never
+    change, and a separator sliding about while the digits move is the thing
+    that makes a rolling counter look cheap.
+
+    No counters and no scripts. A CSS counter cannot carry a thousands
+    separator, and a browser that did not support it would leave the figure
+    blank - on the one screen in the building nobody is standing in front of.
+    Worst case here is a digit that changes without sliding.
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = 0.0
+    if number != number:          # NaN
+        number = 0.0
+    decimals = max(0, int(decimals))
+    text = f"{number:,.{decimals}f}"
+    key = "".join(c for c in str(uid) if c.isalnum()) or "n"
+
+    strip = "".join(f'<span style="display:block; height:1em;">{d}</span>'
+                    for d in range(10))
+    out = []
+    for i, ch in enumerate(text):
+        if ch.isdigit():
+            out.append(
+                f'<span style="display:inline-block; width:0.62em; height:1em; '
+                f'overflow:hidden; vertical-align:bottom;">'
+                f'<span id="od{key}{i}" style="display:block; '
+                f'transform:translateY(-{int(ch)}em); '
+                f'transition:transform 0.75s cubic-bezier(0.22,0.61,0.36,1) '
+                f'{i * 0.04:.2f}s;">{strip}</span></span>')
+        else:
+            out.append(f'<span style="display:inline-block; '
+                       f'vertical-align:bottom;">{esc(ch)}</span>')
+    return (f'<span style="display:inline-flex; align-items:flex-end; '
+            f'line-height:1; font-variant-numeric:tabular-nums;">'
+            + "".join(out) + '</span>')
+
+
+def build_finale(done_units=None, target_units=None, unit: str = "L",
+                 uid: str = "f") -> str:
+    """The moment the shift's build finishes, played once.
+
+    Shown on the run where the target is first reached and not again, which
+    is the caller's job to remember - this module has nowhere to keep that.
+    That is also what takes it away again: the next refresh simply does not
+    send it, so it is up for one full cycle of the wall display and then
+    gone. A banner that stays up all afternoon stops meaning "just now" by
+    two o'clock.
+
+    It does NOT fade itself out on a timer, which is what the first version
+    did. A timed fade starts when the browser inserts the element, and the
+    element can be inserted before the frame carrying it is painted - so the
+    band was reaching zero opacity without ever having been on screen. On a
+    display nobody is standing in front of, an effect that might have played
+    is the same as one that did not. The only animation left here is the
+    half-second it takes to arrive, which cannot hide anything.
+    """
+    key = "".join(c for c in str(uid) if c.isalnum()) or "f"
+    line = ""
+    if done_units is not None and target_units:
+        line = (f'<span style="font-size:1.15rem; letter-spacing:0.10em; '
+                f'opacity:0.85; white-space:nowrap;">'
+                f'{done_units:,.0f} / {target_units:,.0f} {esc(unit)} POURED</span>')
+    return (
+        f'<style>@keyframes fin{key}{{'
+        f'0%{{opacity:0; transform:scale(0.985);}}'
+        f'100%{{opacity:1; transform:scale(1);}}}}</style>'
+        f'<div style="display:flex; align-items:center; justify-content:center; '
+        f'gap:26px; flex-wrap:wrap; text-align:center; font-family:monospace; '
+        f'color:#10B981; border:2px solid #10B981; border-radius:10px; '
+        f'padding:14px 20px; margin:6px 0 14px 0; '
+        f'background:rgba(16,185,129,0.12); '
+        f'animation:fin{key} 0.5s ease-out 1 forwards;">'
+        f'<span style="font-size:2.1rem; font-weight:800; letter-spacing:0.22em; '
+        f'white-space:nowrap;">BUILD COMPLETE</span>{line}</div>')
+
+
 def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
-                    unit: str = "L", height_px: int = 300, uid: str = "b") -> str:
+                    unit: str = "L", height_px: int = 300, uid: str = "b",
+                    finale: bool = False) -> str:
     """The cartridge, built to `pct` of the shift's expected output.
 
     The part is drawn twice: a faint ghost of the whole thing, so the target
@@ -102,6 +197,18 @@ def cartridge_build(pct, image_b64: str, done_units=None, target_units=None,
             f'bottom:calc({pct:.2f}% - 1px); height:2px; background:{LASER}; '
             f'box-shadow:0 0 10px 2px {LASER_GLOW}; '
             f'transition:bottom 1.2s ease-in-out; z-index:4;"></div>')
+
+    # One pass of the laser down the finished part, on the run where the
+    # build completes and no other. Once, forwards, then gone - the same rule
+    # as the sign-in sweep, for the same reason.
+    if done and finale:
+        laser = (
+            f'<style>@keyframes fpass{key}{{'
+            f'0%{{bottom:100%; opacity:0;}} 10%{{opacity:1;}}'
+            f'82%{{opacity:1;}} 100%{{bottom:-2%; opacity:0;}}}}</style>'
+            f'<div style="position:absolute; left:-6%; right:-6%; height:2px; '
+            f'background:{LASER}; box-shadow:0 0 12px 3px {LASER_GLOW}; '
+            f'animation:fpass{key} 2.4s ease-in-out 1 forwards; z-index:4;"></div>')
 
     ghost = ""
     if not done:

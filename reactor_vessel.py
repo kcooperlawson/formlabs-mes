@@ -243,6 +243,55 @@ def _graduations(capacity_l: float, x_from: float, x_to: float,
 # The vessels
 # ---------------------------------------------------------------------------
 
+# How a level moves to its new height rather than jumping to it. A transition
+# on a plain value, never an animation: the pages carrying these re-run on a
+# timer, so it has to glide when the litres actually change and sit perfectly
+# still when they do not. A browser that will not transition an SVG geometry
+# attribute snaps to the new level, which is what this did before.
+_EASE = ("transition:y 0.9s ease-in-out, height 0.9s ease-in-out, "
+         "cy 0.9s ease-in-out;")
+
+
+def _surface(x: float, w: float, y: float, uid: str, flat: bool = False) -> str:
+    """The top of the liquid, drawn as a surface rather than a cut edge.
+
+    A vessel is a round thing seen from slightly above, so its contents end in
+    an ellipse, not a straight line. Drawing that line straight is what made
+    these read as bar charts with a tank around them. The ellipse costs two
+    shapes: the liquid's own colour bowing up at the back, and a paler ring on
+    top of it where the light catches the surface.
+
+    A tote is a square bottle, so it gets a flat surface and the highlight
+    alone. Giving it the same ellipse would be drawing a cylinder that is not
+    there.
+    """
+    ry = 0.0 if flat else max(3.0, w * 0.075)
+    cx = x + w / 2
+    body = "" if flat else (
+        f'<ellipse cx="{cx:.1f}" cy="{y:.1f}" rx="{w / 2:.1f}" ry="{ry:.1f}" '
+        f'fill="url(#lvl{uid})" style="{_EASE}"/>')
+    return (
+        body
+        + f'<ellipse cx="{cx:.1f}" cy="{y:.1f}" rx="{w / 2 - 1:.1f}" '
+          f'ry="{max(1.6, ry * 0.72):.1f}" fill="#FFFFFF" opacity="0.30" '
+          f'style="{_EASE}"/>'
+        + f'<ellipse cx="{cx:.1f}" cy="{y:.1f}" rx="{w / 2 - 1:.1f}" '
+          f'ry="{max(1.1, ry * 0.72):.1f}" fill="none" stroke="#FFFFFF" '
+          f'stroke-width="1.4" opacity="0.65" style="{_EASE}"/>')
+
+
+def _sheen(x: float, w: float, y_top: float, h: float) -> str:
+    """A soft highlight down one side, so the liquid reads as wet.
+
+    Kept to one band on the left at low opacity. Anything stronger starts
+    competing with the resin's own colour, and the colour is the thing this
+    picture is recognised by from across the floor.
+    """
+    return (f'<rect x="{x + w * 0.10:.1f}" y="{y_top:.1f}" '
+            f'width="{max(4.0, w * 0.13):.1f}" height="{max(0.0, h):.1f}" '
+            f'rx="3" fill="#FFFFFF" opacity="0.10" style="{_EASE}"/>')
+
+
 def _percent_label(x: float, y: float, pct: float, ink: str, idle: bool = False) -> str:
     """The number over the liquid - or IDLE, on a vessel with nothing on it.
 
@@ -367,10 +416,10 @@ def _fabricated(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_mark
         f'</clipPath>'
         f'<g clip-path="url(#clipfab{uid})">'
         f'<rect x="{x:.1f}" y="{surface_y:.1f}" width="{w:.1f}" '
-        f'height="{y_tip - surface_y:.1f}" fill="url(#lvl{uid})"/>'
-        f'<rect x="{x:.1f}" y="{surface_y:.1f}" width="{w:.1f}" height="2.2" '
-        f'fill="#FFFFFF" opacity="0.55"/>'
-        f'</g>'
+        f'height="{y_tip - surface_y:.1f}" fill="url(#lvl{uid})" style="{_EASE}"/>'
+        + _sheen(x, w, surface_y, y_tip - surface_y)
+        + _surface(x, w, surface_y, uid)
+        + f'</g>'
         # the dark band at the joint, then the ribs over the cone
         f'<rect x="{x - 3:.1f}" y="{y_joint - 7:.1f}" width="{w + 6:.1f}" height="11" '
         f'fill="#111827"/>'
@@ -428,10 +477,10 @@ def _ibc_tote(uid, fill_pct, capacity_l, top, bottom, ink, asset_tag, bay_marker
         f'height="{body_h:.1f}" rx="9"/></clipPath>'
         f'<g clip-path="url(#clipibc{uid})">'
         f'<rect x="{x:.1f}" y="{fill_y:.1f}" width="{w:.1f}" height="{fill_h + 2:.1f}" '
-        f'fill="url(#lvl{uid})"/>'
-        f'<rect x="{x:.1f}" y="{fill_y:.1f}" width="{w:.1f}" height="2.2" fill="#FFFFFF" '
-        f'opacity="0.55"/>'
-        f'</g>'
+        f'fill="url(#lvl{uid})" style="{_EASE}"/>'
+        + _sheen(x, w, fill_y, fill_h)
+        + _surface(x, w, fill_y, uid, flat=True)
+        + f'</g>'
         # the cage around it: top collar, corner posts, horizontal rails
         + rails
         + f'<rect x="{x - 10:.1f}" y="{y_top - 20:.1f}" width="{w + 20:.1f}" height="22" rx="3" '

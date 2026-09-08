@@ -58,7 +58,7 @@ def joint_y(svg):
 def surface_y(svg, uid="t1"):
     """Where the top of the liquid sits, in the drawing's own coordinates."""
     m = re.search(rf'<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" '
-                  rf'height="[\d.]+" fill="url\(#lvl{uid}\)"/>', svg)
+                  rf'height="[\d.]+" fill="url\(#lvl{uid}\)"', svg)
     return float(m.group(1)) if m else None
 
 
@@ -216,6 +216,35 @@ check("a tag that could break the drawing is escaped",
 check("no tag means no plate rather than an empty one",
       "M-205" in draw(), False)
 print("  floor identifiers OK")
+
+# --- the liquid has to read as liquid --------------------------------------
+# It was a flat-topped rectangle inside a tank outline, which is a bar chart
+# with decoration round it. A vessel is a round thing seen slightly from
+# above, so its contents end in an ellipse. None of this is allowed to change
+# WHERE the surface sits, which is the only thing on this drawing anybody
+# makes a decision on.
+fab = draw(fill_pct=60)
+check("the fabricated vessel's surface is drawn as an ellipse, not a cut edge",
+      "<ellipse" in fab, True)
+check("and the surface still sits exactly where it did before the ellipse",
+      surface_y(fab), 150.0)
+tote = draw(vessel_type="ibc_tote", fill_pct=60)
+check("a square tote gets a flat surface, because there is no cylinder in it",
+      'fill="url(#lvlt1)"/>' in tote, False)
+check("but it still gets the highlight where the light would catch it",
+      "<ellipse" in tote, True)
+check("the fabricated one gets the surface in the resin's own colour",
+      'fill="url(#lvlt1)"' in fab.split("<ellipse")[1].split(">")[0], True)
+
+# The level glides to its new height. It has to be a transition on a plain
+# value and never an animation: every page carrying these re-runs on a timer,
+# and an animation would restart mid-cycle each time and read as a fault.
+check("the level moves by transition", "transition:y 0.9s" in fab, True)
+check("and never by animation", "animation" in fab, False)
+check("the sheen is clipped to the liquid, so an empty vessel has none",
+      'height="0.0"' in draw(fill_pct=0) or surface_y(draw(fill_pct=0)) is not None,
+      True)
+print("  the liquid OK")
 
 print("\n" + "=" * 66)
 if FAILS:

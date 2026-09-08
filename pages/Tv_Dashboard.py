@@ -28,7 +28,7 @@ from database import esc
 from resin_palette import resin_chip, stored_color_map
 from record_health import record_state
 from shift_clock import compute_shift_status
-from print_build import cartridge_build, layer_bar
+from print_build import build_finale, cartridge_build, layer_bar, odometer
 import base64
 
 def get_base64_image(image_path):
@@ -358,6 +358,27 @@ build_hours = total_shift_length if active_shift.startswith("ALL") else shift_le
 shift_target_l = target_lph * max(0.0, build_hours)
 build_pct = (current_output / shift_target_l * 100.0) if shift_target_l > 0 else 0.0
 
+# Finishing is a moment, so it gets played once and then it is over. This page
+# re-runs every ten seconds, and a celebration that fires on every one of them
+# is not a celebration, it is a fault light. The shift is in the key so the
+# second shift gets its own moment, and the date is in it so tomorrow's first
+# shift is not treated as still finished from yesterday.
+# What is remembered is WHEN the build finished, not merely that it did. A
+# plain "have I shown this yet" flag was the first attempt and it barely
+# appeared: Streamlit runs the script again immediately after a page switch,
+# so the second run cleared the flag and took the band away inside a second.
+# A window instead means the moment survives any number of extra runs and
+# still ends on its own, about two refreshes later.
+_finale_key = f"tv_build_done::{date.today().isoformat()}::{active_shift}"
+FINALE_SECONDS = 25.0
+build_finale_now = False
+if shift_target_l > 0 and build_pct >= 99.95:
+    _first_done = st.session_state.get(_finale_key)
+    if _first_done is None:
+        _first_done = time.time()
+        st.session_state[_finale_key] = _first_done
+    build_finale_now = (time.time() - _first_done) < FINALE_SECONDS
+
 # --- the record, and whether anything is still reaching it ----------------
 # Every figure below is computed from the log. When the log stops arriving -
 # the PC rebooted, Postgres did not come back, the phones cannot reach the
@@ -395,6 +416,14 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# The shift finishing goes across the wall rather than inside the build card,
+# which is 130 px wide and wraps "BUILD COMPLETE" onto three lines. This is
+# the one moment on this screen worth looking up for, so it gets the width the
+# stopped-record alarm gets, and takes itself away afterwards.
+if build_finale_now:
+    st.markdown(build_finale(current_output, shift_target_l, "L", uid="tvfin"),
+                unsafe_allow_html=True)
+
 # ===================== DYNAMIC KPI ROW =====================
 # The build column is narrow on purpose: it is a tall object, it carries no
 # digits anyone has to read, and it must not take width from the gauges.
@@ -427,7 +456,7 @@ with col2:
     st.markdown(f"""
         <div class="tv-card" style="padding: 15px;">
             <div class="tv-label">💧 TOTAL VOLUME POURED</div>
-            <div class="tv-value" style="font-size: 3rem;">{current_output:,.0f} <span style="font-size:1.2rem; color:#94A3B8;">Liters</span></div>
+            <div class="tv-value" style="font-size: 3rem;">{odometer(current_output, uid="tvvol")} <span style="font-size:1.2rem; color:#94A3B8;">Liters</span></div>
             <div style="display:flex; justify-content: space-between; border-top: 1px solid #1E2B45; margin-top: 12px; padding-top: 12px;">
                 <div style="text-align: left;">
                     <div style="font-size:0.7rem; color:#94A3B8; font-weight:bold; letter-spacing:0.1em;">EXPECTED NOW</div>
@@ -444,13 +473,13 @@ with col2:
 if packing_enabled:
     with col3:
         st.markdown(f"""<div class="tv-card" style="border-color:#A855F7;"><div class="tv-label" style="color:#A855F7;">📦 TOTAL UNITS PACKED</div>
-            <div class="tv-value" style="color:#A855F7;">{total_packed:,.0f} <span style="font-size:1.5rem; color:#94A3B8;">Units</span></div>
+            <div class="tv-value" style="color:#A855F7;">{odometer(total_packed, uid="tvpack")} <span style="font-size:1.5rem; color:#94A3B8;">Units</span></div>
             <div style="color:#A855F7; font-size:1.2rem; font-weight:bold; margin-top:20px;">Est. Skids Built: {(total_packed / 500):,.1f}</div></div>""",
                     unsafe_allow_html=True)
 
     with col4:
         st.markdown(f"""<div class="tv-card" style="border-color:#F59E0B;"><div class="tv-label" style="color:#F59E0B;">⚠️ UNPACKED FLOOR W.I.P.</div>
-            <div class="tv-value" style="color:#F59E0B;">{total_poured - total_packed:,} <span style="font-size:1.5rem; color:#94A3B8;">Pending</span></div>
+            <div class="tv-value" style="color:#F59E0B;">{odometer(total_poured - total_packed, uid="tvwip")} <span style="font-size:1.5rem; color:#94A3B8;">Pending</span></div>
             <div style="color:#94A3B8; font-size:1.2rem; font-weight:bold; margin-top:20px;">Units awaiting pack-out</div></div>""",
                     unsafe_allow_html=True)
 
@@ -462,7 +491,8 @@ with col_build:
         "<div class='tv-card' style='padding:14px 10px;'>"
         "<div class='tv-label' style='text-align:center;'>🖨️ SHIFT BUILD</div>"
         + cartridge_build(build_pct, cartridge_b64, current_output, shift_target_l,
-                          unit="L", height_px=232, uid="tvbuild")
+                          unit="L", height_px=232, uid="tvbuild",
+                          finale=build_finale_now)
         + "</div>", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
