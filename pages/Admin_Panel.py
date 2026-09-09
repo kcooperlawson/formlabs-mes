@@ -18,7 +18,8 @@ from database import (
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
     list_backup_files, prune_old_backups,
     get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
-    check_authentication, get_assigned_runs_df, role_can_administer, set_cookie
+    check_authentication, get_assigned_runs_df, role_can_administer, set_cookie,
+    can, grant_ability, revoke_ability
 )
 from backup_policy import backup_state, DUE_AFTER_HOURS, KEEP_BACKUPS
 from database import esc
@@ -90,33 +91,8 @@ with st.sidebar:
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
-    # --- CUSTOM ROUTER (NEW) ---
-    st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-
-    # In execution mode this is administrators only. In logging mode there is
-    # no separate IT role and a manager reaches it too - see
-    # crud.can_administer.
-    if role_can_administer(st.session_state.get("user_role")):
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-
-        # The Device Gateway registry. This link was deliberately absent for a
-        # long time: the gateway has never been run against real equipment, and
-        # an administrator should not be able to arrive at a configuration
-        # screen for hardware nobody has connected. The Plant Settings switch
-        # is what changed - the link is back, and it appears only for a plant
-        # that has turned the gateway on.
-        #
-        # Worth keeping in mind here: st.page_link raises on a target it cannot
-        # find, and this navigation renders near the top of the page, so one
-        # bad line takes the whole console down. The page sweep will not catch
-        # it either, because that harness stubs st.page_link out.
-        if bool(get_plant_settings().get("enable_device_gateway", 0)):
-            st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+    from ui_shell import nav_menu
+    nav_menu()
 
     from ui_shell import handbook_link
     handbook_link()
@@ -207,18 +183,8 @@ with st.sidebar:
         # switch_page raises to navigate, so an st.rerun() after it never ran.
         st.switch_page("Home.py")
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# IT Admins see "God Mode" (All pages accessible)
-nav_col1, nav_col2, nav_col3, nav_col4, nav_analytics, nav_admin = st.columns((1.1, 1.1, 1.1, 1.1, 1.1, 1.1))
-with nav_col1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-with nav_col2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-with nav_col3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-with nav_col4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-with nav_analytics: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-with nav_admin: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-
-st.markdown("---")
+from ui_shell import nav_bar
+nav_bar()
 
 st.markdown(f'''
 <div style="display:flex; align-items:center; margin-bottom: 5px;">
@@ -362,6 +328,77 @@ with tab_roster:
                 update_user_role_and_shift(int(user_row["id"]), mod_role, mod_shift)
                 st.toast(f"✅ Updated '{modify_user}'!")
                 st.rerun()
+
+    with st.expander("🎟️ Extra Abilities", expanded=False):
+        # A role is a starting point, not a description of a person. This is
+        # where one account is given something its role does not carry -
+        # written for the manager doing the giving, so every line is what the
+        # ability lets somebody do rather than what it is called in the code.
+        st.caption(
+            "Give one account something its role does not include. The person "
+            "keeps their role everywhere else: an operator with the plant "
+            "dashboard still logs as an operator and still appears as one in "
+            "every report.")
+        if df_users.empty:
+            st.info("No accounts yet.")
+        else:
+            _ab_user = st.selectbox("Select Personnel", df_users["username"].tolist(),
+                                    key="ab_user")
+            _ab_row = df_users[df_users["username"] == _ab_user].iloc[0]
+            _ab_id = int(_ab_row["id"])
+            _ab_role = str(_ab_row["role"])
+            _held = crud.abilities_of(_ab_id, _ab_role)
+            _mine = st.session_state.get("user_name", "")
+
+            st.markdown(f"**{esc(str(_ab_row['full_name']))}** — role `{esc(_ab_role)}`")
+            _changed = False
+            for _key, (_label, _help) in crud.ABILITIES.items():
+                _how = _held.get(_key, "")
+                if _how == "role":
+                    st.checkbox(_label, value=True, disabled=True,
+                                key=f"ab_{_key}_{_ab_id}",
+                                help="Comes with this role. Nothing to give.")
+                    continue
+                # Nobody hands out what they do not hold themselves. The rule
+                # is enforced in crud.grant_ability as well; this is only so
+                # the screen does not offer something that would be refused.
+                if not can(_key):
+                    st.checkbox(_label, value=False, disabled=True,
+                                key=f"ab_{_key}_{_ab_id}",
+                                help="You do not have this ability yourself, "
+                                     "so you cannot give it to anybody.")
+                    continue
+                _now = st.checkbox(_label, value=(_how == "granted"),
+                                   key=f"ab_{_key}_{_ab_id}", help=_help)
+                if _now and _how != "granted":
+                    ok, msg = grant_ability(_ab_id, _key, by_name=_mine,
+                                            by_user_id=st.session_state.get("user_id"),
+                                            by_role=st.session_state.get("user_role"))
+                    st.toast(("✅ " if ok else "❌ ") + msg)
+                    _changed = True
+                elif not _now and _how == "granted":
+                    ok, msg = revoke_ability(_ab_id, _key, by_name=_mine)
+                    st.toast(("✅ " if ok else "❌ ") + msg)
+                    _changed = True
+            if _changed:
+                st.rerun()
+
+            # Who gave what, and when. The first question anybody asks about a
+            # permission is how somebody came to have it, so the answer is on
+            # the same screen rather than in a log file.
+            _hist = crud.ability_history(_ab_id)
+            if _hist:
+                st.markdown("###### History")
+                for _h in _hist[:12]:
+                    _when = _h["granted_at"].strftime("%d %b %H:%M") if _h["granted_at"] else "?"
+                    if _h["active"]:
+                        st.caption(f"✅ {esc(_h['label'])} — given by "
+                                   f"{esc(_h['granted_by'] or 'somebody')} on {_when}")
+                    else:
+                        _rev = _h["revoked_at"].strftime("%d %b %H:%M") if _h["revoked_at"] else "?"
+                        st.caption(f"↩️ {esc(_h['label'])} — given by "
+                                   f"{esc(_h['granted_by'] or 'somebody')} on {_when}, "
+                                   f"removed by {esc(_h['revoked_by'] or 'somebody')} on {_rev}")
 
     with st.expander("🔑 Reset User PIN", expanded=False):
         if not df_users.empty:

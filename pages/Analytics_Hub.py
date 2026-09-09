@@ -20,7 +20,7 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 from database import (
     get_production_logs_df,
     get_downtime_logs_df,
-    get_plant_settings, do_logout, check_authentication, role_can_administer,
+    get_plant_settings, do_logout, check_authentication, role_can_administer, can,
     set_cookie,
     get_all_users_df, get_all_resin_specs_df,
 )
@@ -34,7 +34,7 @@ check_authentication(cookie_manager)
 if not st.session_state.get("authenticated", False):
     st.switch_page("Home.py")
 
-if st.session_state.get("user_role") not in ["manager", "admin"]:
+if not can("view_analytics"):
     st.error("🔒 Access Denied: Restricted to Plant Management.")
     st.stop()
 
@@ -97,18 +97,8 @@ with st.sidebar:
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
     # --- CUSTOM ROUTER (NEW) ---
-    st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-
-    # In execution mode this is administrators only. In logging mode there is
-    # no separate IT role and a manager reaches it too - see
-    # crud.can_administer.
-    if role_can_administer(st.session_state.get("user_role")):
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+    from ui_shell import nav_menu
+    nav_menu()
 
     from ui_shell import handbook_link
     handbook_link()
@@ -257,32 +247,9 @@ st.markdown("""
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
 
-st.markdown("<br>", unsafe_allow_html=True)
-if role_can_administer(current_role):
-    # God Mode (Now 6 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    # Manager Suite (Now 5 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-else:
-    # Operator View (Stays 3 Columns)
-    nav_1, nav_2, nav_3 = st.columns(3, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+from ui_shell import nav_bar
+nav_bar()
 
-st.markdown("---")
 # ===================== DATA ACQUISITION & PROCESSING =====================
 from datetime import date, timedelta
 

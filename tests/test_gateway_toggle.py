@@ -82,16 +82,20 @@ print("\nThe link and the page agree")
 admin_src = src("pages/Admin_Panel.py")
 cockpit_src = src("pages/Manager_Cockpit.py")
 registry_src = src("pages/Device_Registry.py")
+shell_src = src("ui_shell.py")
 
+# The link lives in the shared menu now - one definition, drawn by every
+# sidebar in the application - so this checks it there and checks that the
+# consoles use that menu rather than writing their own.
+check("pages/Device_Registry.py" in shell_src, "the shared menu links to the registry")
+_where_flag = shell_src.find('get("enable_device_gateway"')
+_where_link = shell_src.find('st.page_link("pages/Device_Registry.py"')
+check(0 <= _where_flag < _where_link,
+      "the shared menu reads the switch before it draws the link")
+check("role_can_administer" in shell_src[max(0, _where_flag - 400):_where_link],
+      "and only offers it to somebody who administers")
 for name, text in (("IT Admin", admin_src), ("Manager Cockpit", cockpit_src)):
-    check("pages/Device_Registry.py" in text,
-          f"{name} links to the registry")
-    # The link line has to sit inside a check of the setting. Cheap proxy:
-    # the setting is read in the same file, above the link.
-    where_flag = text.find('get("enable_device_gateway"')
-    where_link = text.find('st.page_link("pages/Device_Registry.py"')
-    check(0 <= where_flag < where_link,
-          f"{name} reads the switch before it draws the link")
+    check("nav_menu()" in text, f"{name} draws the shared menu")
 
 check("role_can_administer" in registry_src,
       "the registry gates on the same permission the link does")

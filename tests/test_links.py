@@ -71,15 +71,25 @@ def targets_in(path):
         check(False, f"{path.name} does not parse: {e}")
         return found
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
+        if isinstance(node, ast.Call):
+            fn = node.func
+            name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+            if name in ("page_link", "switch_page"):
+                for arg in node.args[:1]:
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        found.append((arg.value, node.lineno))
             continue
-        fn = node.func
-        name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-        if name not in ("page_link", "switch_page"):
-            continue
-        for arg in node.args[:1]:
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                found.append((arg.value, node.lineno))
+        # The shared menu holds its targets in a list of tuples rather than
+        # passing each one to page_link on the spot, so a check that only
+        # looked at call arguments stopped seeing the navigation the day the
+        # six hand-written bars were collapsed into one. Any string that names
+        # a page counts, wherever it is written.
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            v = node.value
+            if v == "Home.py" or (v.startswith("pages/") and v.endswith(".py")):
+                found.append((v, node.lineno))
+    # A file can now name the same target twice (the tuple and a page_link on
+    # it); the callers only care which targets appear and where.
     return found
 
 
@@ -147,8 +157,7 @@ def main():
     # rule this asserts is the cheap one: every link to Home.py has to sit
     # inside a branch that tested who is looking.
     print("\n  Links to the plant dashboard are guarded")
-    GUARDS = ("role_can_view_scada", "can_view_scada", "role_can_administer",
-              "manager", "admin")
+    GUARDS = ("view_scada", "role_can_administer", "manager", "admin")
     for path in app_sources():
         src = path.read_text(encoding="utf-8", errors="replace")
         try:

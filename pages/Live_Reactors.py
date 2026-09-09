@@ -30,6 +30,7 @@ from database import (
     check_authentication,
     role_can_administer,
     role_can_view_scada,
+    can,
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map, resin_color
@@ -101,45 +102,9 @@ st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
 
-st.markdown("<br>", unsafe_allow_html=True)
-if role_can_administer(current_role):
-    # God Mode (Now 6 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5:
-        st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6:
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    # Manager Suite (Now 5 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5:
-        st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-else:
-    # Two links. The plant dashboard is not one of them - see
-    # crud.can_view_scada.
-    nav_1, nav_2 = st.columns(2, gap="small")
-    with nav_1:
-        st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+from ui_shell import nav_bar
+nav_bar()
 
-st.markdown("---")
 
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
 with st.sidebar:
@@ -158,25 +123,8 @@ with st.sidebar:
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
     # --- CUSTOM ROUTER (NEW) ---
-    st.markdown("#### 🗺️ Navigation")
-    # This one listed every page to everybody and left each page to refuse
-    # them at the door. An operator on the reactor screen was offered five
-    # links and could open two.
-    _nav_role = st.session_state.get("user_role", "operator")
-    if role_can_view_scada(_nav_role):
-        st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    if _nav_role not in ("operator", "packer"):
-        st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    if _nav_role not in ("operator", "packer"):
-        st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-
-    # In execution mode this is administrators only. In logging mode there is
-    # no separate IT role and a manager reaches it too - see
-    # crud.can_administer.
-    if role_can_administer(st.session_state.get("user_role")):
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+    from ui_shell import nav_menu
+    nav_menu()
 
     from ui_shell import handbook_link
     handbook_link()
@@ -305,7 +253,7 @@ _resin_colours = stored_color_map(specs_df)
 all_resins = ["None"] + sorted(specs_df["resin_name"].unique().tolist()) if not specs_df.empty else ["None"]
 all_pumps = ["None"] + get_active_pumps()
 
-if st.session_state.get("user_role") in ["manager", "admin"]:
+if can("manage_reactors"):
     with st.expander("⚙️ Manage Permanent Reactor Fleet", expanded=False):
         c1, c2 = st.columns([1.5, 2.5])
         with c1:
@@ -427,7 +375,7 @@ _fleet_arriving = _fleet_renders <= 2
 # whole effect is the tank level, and this is where you can see it land. The
 # operator's form carries the same thing behind the same switch, for the times
 # nobody with a manager login is on the floor.
-if _bulk_enabled and st.session_state.get("user_role") in ["manager", "admin"]:
+if _bulk_enabled and can("manage_reactors"):
     with st.expander("🛢️ Log a bulk pour (drum, tote, pail)", expanded=False):
         _live = df_reactors[df_reactors["current_resin"].notna()] if not df_reactors.empty else df_reactors
         _live = _live[_live["current_resin"] != "None"] if not _live.empty else _live

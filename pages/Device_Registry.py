@@ -74,14 +74,9 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(f"### 👤 {st.session_state.get('user_name', 'Operator')}")
     st.caption(f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}`")
-    st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-    st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-    st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+    from ui_shell import nav_menu
+    nav_menu()
+
     st.markdown("---")
     if st.button("Log Out & Clear Device", type="primary", use_container_width=True, key="dr_logout_btn"):
         do_logout(cookie_manager)

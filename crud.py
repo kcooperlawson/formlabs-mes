@@ -19,7 +19,7 @@ from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor, Shee
                     ErrorReport,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
-                    LotVerification)
+                    LotVerification, UserAbility)
 from reactor_vessel import resolve_vessel_type
 from app_logger import logger
 
@@ -1223,6 +1223,207 @@ def format_choices(bulk_enabled: bool = False) -> tuple:
 def format_code(label) -> str:
     """The stored code for a Container Format label."""
     return CONTAINER_FORMATS.get(str(label or "").strip(), "V2")
+
+
+# --------------------------------------------------------------- abilities --
+#
+# What a person can reach, as a short list of named things rather than a role
+# spread across thirty files. Each key is one real door in the application, and
+# the label is what a manager reads on the tick box - written for somebody who
+# has never seen the code, because they are the person handing it out.
+#
+# Adding an ability here is half the job. The other half is the door itself
+# asking for it, and the navigation link asking the same question, so a link
+# that is drawn is a page that opens.
+ABILITIES = {
+    "view_scada": (
+        "See the plant dashboard",
+        "The Live SCADA screen: the whole plant at once, every station, the "
+        "pace against target and the operator leaderboard."),
+    "view_analytics": (
+        "See the analytics hub",
+        "Trends over time, yield, fill weight and give-away, per operator and "
+        "per resin."),
+    "view_manager_cockpit": (
+        "See the manager cockpit and its reports",
+        "The management console and the report screens behind it: historical "
+        "production, scrap intelligence, lot verification review, cleanliness "
+        "audits and floor messages."),
+    "manage_reactors": (
+        "Add and edit reactors",
+        "Register a vessel, set its capacity, kind, asset tag and bay marker, "
+        "link it to a pump station, and correct a tank level."),
+    "manage_resins": (
+        "Edit master resin specifications",
+        "Target fill weights, tolerance bands, shelf life and the colour each "
+        "resin is drawn in. Every check weight in the plant is judged against "
+        "these."),
+    "manage_logs": (
+        "Log management and bulk cleanup",
+        "Filter and delete production and downtime records. The one ability "
+        "on this list that can remove data."),
+    "manage_people": (
+        "Floor roster and PIN resets",
+        "Add accounts, set roles and shifts, reset a PIN, unlock an account "
+        "after too many wrong tries."),
+    "export_data": (
+        "Export and sync",
+        "CSV export of any filtered view, and the Google Sheets sync."),
+}
+
+# What each role can do before anybody grants it anything. A grant is added to
+# this, never subtracted from it: an operator with a grant is an operator who
+# can also do one more thing, and taking abilities AWAY from a role would mean
+# two systems disagreeing about what a manager is.
+ROLE_ABILITIES = {
+    "admin": set(ABILITIES),
+    "manager": set(ABILITIES),
+    "packer": set(),
+    "operator": set(),
+}
+
+
+def role_abilities(role) -> set:
+    """What this role gives, before any personal grant."""
+    return set(ROLE_ABILITIES.get(str(role or "").strip().lower(), ()))
+
+
+def granted_abilities(user_id) -> set:
+    """The abilities ticked onto this specific account, still in force."""
+    if not user_id:
+        return set()
+    session = ScopedSession()
+    try:
+        rows = session.query(UserAbility).filter(
+            UserAbility.user_id == int(user_id),
+            UserAbility.revoked_at.is_(None)).all()
+        return {str(r.ability) for r in rows if str(r.ability) in ABILITIES}
+    except Exception:
+        # A permission lookup that raises must not take a page down with it.
+        # The safe answer when the store cannot be read is the role's own set,
+        # which is what every account had before this table existed.
+        return set()
+    finally:
+        session.close()
+
+
+def user_can(user_id, role, ability) -> bool:
+    """Whether this person can do this thing: their role, plus their grants.
+
+    The one function. The door on a page asks it and so does the link that
+    offers the page, because when those are two different rules they drift,
+    and what that looks like on the floor is a button that bounces or a screen
+    that opens to somebody it was quietly removed from.
+    """
+    ability = str(ability or "").strip()
+    if ability not in ABILITIES:
+        return False
+    if ability in role_abilities(role):
+        return True
+    return ability in granted_abilities(user_id)
+
+
+def abilities_of(user_id, role) -> dict:
+    """Every ability, and how this person has it: role, granted, or not at all."""
+    from_role = role_abilities(role)
+    granted = granted_abilities(user_id)
+    out = {}
+    for key in ABILITIES:
+        out[key] = ("role" if key in from_role
+                    else "granted" if key in granted else "")
+    return out
+
+
+def grant_ability(user_id, ability, by_name="", by_user_id=None, by_role="") -> tuple:
+    """Give one account one ability. Returns (ok, message).
+
+    Two rules, both refused here rather than only hidden in the interface. A
+    person cannot hand out an ability they do not have themselves, and only
+    somebody who administers the plant can hand out anything at all. The
+    interface can be wrong about who is looking; this cannot.
+    """
+    ability = str(ability or "").strip()
+    if ability not in ABILITIES:
+        return False, f"There is no ability called {ability!r}."
+    if not user_can(by_user_id, by_role, ability):
+        return False, ("You cannot give away an ability you do not have "
+                       "yourself.")
+    if ability in role_abilities(_role_of(user_id)):
+        return False, "That account already has this from its role."
+    session = ScopedSession()
+    try:
+        existing = session.query(UserAbility).filter(
+            UserAbility.user_id == int(user_id),
+            UserAbility.ability == ability,
+            UserAbility.revoked_at.is_(None)).first()
+        if existing:
+            return True, "Already granted."
+        session.add(UserAbility(user_id=int(user_id), ability=ability,
+                                granted_by=str(by_name or "")[:100],
+                                granted_at=datetime.now()))
+        session.commit()
+        return True, f"Granted: {ABILITIES[ability][0]}."
+    except Exception as exc:
+        session.rollback()
+        return False, str(exc)[:160]
+    finally:
+        session.close()
+
+
+def revoke_ability(user_id, ability, by_name="") -> tuple:
+    """Take one granted ability back. The row stays, marked with who and when."""
+    ability = str(ability or "").strip()
+    session = ScopedSession()
+    try:
+        rows = session.query(UserAbility).filter(
+            UserAbility.user_id == int(user_id),
+            UserAbility.ability == ability,
+            UserAbility.revoked_at.is_(None)).all()
+        if not rows:
+            return True, "Not granted."
+        for row in rows:
+            row.revoked_at = datetime.now()
+            row.revoked_by = str(by_name or "")[:100]
+        session.commit()
+        return True, f"Removed: {ABILITIES.get(ability, (ability,))[0]}."
+    except Exception as exc:
+        session.rollback()
+        return False, str(exc)[:160]
+    finally:
+        session.close()
+
+
+def ability_history(user_id) -> list:
+    """Every grant and revoke for this account, newest first, for display."""
+    session = ScopedSession()
+    try:
+        rows = session.query(UserAbility).filter(
+            UserAbility.user_id == int(user_id)).order_by(
+            UserAbility.granted_at.desc()).all()
+        return [{
+            "ability": str(r.ability),
+            "label": ABILITIES.get(str(r.ability), (str(r.ability),))[0],
+            "granted_by": r.granted_by or "",
+            "granted_at": r.granted_at,
+            "revoked_by": r.revoked_by or "",
+            "revoked_at": r.revoked_at,
+            "active": r.revoked_at is None,
+        } for r in rows]
+    except Exception:
+        return []
+    finally:
+        session.close()
+
+
+def _role_of(user_id) -> str:
+    session = ScopedSession()
+    try:
+        row = session.query(User).filter(User.id == int(user_id)).first()
+        return str(row.role) if row else ""
+    except Exception:
+        return ""
+    finally:
+        session.close()
 
 
 def can_view_scada(role) -> bool:

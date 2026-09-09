@@ -31,6 +31,35 @@ class User(Base):
     last_cartridge = Column(String(60), nullable=True)
     last_resin = Column(String(100), nullable=True)
 
+
+class UserAbility(Base):
+    """One ability handed to one account, on top of what their role gives.
+
+    A role is a starting point, not a description of a person. The floor has
+    an operator who built the system and needs to reach screens no operator
+    needs, and the honest answer to that is not to make him a manager in every
+    report he appears in - it is to say that this account can also do these
+    things.
+
+    Grants are rows rather than a column of flags so that the history is the
+    record: a revoked grant is kept with who revoked it and when, because the
+    first question anybody asks about a permission is how somebody got it.
+    Active grants are the rows with no revoked_at.
+    """
+    __tablename__ = "user_abilities"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False, index=True)
+    # A key from crud.ABILITIES. Stored as text so a release that adds an
+    # ability does not need a migration, and one that removes an ability
+    # leaves rows that simply stop matching anything.
+    ability = Column(String(40), nullable=False, index=True)
+    granted_by = Column(String(100), nullable=True)
+    granted_at = Column(DateTime, default=datetime.utcnow)
+    revoked_by = Column(String(100), nullable=True)
+    revoked_at = Column(DateTime, nullable=True, index=True)
+
+
 class ProductionLog(Base):
     __tablename__ = "production_logs"
     id = Column(Integer, primary_key=True, autoincrement=True)

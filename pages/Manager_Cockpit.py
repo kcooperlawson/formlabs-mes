@@ -35,7 +35,7 @@ st.logo("assets/formlabs_logo.png")
 
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
 from database import (do_logout, check_authentication, get_plant_settings,
-                      role_can_administer, set_cookie)
+                      role_can_administer, role_can_view_scada, can, set_cookie)
 
 cookie_manager = stx.CookieManager(key="mgr_cookies")
 try:
@@ -48,7 +48,7 @@ check_authentication(cookie_manager)
 if not st.session_state.get("authenticated", False):
     st.switch_page("Home.py")
 
-if st.session_state.get("user_role") not in ["manager", "admin"]:
+if not can("view_manager_cockpit"):
     st.error("🔒 Access Denied: Restricted to Plant Management.")
     st.stop()
 
@@ -78,26 +78,8 @@ with st.sidebar:
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
     # --- CUSTOM ROUTER (NEW) ---
-    st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡")
-    st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-    st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-    st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-
-    # In execution mode this is administrators only. In logging mode there is
-    # no separate IT role and a manager reaches it too - see
-    # crud.can_administer.
-    if role_can_administer(st.session_state.get("user_role")):
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
-
-        # The hardware gateway is off in most plants and the registry is a
-        # confusing page to land on when nothing is wired up, so it only
-        # appears once somebody has turned the gateway on in Plant Settings.
-        # Same permission as the page itself, so this never shows a link that
-        # answers Access Denied.
-        if bool(get_plant_settings().get("enable_device_gateway", 0)):
-            st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+    from ui_shell import nav_menu
+    nav_menu()
 
     from ui_shell import handbook_link
     handbook_link()
@@ -181,24 +163,9 @@ with st.sidebar:
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
 
-st.markdown("<br>", unsafe_allow_html=True)
-if role_can_administer(current_role):
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
+from ui_shell import nav_bar
+nav_bar()
 
-st.markdown("---")
 
 st.markdown(f"""
 <div style="display:flex; align-items:center; margin-bottom: 5px;">

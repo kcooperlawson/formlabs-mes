@@ -17,7 +17,8 @@ import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 
 from database import (do_logout, get_avatar_path, role_can_administer,
-                      role_can_view_scada, set_cookie, flash, draw_flashes)
+                      role_can_view_scada, can, get_plant_settings,
+                      set_cookie, flash, draw_flashes)
 
 try:
     from themes import THEMES
@@ -145,6 +146,56 @@ def apply_display_preferences(cookie_manager=None):
         pass
 
 
+# ------------------------------------------------------------ the one menu --
+#
+# Every page used to write its own navigation out by hand: six bars, six
+# copies of the same list, and the rule about who gets which page kept in a
+# seventh place. The result was exactly what you would expect. A bar went on
+# offering the plant dashboard for a day after the dashboard stopped accepting
+# operators, and two bars on the same screen disagreed with each other.
+#
+# So the list lives here, once, and it is built by asking what this person can
+# do rather than what they are called. A link that is drawn is a page that
+# opens, because the door on that page asks the same question.
+def nav_links():
+    """(target, label, short label, icon) for every page this person reaches."""
+    out = []
+    if can("view_scada"):
+        out.append(("Home.py", "Live SCADA", "Live SCADA", "⚡"))
+    out.append(("pages/Operator_Form.py", "Operator Form", "Workstation", "📝"))
+    if can("view_manager_cockpit"):
+        out.append(("pages/Manager_Cockpit.py", "Manager Cockpit", "Manager", "📊"))
+    out.append(("pages/Live_Reactors.py", "Live Reactors", "Reactors", "🛢️"))
+    if can("view_analytics"):
+        out.append(("pages/Analytics_Hub.py", "Analytics Hub", "Analytics", "🌌"))
+    if role_can_administer(st.session_state.get("user_role")):
+        out.append(("pages/Admin_Panel.py", "IT Admin", "IT Admin", "🛡️"))
+    return out
+
+
+def nav_bar():
+    """The row of buttons across the top of a page. Sized to what is in it."""
+    links = nav_links()
+    if not links:
+        return
+    st.markdown("<br>", unsafe_allow_html=True)
+    for col, (target, _long, short, icon) in zip(
+            st.columns(len(links), gap="small"), links):
+        with col:
+            st.page_link(target, label=short, icon=icon, use_container_width=True)
+    st.markdown("---")
+
+
+def nav_menu():
+    """The list down the sidebar. Same links, longer labels, no columns."""
+    st.markdown("#### 🗺️ Navigation")
+    for target, long_label, _short, icon in nav_links():
+        st.page_link(target, label=long_label, icon=icon)
+    if bool(get_plant_settings().get("enable_device_gateway", 0)) and \
+            role_can_administer(st.session_state.get("user_role")):
+        st.page_link("pages/Device_Registry.py", label="Device Gateway", icon="🔌")
+
+
 def render_shell(show_settings: bool = True):
     """Draw the nav bar and sidebar. Returns the page's cookie manager."""
     cookie_manager = stx.CookieManager(key=f"ghost_cookie_{st.session_state.get('user_id', '0')}")
@@ -168,31 +219,7 @@ def render_shell(show_settings: bool = True):
     apply_display_preferences()
     current_role = st.session_state.get("user_role", "operator")
 
-    # --- TOP NAVIGATION BAR ---
-    st.markdown("<br>", unsafe_allow_html=True)
-    if role_can_administer(current_role):
-        nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-        with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-        with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-        with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-        with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-        with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-        with nav_6: st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-    elif current_role == "manager":
-        nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-        with nav_1: st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-        with nav_2: st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-        with nav_3: st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-        with nav_4: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-        with nav_5: st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    else:
-        # Two links, and neither is the plant dashboard - see the note at the
-        # top of Home.py. An operator's own figures are on their own form.
-        nav_1, nav_2 = st.columns(2, gap="small")
-        with nav_1: st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-        with nav_2: st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-
-    st.markdown("---")
+    nav_bar()
 
     # --- SIDEBAR: PROFILE & SETTINGS ---
     with st.sidebar:
@@ -209,32 +236,12 @@ def render_shell(show_settings: bool = True):
         st.caption(
             f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
-        # --- CUSTOM ROUTER (NEW) ---
-        # Role-aware, like the top bar already was. This list used to show
-        # every page to everybody and lean on the page's own guard to refuse
-        # them, so an operator was offered five links and could open two. A
-        # menu full of doors that say no is worse than a short menu.
-        _nav_role = st.session_state.get("user_role", "operator")
-        st.markdown("#### 🗺️ Navigation")
-        if role_can_view_scada(_nav_role):
-            st.page_link("Home.py", label="Live SCADA", icon="⚡")
-        st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
-        if _nav_role not in ("operator", "packer"):
-            st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊")
-        st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️")
-        if _nav_role not in ("operator", "packer"):
-            st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌")
-
-        # In execution mode this is administrators only. In logging mode
-        # there is no separate IT role and a manager reaches it too - see
-        # crud.can_administer.
-        if role_can_administer(st.session_state.get("user_role")):
-            st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️")
+        nav_menu()
 
         # The handbook, for the people who run this. Deliberately a small grey
         # line at the bottom of the menu rather than a button: it is a thing
         # you go and find once, not a thing you need in front of you.
-        if _nav_role not in ("operator", "packer"):
+        if can("view_manager_cockpit"):
             handbook_link()
 
         st.markdown("---")

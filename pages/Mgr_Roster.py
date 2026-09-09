@@ -27,10 +27,11 @@ st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Default Dark"), 
 # because arriving from another page carried the session in memory, and the
 # one thing nobody does while testing is press F5.
 import extra_streamlit_components as _stx
+from database import can
 from database import check_authentication as _check_auth
 _check_auth(_stx.CookieManager(key="auth_roster"))
 
-if not st.session_state.get("authenticated", False) or st.session_state.get("user_role") not in ["manager", "admin"]:
+if not st.session_state.get("authenticated", False) or not can("manage_people"):
     st.error("🔒 Access Denied: Restricted to Plant Management.")
     st.stop()
 

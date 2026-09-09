@@ -98,11 +98,11 @@ check("and neither does a missing one", can_view_scada(None), False)
 # working, so anybody signed in could read the whole plant's figures.
 import pathlib as _pl  # noqa: E402
 _root = _pl.Path(__file__).resolve().parent.parent
-for _page in ("Manager_Cockpit.py", "Analytics_Hub.py"):
+for _page, _ability in (("Manager_Cockpit.py", "view_manager_cockpit"),
+                        ("Analytics_Hub.py", "view_analytics")):
     _src = (_root / "pages" / _page).read_text(encoding="utf-8")
-    _gate = 'user_role") not in ["manager", "admin"]'
-    check(f"{_page} turns an operator away at its own door",
-          _gate in _src and "st.stop()" in _src, True)
+    check(f"{_page} turns away anyone without {_ability}, at its own door",
+          f'if not can("{_ability}")' in _src and "st.stop()" in _src, True)
 
 print("\n" + "=" * 62)
 if FAILS:

@@ -51,6 +51,7 @@ from database import (
     get_plant_settings,
     role_can_administer,
     role_can_view_scada,
+    can,
     set_cookie,
     flash,
     draw_flashes,
@@ -166,47 +167,9 @@ current_shift = st.session_state.get("user_shift") or "Shift 1"
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
 
-st.markdown("<br>", unsafe_allow_html=True)
-if role_can_administer(current_role):
-    # God Mode (Now 6 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5:
-        st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6:
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    # Manager Suite (Now 5 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5:
-        st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-else:
-    # Two links, not three. The SCADA page is manager and admin only now, and
-    # an operator who opens it is sent straight back here - so a Live SCADA
-    # link on this bar was an invitation to tap something that bounces. The
-    # sidebar menu was narrowed when that changed and this bar was missed.
-    nav_1, nav_2 = st.columns(2, gap="small")
-    with nav_1:
-        st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+from ui_shell import nav_bar
+nav_bar()
 
-st.markdown("---")
 
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
@@ -225,21 +188,8 @@ with st.sidebar:
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
-    # --- CUSTOM ROUTER MENU ---
-    st.markdown("#### 🗺️ Navigation")
-    # Same rule as the top bar, from the same function. This menu had its own
-    # copy of the list and kept offering the dashboard after the top bar
-    # stopped, which is worse than never having fixed either: the two bars on
-    # one screen disagreed with each other.
-    if role_can_view_scada(st.session_state.get("user_role")):
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️", use_container_width=True)
-
-    # Only show Manager and Analytics to Managers/Admins
-    if st.session_state.get("user_role") in ["manager", "admin"]:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
-        st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
+    from ui_shell import nav_menu
+    nav_menu()
 
     # In execution mode this is administrators only. In logging mode there is
     # no separate IT role and a manager reaches it too - see

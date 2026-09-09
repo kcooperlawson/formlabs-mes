@@ -97,6 +97,56 @@ def role_can_view_scada(role) -> bool:
     return _crud.can_view_scada(role)
 
 
+@_st.cache_data(ttl=15, show_spinner=False)
+def _granted_abilities(user_id):
+    """Cached, because a page asks about several abilities on every rerun.
+
+    Fifteen seconds, so a manager who ticks a box and tells somebody to
+    refresh is not explaining why it has not taken effect yet. The cache is
+    cleared outright when a grant changes, so the wait is only for another
+    browser's copy.
+    """
+    return _crud.granted_abilities(user_id)
+
+
+def can(ability) -> bool:
+    """Whether the person signed in on THIS screen can do this thing.
+
+    The one question every door and every navigation link asks:
+
+        if can("view_analytics"):
+            st.page_link("pages/Analytics_Hub.py", ...)
+
+    Reads the account from the session rather than taking arguments, because
+    a call site that has to remember to pass the right user id is a call site
+    that will eventually pass the wrong one.
+    """
+    role = _st.session_state.get("user_role", "")
+    if ability in _crud.role_abilities(role):
+        return True
+    return ability in _granted_abilities(_st.session_state.get("user_id"))
+
+
+def grant_ability(user_id, ability, by_name="", by_user_id=None, by_role=""):
+    ok, msg = _crud.grant_ability(user_id, ability, by_name, by_user_id, by_role)
+    _granted_abilities.clear()
+    return ok, msg
+
+
+def revoke_ability(user_id, ability, by_name=""):
+    ok, msg = _crud.revoke_ability(user_id, ability, by_name)
+    _granted_abilities.clear()
+    return ok, msg
+
+
+def abilities_of(user_id, role):
+    return _crud.abilities_of(user_id, role)
+
+
+def ability_history(user_id):
+    return _crud.ability_history(user_id)
+
+
 def _clear_reference_caches():
     """Drop every cached reference read. Called after any config write."""
     for _fn in (get_all_resin_specs_df, get_active_pumps, get_all_pumps_df,

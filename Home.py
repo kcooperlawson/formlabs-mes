@@ -30,6 +30,7 @@ from database import (
     get_plant_settings,
     role_can_administer,
     role_can_view_scada,
+    can,
     set_cookie,
     flash,
     draw_flashes,
@@ -122,7 +123,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.39"
+APP_VERSION = "PT-V3.40"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -430,50 +431,13 @@ current_role = st.session_state.get("user_role", "operator")
 # station and one cartridge. Rate matters here and nobody pretends otherwise -
 # it is what the pace line and the leaderboard are for - it is just read by the
 # people who act on it.
-if not role_can_view_scada(current_role):
+if not can("view_scada"):
     st.switch_page("pages/Operator_Form.py")
 
 
-st.markdown("<br>", unsafe_allow_html=True)
-if role_can_administer(current_role):
-    # God Mode (Now 6 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5, nav_6 = st.columns(6, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5:
-        st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-    with nav_6:
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
-elif current_role == "manager":
-    # Manager Suite (Now 5 Columns)
-    nav_1, nav_2, nav_3, nav_4, nav_5 = st.columns(5, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Operator", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager", icon="📊", use_container_width=True)
-    with nav_4:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
-    with nav_5:
-        st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
-else:
-    # Operator View (Stays 3 Columns)
-    nav_1, nav_2, nav_3 = st.columns(3, gap="small")
-    with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
-        st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_3:
-        st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
+from ui_shell import nav_bar
+nav_bar()
 
-st.markdown("---")
 
 #- SIDEBAR: PROFILE & SETTINGS ---
 with st.sidebar:
@@ -491,22 +455,8 @@ with st.sidebar:
     st.caption(
         f"Role: `{str(st.session_state.get('user_role', 'unknown')).upper()}` | Shift: `{st.session_state.get('user_shift', 'Unknown')}`")
 
-    # --- CUSTOM ROUTER MENU ---
-    st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️", use_container_width=True)
-
-    # Only show Manager and Analytics to Managers/Admins
-    if st.session_state.get("user_role") in ["manager", "admin"]:
-        st.page_link("pages/Manager_Cockpit.py", label="Manager Cockpit", icon="📊", use_container_width=True)
-        st.page_link("pages/Analytics_Hub.py", label="Analytics Hub", icon="🌌", use_container_width=True)
-
-    # In execution mode this is administrators only. In logging mode there is
-    # no separate IT role and a manager reaches it too - see
-    # crud.can_administer.
-    if role_can_administer(st.session_state.get("user_role")):
-        st.page_link("pages/Admin_Panel.py", label="IT Admin", icon="🛡️", use_container_width=True)
+    from ui_shell import nav_menu
+    nav_menu()
 
     # The handbook, for the people who run this. Operators and packers are
     # sent to the form before this sidebar is ever drawn, so everyone who

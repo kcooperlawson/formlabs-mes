@@ -8,6 +8,28 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.40 — Wednesday, September 9, 2026
+**A manager can give one person extra abilities**
+
+A role is a starting point, not a description of a person. I am a floor operator and I built this, so I need screens no operator needs, and the answer to that should not be to hand me a manager account and have every report count me as one. Somebody else will end up in the same spot.
+
+- **IT Admin, Personnel, Extra Abilities.** Pick a person, tick what they can also do. Their role does not change. An operator with the plant dashboard still logs as an operator and still shows up as one everywhere.
+- **Eight abilities to hand out.** See the plant dashboard. See the analytics hub. See the manager cockpit and its reports. Add and edit reactors. Edit master resin specifications. Log management and bulk cleanup. Floor roster and PIN resets. Export and sync.
+- **Each one is written for the person handing it out**, not for me. The tick box says what it lets somebody do.
+- **Two rules that are enforced in the code, not just hidden on the screen.** You cannot give away an ability you do not have yourself, and only somebody who administers the plant can give anything at all.
+- **Every grant is recorded** with who gave it and when, and a removed grant keeps its row with who removed it. That history is on the same screen, because the first question anybody asks about a permission is how somebody came to have it.
+- Nothing is granted by the upgrade. Every account keeps exactly what its role gave it until somebody ticks a box.
+
+**The reason it is built this way**
+
+The bug I keep hitting is not a permission hole, it is the same rule written down in more than one place. The door on a page said one thing and six navigation bars said another, so a link would go on being offered after the page stopped accepting it.
+
+- **One function answers now.** The door on the page asks it and so does the link that offers the page. A link you can see is a page that opens.
+- **One menu.** Every navigation bar and every sidebar list in the app is drawn from a single definition. There were six copies of that list. A test fails if a seventh appears.
+- Every management screen refuses on the ability, not on a role name. Thirteen doors, one rule.
+
+---
+
 ## 3.39 — Wednesday, September 9, 2026
 **The dashboard link that was still there in four places**
 

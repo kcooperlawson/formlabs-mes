@@ -551,17 +551,16 @@ td.k{font-weight:600; color:var(--ink);}
       <tr><td class="k">Choose how the plant runs this system</td><td class="no">&mdash;</td><td class="part">Logging mode</td><td class="yes">Yes</td></tr>
     </tbody>
   </table>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;">The SCADA dashboard is not on that
-  list for operators: it is a management view of the whole plant, and their own figures are on their own
-  screen. Rate is on it because rate matters, read by the people who act on it.</p>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;"><em>Logging mode</em> marks the rows a
-  manager holds only while the plant runs as a log. <em>Test mode</em> lets a manager or administrator
-  log on behalf of an operator for training and troubleshooting; the entry is attributed to the operator
-  selected and is visible in the log.</p>
-  <p style="font-size:8.4pt;color:var(--faint);margin-top:6pt;">One thing the mode cannot do is strand a
-  plant: an execution system restricts this console to administrator accounts, so the switch is refused
-  while no such account exists, rather than locking everybody out of the screen that would switch it
-  back.</p>
+  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;">The SCADA dashboard is not on
+  that list for operators: it is a management view of the whole plant, and their own figures are on
+  their own screen. <em>Logging mode</em> marks the rows a manager holds only while the plant runs as a
+  log, and switching to an execution system is refused while no administrator account exists to switch
+  it back. <em>Test mode</em> lets a manager log on behalf of an operator for training; the entry is
+  attributed to that operator and is visible in the log.</p>
+  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;">The table is where each role
+  <em>starts</em>. An administrator can give one account a named ability on top of it &mdash; the
+  dashboard, analytics, editing reactors &mdash; without changing that person&rsquo;s role or how they
+  appear in any report. Every grant is recorded with who gave it and when.</p>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>12</span></div>
 </section>
 
