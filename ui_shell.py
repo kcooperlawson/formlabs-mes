@@ -17,7 +17,7 @@ import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 
 from database import (do_logout, get_avatar_path, role_can_administer,
-                      set_cookie, flash, draw_flashes)
+                      role_can_view_scada, set_cookie, flash, draw_flashes)
 
 try:
     from themes import THEMES
@@ -216,7 +216,7 @@ def render_shell(show_settings: bool = True):
         # menu full of doors that say no is worse than a short menu.
         _nav_role = st.session_state.get("user_role", "operator")
         st.markdown("#### 🗺️ Navigation")
-        if _nav_role not in ("operator", "packer"):
+        if role_can_view_scada(_nav_role):
             st.page_link("Home.py", label="Live SCADA", icon="⚡")
         st.page_link("pages/Operator_Form.py", label="Operator Form", icon="📝")
         if _nav_role not in ("operator", "packer"):

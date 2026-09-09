@@ -92,6 +92,11 @@ def role_can_administer(role) -> bool:
     return _crud.can_administer(role, get_plant_settings().get("simple_mode", True))
 
 
+def role_can_view_scada(role) -> bool:
+    """crud.can_view_scada, for pages to call. See that function for why."""
+    return _crud.can_view_scada(role)
+
+
 def _clear_reference_caches():
     """Drop every cached reference read. Called after any config write."""
     for _fn in (get_all_resin_specs_df, get_active_pumps, get_all_pumps_df,

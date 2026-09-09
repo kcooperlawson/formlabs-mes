@@ -22,6 +22,7 @@ from database import (
     check_authentication,
     get_all_users_df,
     role_can_administer,
+    role_can_view_scada,
     set_cookie,
 )
 from database import esc
@@ -112,13 +113,11 @@ elif current_role == "manager":
     with nav_5:
         st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
 else:
-    # Operator View (Stays 3 Columns)
-    nav_1, nav_2, nav_3 = st.columns(3, gap="small")
+    # Two links, the same two as everywhere else an operator stands.
+    nav_1, nav_2 = st.columns(2, gap="small")
     with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
         st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_3:
+    with nav_2:
         st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
 
 st.markdown("---")

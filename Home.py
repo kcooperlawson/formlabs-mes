@@ -29,6 +29,7 @@ from database import (
     get_downtime_logs_df,
     get_plant_settings,
     role_can_administer,
+    role_can_view_scada,
     set_cookie,
     flash,
     draw_flashes,
@@ -121,7 +122,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.38"
+APP_VERSION = "PT-V3.39"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -429,7 +430,7 @@ current_role = st.session_state.get("user_role", "operator")
 # station and one cartridge. Rate matters here and nobody pretends otherwise -
 # it is what the pace line and the leaderboard are for - it is just read by the
 # people who act on it.
-if current_role in ("operator", "packer"):
+if not role_can_view_scada(current_role):
     st.switch_page("pages/Operator_Form.py")
 
 

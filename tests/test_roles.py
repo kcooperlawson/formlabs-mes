@@ -76,6 +76,34 @@ check("and never weakens the admin answer", can_administer("admin", None), True)
 
 print(f"  {CHECKS} combinations checked")
 
+# --- who sees the plant dashboard ----------------------------------------
+# One function, asked by the door on Home.py and by every navigation bar. The
+# bug it exists to prevent is not a permission hole, it is the opposite: a
+# link drawn for somebody the door then turns away, which reads as the app
+# being broken rather than as a rule.
+from crud import can_view_scada  # noqa: E402
+
+print("\n  The plant dashboard")
+check("a manager sees it", can_view_scada("manager"), True)
+check("an admin sees it", can_view_scada("admin"), True)
+check("an operator does not", can_view_scada("operator"), False)
+check("nor does a packer", can_view_scada("packer"), False)
+check("case and whitespace are not part of the rule",
+      can_view_scada("  Manager "), True)
+check("an unknown role does not", can_view_scada("supervisor"), False)
+check("and neither does a missing one", can_view_scada(None), False)
+
+# The management screens refuse an operator at the door, not only in the menu.
+# Analytics was the exception: it left the menu and the address went on
+# working, so anybody signed in could read the whole plant's figures.
+import pathlib as _pl  # noqa: E402
+_root = _pl.Path(__file__).resolve().parent.parent
+for _page in ("Manager_Cockpit.py", "Analytics_Hub.py"):
+    _src = (_root / "pages" / _page).read_text(encoding="utf-8")
+    _gate = 'user_role") not in ["manager", "admin"]'
+    check(f"{_page} turns an operator away at its own door",
+          _gate in _src and "st.stop()" in _src, True)
+
 print("\n" + "=" * 62)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} ROLE CHECKS FAILED:\n" + "\n".join(FAILS))

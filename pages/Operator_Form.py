@@ -50,6 +50,7 @@ from database import (
     send_floor_message,
     get_plant_settings,
     role_can_administer,
+    role_can_view_scada,
     set_cookie,
     flash,
     draw_flashes,
@@ -226,7 +227,12 @@ with st.sidebar:
 
     # --- CUSTOM ROUTER MENU ---
     st.markdown("#### 🗺️ Navigation")
-    st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
+    # Same rule as the top bar, from the same function. This menu had its own
+    # copy of the list and kept offering the dashboard after the top bar
+    # stopped, which is worse than never having fixed either: the two bars on
+    # one screen disagreed with each other.
+    if role_can_view_scada(st.session_state.get("user_role")):
+        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
     st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
     st.page_link("pages/Live_Reactors.py", label="Live Reactors", icon="🛢️", use_container_width=True)
 

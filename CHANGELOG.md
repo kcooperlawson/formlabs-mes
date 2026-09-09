@@ -8,6 +8,27 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.39 — Wednesday, September 9, 2026
+**The dashboard link that was still there in four places**
+
+I fixed this yesterday and I only fixed one of them. Running today I still had Live SCADA on the operator form's side menu, and on the reactor screen it was on the top bar and in the side menu as well. The top bar of the form was the one I had fixed, so the two bars on the same screen disagreed with each other, which is worse than not having started.
+
+The cause is that the list of pages is written out by hand in six navigation bars, and the rule about who gets the dashboard lived somewhere else again. Change one and the other five carry on as they were.
+
+- **One function decides it now.** `can_view_scada`. The door on the SCADA page asks it, and so does every navigation bar. A link that gets drawn is a page that opens.
+- **The four bars that still offered it don't.** Operator form side menu, reactor screen top bar and side menu, and the wall display's bar.
+- **The reactor screen's side menu was listing every page to everybody** and leaving each page to refuse them at the door. An operator standing there was offered five links and could open two.
+- **A test that fails if it happens again.** Every link to the SCADA page has to sit inside a branch that checked who is looking, or the navigation suite fails and names the file and line.
+
+**And that test found a real hole**
+
+Analytics Hub had no door on it at all. It came off the operator's menu when I narrowed their navigation, and that was the whole of it — the address still worked, so any signed-in operator who typed it or was sent the link saw the plant's full analytics. The handbook says operators do not have analytics. Now they do not.
+
+- **Analytics Hub refuses anyone who is not a manager or an admin**, the same way the Manager Cockpit already did.
+- The roles suite now checks both pages have that door, not just that the menu is right.
+
+---
+
 ## 3.38 — Wednesday, September 9, 2026
 **Going over the documents before test day**
 

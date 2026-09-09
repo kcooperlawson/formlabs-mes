@@ -1225,6 +1225,26 @@ def format_code(label) -> str:
     return CONTAINER_FORMATS.get(str(label or "").strip(), "V2")
 
 
+def can_view_scada(role) -> bool:
+    """Whether this role sees the plant dashboard.
+
+    One definition, because the alternative is what actually happened. The
+    door is on Home.py and the link is written out by hand in every navigation
+    bar - six of them - and when the door changed, four of the bars did not.
+    An operator was offered a button that sent them straight back to the form
+    they were already on, which reads as the app being broken rather than as a
+    permission.
+
+    So the door and every link ask the same function. A link that is drawn is
+    a page that opens.
+
+    It takes a role today. When a manager can grant abilities to one person,
+    this is where that lookup goes, and everything that already asks it
+    inherits the answer without being found and edited again.
+    """
+    return str(role or "").strip().lower() in ("manager", "admin")
+
+
 def can_administer(role, simple_mode) -> bool:
     """Whether this role reaches the administration console.
 

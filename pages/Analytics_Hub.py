@@ -34,6 +34,10 @@ check_authentication(cookie_manager)
 if not st.session_state.get("authenticated", False):
     st.switch_page("Home.py")
 
+if st.session_state.get("user_role") not in ["manager", "admin"]:
+    st.error("🔒 Access Denied: Restricted to Plant Management.")
+    st.stop()
+
 # --- SETUP & LOGO ---
 st.set_page_config(
     page_title="Analytics Engine | Formlabs MES",

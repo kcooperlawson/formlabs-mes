@@ -135,6 +135,63 @@ def main():
             check(False, f"KNOWN_ORPHANS lists {rel}, but something links to it now "
                          f"- drop it from the list so it is checked like the rest")
 
+    # --- no link an operator can see leads somewhere they get sent back from --
+    #
+    # The SCADA page is manager and admin only, and an operator who opens it is
+    # sent straight back to their form. So a link to it inside a branch an
+    # operator reaches is not a permission problem, it is a button that does
+    # nothing, and it reads as the app being broken.
+    #
+    # This got out twice. Six navigation bars are written by hand, the door was
+    # changed in one place, and four of the bars went on offering the link. The
+    # rule this asserts is the cheap one: every link to Home.py has to sit
+    # inside a branch that tested who is looking.
+    print("\n  Links to the plant dashboard are guarded")
+    GUARDS = ("role_can_view_scada", "can_view_scada", "role_can_administer",
+              "manager", "admin")
+    for path in app_sources():
+        src = path.read_text(encoding="utf-8", errors="replace")
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            continue
+        # A page that turns an operator away at its own door cannot offer them
+        # a link at all, so it is exempt as a whole: a role test whose body
+        # stops the script or sends them somewhere else.
+        def _is_gate(node):
+            if not isinstance(node, ast.If):
+                return False
+            test_src = ast.get_source_segment(src, node.test) or ""
+            if not any(g in test_src for g in GUARDS):
+                return False
+            body_src = "\n".join(ast.get_source_segment(src, s) or "" for s in node.body)
+            return "st.stop()" in body_src or "switch_page" in body_src
+        if any(_is_gate(node) for node in ast.walk(tree)):
+            continue
+        # Every line that is inside the test or body of an `if` whose test
+        # mentions one of the guards above.
+        guarded = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.If):
+                continue
+            test_src = ast.get_source_segment(src, node.test) or ""
+            if not any(g in test_src for g in GUARDS):
+                continue
+            for child in ast.walk(node):
+                if hasattr(child, "lineno"):
+                    guarded.add(child.lineno)
+        for target, lineno in targets_in(path):
+            if target != "Home.py":
+                continue
+            # switch_page("Home.py") is a redirect, not an offer.
+            line = src.splitlines()[lineno - 1]
+            if "switch_page" in line:
+                continue
+            check(lineno in guarded,
+                  f"{path.name}:{lineno} offers the plant dashboard without "
+                  f"checking who is looking")
+    print("    checked every page_link to Home.py")
+
     print("\n" + "=" * 62)
     if FAILS:
         print(f"{len(FAILS)} of {CHECKS} NAVIGATION CHECKS FAILED:")
