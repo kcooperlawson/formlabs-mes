@@ -1288,6 +1288,26 @@ if tab1 is not None:
                 _name = f"{_tag} ({_vessel['reactor_name']})" if _tag else _vessel["reactor_name"]
                 st.caption(f"🛢️ Drawing from **{_name}**{_where}")
 
+                # Where that tank stands with QC. It is said and never
+                # enforced: a missing QC entry is a gap in somebody's
+                # paperwork, and stopping a pour over it would turn an office
+                # job into a stopped line. The operator is told, their lead
+                # gets told by the same screen, and the log records either way.
+                _b = crud.current_batch(_vessel["reactor_name"])
+                if _b:
+                    _r = _b.get("qc_result") or ""
+                    if _r == "fail":
+                        st.warning("⚠️ **This tank's batch failed QC.** Your log "
+                                   "still records. Check with your lead before "
+                                   "you pour any more of it.")
+                    elif _r == "hold":
+                        st.warning("⚠️ **This tank's batch is on hold at QC.** "
+                                   "Your log still records. Worth a word with "
+                                   "your lead.")
+                    elif _b.get("qc_open"):
+                        st.caption("🧪 A sample from this tank is out at QC. "
+                                   "Nothing to do, it is just not back yet.")
+
         cart_matched = get_all_resin_specs_df(cart_code)
         cart_matched = cart_matched[cart_matched["resin_name"] == resin] if not cart_matched.empty else cart_matched
         # weight_spec is whichever spec row we ended up showing, or None when

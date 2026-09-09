@@ -68,6 +68,21 @@ def handbook_link():
         unsafe_allow_html=True)
 
 
+def update_guide_link():
+    """The update process, on the console the person updating already opens.
+
+    Same grey line as the handbook and for the same reason: it is something
+    you go and find on the day you need it. IT Admin only, because that is
+    where the person carrying the USB stick ends up.
+    """
+    st.markdown(
+        '<div style="margin-top:4px; font-size:0.8rem; opacity:0.7;">'
+        '<a href="./app/static/Formlabs_MES_Update_Guide.pdf" target="_blank" '
+        'style="color:inherit; text-decoration:none;">'
+        '🧰 Update process (PDF)</a></div>',
+        unsafe_allow_html=True)
+
+
 def _install_crash_reporting():
     """Attach the crash reporter, once per process.
 

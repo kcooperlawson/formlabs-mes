@@ -79,3 +79,15 @@ def boot(fresh=True, db_name=None):
 
     os.environ["DB_URL"] = uri
     return srv, uri
+
+
+# Importing this module points DB_URL at the throwaway database, on its own.
+#
+# Half the suites only ever said `import _boot`, with a comment claiming a test
+# run can never touch production - and then never called boot(), so DB_URL was
+# whatever .env said and those suites ran against the live database. On this
+# machine that is a demo; on the plant PC it is the real one.
+#
+# So the import does it. A suite that wants a clean database still calls
+# boot(fresh=True) itself and gets one.
+boot(fresh=False)

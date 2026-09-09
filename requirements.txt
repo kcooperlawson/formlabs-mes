@@ -1,19 +1,31 @@
-alembic>=1.13.0
+# What this application needs to run.
+#
+# Every version here is the version actually installed and running on the
+# machine this system is deployed on, read straight off that venv. That is the
+# whole point of the file: it is a description of something that works, not a
+# wish list.
+#
+# It was not always. It carried numpy==2.5.2, which needs Python 3.12 - the
+# deployment runs 3.11 and had 2.4.6 - so pip gave up at that line. Nothing
+# noticed on a machine that was already installed, and it would have stopped
+# a fresh install on any PC with 3.11 dead at step 3. It also listed ten
+# packages for Google's API client, which nothing in the app imports: the
+# Sheets sync talks to an Apps Script webhook over requests.
+#
+# So: if you add an import, add it here, and take the version from the machine
+# you installed it on.
+
+alembic==1.19.1
 altair==6.2.2
 anyio==4.14.2
 attrs==26.1.0
 bcrypt==5.0.0
 blinker==1.9.0
 certifi==2026.7.22
-cffi==2.1.1
 charset-normalizer==3.5.1
 click==8.5.0
-cryptography==50.0.1
 extra-streamlit-components==0.1.81
-google-auth==2.57.0
-google-auth-oauthlib==1.4.1
 greenlet==3.5.5
-gspread==6.2.1
 h11==0.16.0
 httptools==0.8.0
 idna==3.19
@@ -23,29 +35,25 @@ jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 MarkupSafe==3.0.3
 narwhals==2.25.0
-numpy==2.5.2
-oauthlib==3.3.1
+numpy==2.4.6
+
+# Excel export on the Google Sync page. pandas cannot write .xlsx without
+# it and does not install it for itself; the page degrades to CSV when it
+# is missing, so a plant that wants .xlsx needs this line.
+openpyxl==3.1.5
 packaging==26.3
 pandas==3.0.5
-# Excel export on the Google Sync page. pandas cannot write .xlsx without it
-# and does not install it for itself; the page degrades to CSV when it is
-# missing rather than failing, but a plant that wants .xlsx needs this line.
-openpyxl==3.1.5
 pillow==12.3.0
 plotly==7.0.0
 protobuf==7.36.0
 psycopg2-binary==2.9.12
 pyarrow==25.0.1
-pyasn1==0.6.4
-pyasn1_modules==0.4.2
-pycparser==3.0
 pydeck==0.9.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.3
 python-multipart==0.0.32
 referencing==0.37.0
 requests==2.34.2
-requests-oauthlib==2.0.0
 rpds-py==2026.6.3
 six==1.17.0
 SQLAlchemy==2.0.52
@@ -59,4 +67,7 @@ urllib3==2.7.0
 uvicorn==0.52.4
 watchdog==6.0.0
 websockets==16.1.1
-zeroconf==0.151.3  # mDNS auto-discovery for the Device Gateway (service_announcer.py / service_discovery.py)
+
+# mDNS announcement, so a Device Gateway on another floor PC can find this
+# machine's database instead of somebody typing a connection string.
+zeroconf==0.151.3

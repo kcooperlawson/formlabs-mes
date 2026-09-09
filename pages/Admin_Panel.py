@@ -94,8 +94,9 @@ with st.sidebar:
     from ui_shell import nav_menu
     nav_menu()
 
-    from ui_shell import handbook_link
+    from ui_shell import handbook_link, update_guide_link
     handbook_link()
+    update_guide_link()
 
     st.markdown("---")
     # ---------------------------

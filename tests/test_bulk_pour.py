@@ -199,6 +199,9 @@ print("  the one definition OK")
 # turned every 5-litre jug into a measured pour - a format that had been right
 # for years, broken by a new option sharing a word with an old one. The
 # arithmetic above would all still have passed.
+# _boot before crud: importing crud opens a database, and without this that
+# database is whatever .env points at - the live one on the plant PC.
+import _boot  # noqa: E402,F401  (throwaway database, refuses production)
 import crud  # noqa: E402
 
 check("a jug is a jug, not a bulk pour, whatever its label says",

@@ -124,6 +124,30 @@ Ten new checks in `tests/test_reactor_level.py` cover all three holes and the tw
 
 Also `dev/run_tests.py`. The test scripts wanted `pgserver`, which only builds on Linux and macOS, so on this machine every one of them died before it ran a single check. It reads the address out of `.env`, points a scratch database at the same server, and runs whichever script you name.
 
+### QC times, and how long resin sits in a reactor *(3.46)*
+
+My manager asked when resin goes to QC, how long it is there, when it comes out, and how long it sits in the reactor. All four are durations, and a duration needs two ends. The tank level is worked out from the logs every time somebody looks, so there was nothing to measure between and nothing to hang a QC result on.
+
+A filling of a vessel is a record now. It opens when a vessel is changed over and closes at the next changeover or when somebody marks it empty.
+
+- **The reactor half needs nothing typed.** The clock starts at the changeover, which operators already confirm at the pump.
+- **Every vessel already holding something got a filling** when this went in, dated from its last changeover in the log. Where the log cannot say, it reads unknown rather than guessing at today.
+- **The reactor page shows the age on each tank**, next to the level, and a QC panel for anyone with the new ability.
+- **Both QC times are typed, not stamped.** The result comes back long before anybody is near a screen. A result timed before the sample went out is refused, and so is a result with no time on it.
+- **The pouring form says when the tank is out at QC, on hold or failed.** It never blocks. A gap in somebody's paperwork should not stop a pour.
+- **Batch History and QC Turnaround** in the cockpit: average turnaround, average time in a vessel, what is out at QC right now with the oldest first, and a CSV download.
+- Recording QC is its own ability, so a lead can have it without being made a manager.
+
+The page says plainly that QC times are hand entered. A turnaround figure built from when somebody got to a screen measures data entry, not QC.
+
+### Two lines of work merged, and a test that was writing to the live database *(3.46)*
+
+Two sessions built releases the same day and both numbered a migration 0020. Two migrations with the same parent gives the database two heads and it stops migrating at all, so the batch one is 0021 now and follows the pump rates.
+
+- **Eight test files only said `import _boot`** and never called it, with a comment claiming a test run can never touch production. DB_URL stayed on whatever `.env` said, which on this PC is the live database. Importing `_boot` now points it at the throwaway one on its own.
+- **requirements.txt lists the versions actually installed here.** It pinned `numpy==2.5.2`, which needs Python 3.12, and this PC runs 3.11 with 2.4.6. A fresh install died on that line, and the offline package bundle came out empty. Ten unused Google API packages went with it.
+- **Diagnose this PC checks the two documents are present**, and IT Admin links the update guide.
+
 ### One place to register a vessel *(3.45)*
 
 The reactor fleet is off the Master Plant Equipment section in IT Admin. It lives on the Live Reactors page, which is where I actually go.

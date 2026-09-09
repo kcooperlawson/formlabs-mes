@@ -19,7 +19,7 @@ from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor, Shee
                     ErrorReport,
                     ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
-                    LotVerification, UserAbility)
+                    LotVerification, UserAbility, ReactorBatch)
 from reactor_vessel import resolve_vessel_type
 from app_logger import logger
 
@@ -1266,6 +1266,11 @@ ABILITIES = {
         "Floor roster and PIN resets",
         "Add accounts, set roles and shifts, reset a PIN, unlock an account "
         "after too many wrong tries."),
+    "manage_qc": (
+        "Record QC on a reactor batch",
+        "Enter when a sample went to QC and when the result came back, and "
+        "whether it passed. The floor sees the answer on the pouring form; "
+        "the times feed the turnaround figures management asked for."),
     "export_data": (
         "Export and sync",
         "CSV export of any filtered view, and the Google Sheets sync."),
@@ -2941,4 +2946,270 @@ def record_changeover(reactor_name: str, new_resin: str, operator: str = "",
             log_type="Resin Changeover")
     except Exception:
         pass
+
+    # A changeover is the end of one filling and the start of the next, which
+    # is the whole reason the dwell time needs nothing typed: the floor already
+    # tells us, every time, at the pump.
+    try:
+        close_batch(reactor_name, by=operator or "System")
+        open_batch(reactor_name, new_resin, pump_station=pump_station,
+                   by=operator or "System")
+    except Exception:
+        pass
     return True
+
+
+# ------------------------------------------------------------- batches ----
+#
+# What management asked for: when resin goes to QC, how long it is there, when
+# it comes back, and how long it sits in the reactor. All four are durations,
+# and a duration needs two ends. A level worked out from the logs has neither.
+#
+# So one filling of one vessel is a row. It opens on a changeover and closes on
+# the next one, both of which already happen, so the reactor half answers
+# itself. The QC half is two times somebody types, and it is worth being honest
+# that those measure when the entry was made unless whoever runs QC is the one
+# entering them.
+QC_RESULTS = ("", "pass", "fail", "hold")
+
+
+def current_batch(reactor_name) -> dict:
+    """The open filling of this vessel, or {} if there is not one."""
+    session = ScopedSession()
+    try:
+        row = session.query(ReactorBatch).filter(
+            ReactorBatch.reactor_name == str(reactor_name or "").strip(),
+            ReactorBatch.emptied_at.is_(None)).order_by(
+            ReactorBatch.filled_at.desc()).first()
+        return _batch_dict(row) if row else {}
+    except Exception:
+        return {}
+    finally:
+        session.close()
+
+
+def open_batch(reactor_name, resin_type, lot_number="", pump_station="",
+               filled_at=None, by="", note="") -> int:
+    """Start a filling. Returns its id, or 0.
+
+    Refuses to open a second one on a vessel that already has an open filling,
+    because two open batches on one tank means every duration after that is a
+    guess about which one somebody meant.
+    """
+    name = str(reactor_name or "").strip()
+    if not name:
+        return 0
+    if current_batch(name):
+        return 0
+    session = ScopedSession()
+    try:
+        row = ReactorBatch(
+            reactor_name=name,
+            resin_type=str(resin_type or "").strip() or None,
+            lot_number=str(lot_number or "").strip() or None,
+            pump_station=str(pump_station or "").strip() or None,
+            filled_at=filled_at or datetime.now(),
+            opened_by=str(by or "")[:100] or None,
+            note=str(note or "")[:240] or None)
+        session.add(row)
+        session.commit()
+        return int(row.id)
+    except Exception:
+        session.rollback()
+        return 0
+    finally:
+        session.close()
+
+
+def close_batch(reactor_name, emptied_at=None, by="") -> bool:
+    """End the open filling on this vessel. Quietly does nothing if there is none."""
+    session = ScopedSession()
+    try:
+        row = session.query(ReactorBatch).filter(
+            ReactorBatch.reactor_name == str(reactor_name or "").strip(),
+            ReactorBatch.emptied_at.is_(None)).order_by(
+            ReactorBatch.filled_at.desc()).first()
+        if row is None:
+            return False
+        row.emptied_at = emptied_at or datetime.now()
+        row.closed_by = str(by or "")[:100] or None
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def set_batch_qc(batch_id, sent_at=None, result_at=None, result="", note="",
+                 by="") -> tuple:
+    """Record the QC round trip for one filling. Returns (ok, message).
+
+    Both times are given rather than stamped, because a manager entering this
+    is usually entering it after the fact. The one rule enforced here is that
+    a result cannot come back before the sample went out - a pair of times in
+    that order produces a negative duration, and a negative duration in a
+    report is worse than a missing one because somebody will average it.
+    """
+    result = str(result or "").strip().lower()
+    if result not in QC_RESULTS:
+        return False, f"{result!r} is not a QC result."
+    if sent_at and result_at and result_at < sent_at:
+        return False, "The result cannot come back before the sample went out."
+    if result and not result_at:
+        return False, "A result needs the time it came back."
+    session = ScopedSession()
+    try:
+        row = session.query(ReactorBatch).filter(
+            ReactorBatch.id == int(batch_id)).first()
+        if row is None:
+            return False, "That batch is not on file."
+        row.qc_sent_at = sent_at
+        row.qc_result_at = result_at
+        row.qc_result = result or None
+        row.qc_note = str(note or "")[:240] or None
+        row.qc_by = str(by or "")[:100] or None
+        session.commit()
+        return True, "QC recorded."
+    except Exception as exc:
+        session.rollback()
+        return False, str(exc)[:160]
+    finally:
+        session.close()
+
+
+def _hours(start, end):
+    if not start or not end:
+        return None
+    return round((end - start).total_seconds() / 3600.0, 2)
+
+
+def _batch_dict(row) -> dict:
+    now = datetime.now()
+    return {
+        "id": int(row.id),
+        "reactor_name": str(row.reactor_name or ""),
+        "resin_type": str(row.resin_type or ""),
+        "lot_number": str(row.lot_number or ""),
+        "pump_station": str(row.pump_station or ""),
+        "filled_at": row.filled_at,
+        "emptied_at": row.emptied_at,
+        "qc_sent_at": row.qc_sent_at,
+        "qc_result_at": row.qc_result_at,
+        "qc_result": str(row.qc_result or ""),
+        "qc_note": str(row.qc_note or ""),
+        "qc_by": str(row.qc_by or ""),
+        "opened_by": str(row.opened_by or ""),
+        "closed_by": str(row.closed_by or ""),
+        "open": row.emptied_at is None,
+        # Hours in the vessel. An open batch is measured to now, because "it
+        # has been sitting there 30 hours so far" is the number somebody is
+        # actually asking about while it is still sitting there.
+        "hours_in_reactor": _hours(row.filled_at, row.emptied_at or now),
+        "hours_at_qc": _hours(row.qc_sent_at, row.qc_result_at or now),
+        "qc_open": bool(row.qc_sent_at and not row.qc_result_at),
+    }
+
+
+def get_batches(reactor_name="", open_only=False, since=None, limit=500) -> list:
+    """Fillings, newest first, as plain dicts with their durations worked out."""
+    session = ScopedSession()
+    try:
+        q = session.query(ReactorBatch)
+        if reactor_name:
+            q = q.filter(ReactorBatch.reactor_name == str(reactor_name).strip())
+        if open_only:
+            q = q.filter(ReactorBatch.emptied_at.is_(None))
+        if since:
+            q = q.filter(ReactorBatch.filled_at >= since)
+        rows = q.order_by(ReactorBatch.filled_at.desc()).limit(int(limit)).all()
+        return [_batch_dict(r) for r in rows]
+    except Exception:
+        return []
+    finally:
+        session.close()
+
+
+def batch_for_pump(pump_station, resin_type) -> dict:
+    """The open filling an operator at this station is pouring out of.
+
+    Found through the vessel rather than by the station on the batch, because
+    reactor_for is already the one place that decides which tank a station and
+    a resin mean, and two answers to that question is how a floor ends up with
+    two different numbers for the same pour.
+    """
+    vessel = reactor_for(pump_station, resin_type)
+    if not vessel or vessel.get("ambiguous"):
+        return {}
+    return current_batch(vessel.get("reactor_name", ""))
+
+
+def backfill_batches(by="System") -> int:
+    """Give every vessel that holds something an open batch, once.
+
+    A plant upgrading to this has tanks that were filled days ago and no rows
+    to say when. The best available answer is that vessel's most recent
+    changeover, which is already in the log; failing that, the first pour of
+    the lot currently coming out of it. Failing both, it is left with no start
+    time rather than being given today's date, because a wrong duration is
+    worse than an absent one - somebody will read it and act on it.
+    """
+    made = 0
+    try:
+        vessels = get_all_reactors_df()
+    except Exception:
+        return 0
+    if vessels.empty:
+        return 0
+    session = ScopedSession()
+    try:
+        for _, v in vessels.iterrows():
+            name = str(v.get("reactor_name") or "").strip()
+            resin = str(v.get("current_resin") or "").strip()
+            if not name or not resin or resin == "None":
+                continue
+            existing = session.query(ReactorBatch).filter(
+                ReactorBatch.reactor_name == name,
+                ReactorBatch.emptied_at.is_(None)).first()
+            if existing:
+                continue
+            pump = str(v.get("assigned_pump") or "").strip()
+            started = None
+            changeover = session.query(ProductionLog).filter(
+                ProductionLog.log_type == "Resin Changeover",
+                ProductionLog.resin_type == resin).order_by(
+                ProductionLog.timestamp.desc()).first()
+            if changeover is not None and name in str(changeover.notes or ""):
+                started = changeover.timestamp
+            if started is None and pump:
+                first_log = session.query(ProductionLog).filter(
+                    ProductionLog.log_type == "Hourly Bottle Count",
+                    ProductionLog.pump_station == pump,
+                    ProductionLog.resin_type == resin).order_by(
+                    ProductionLog.timestamp.asc()).first()
+                started = first_log.timestamp if first_log else None
+            session.add(ReactorBatch(
+                reactor_name=name, resin_type=resin, pump_station=pump or None,
+                filled_at=started, opened_by=by,
+                note="Opened when batch tracking was switched on."))
+            made += 1
+        session.commit()
+        return made
+    except Exception:
+        session.rollback()
+        return 0
+    finally:
+        session.close()
+
+
+# Vessels filled before any of this existed get an open batch on the next
+# start, dated from their last changeover where the log has one. Idempotent:
+# a vessel that already has an open batch is skipped, so every boot after the
+# first is a cheap scan. It sits at the end of the module because it needs the
+# functions above it.
+try:
+    backfill_batches()
+except Exception:
+    logger.exception("backfill_batches() failed; dwell times start from the "
+                     "next changeover instead")

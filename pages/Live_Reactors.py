@@ -31,6 +31,9 @@ from database import (
     role_can_administer,
     role_can_view_scada,
     can,
+    current_batch,
+    set_batch_qc,
+    close_batch,
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map, resin_color
@@ -534,5 +537,96 @@ if not df_reactors.empty:
 
             with tank_cols[j]:
                 st.markdown(html_card, unsafe_allow_html=True)
+
+                # How long this has been sitting here, and where its QC stands.
+                # Two of the three questions management asked, on the screen
+                # that already shows the vessel they are asking about.
+                _batch = current_batch(r_name)
+                if _batch:
+                    _hrs = _batch.get("hours_in_reactor")
+                    _age = ("age unknown" if _hrs is None else
+                            f"in the tank {_hrs:,.0f} h" if _hrs >= 1 else
+                            "in the tank under an hour")
+                    _qc = _batch.get("qc_result") or ""
+                    if _qc == "pass":
+                        _qc_txt, _qc_col = "QC passed", "#22C55E"
+                    elif _qc == "fail":
+                        _qc_txt, _qc_col = "QC FAILED", "#EF4444"
+                    elif _qc == "hold":
+                        _qc_txt, _qc_col = "on hold at QC", "#F59E0B"
+                    elif _batch.get("qc_open"):
+                        _at = _batch.get("hours_at_qc")
+                        _qc_txt = ("at QC" if _at is None else f"at QC {_at:,.0f} h")
+                        _qc_col = "#38BDF8"
+                    else:
+                        _qc_txt, _qc_col = "no QC recorded", "#64748B"
+                    st.markdown(
+                        f"<div style='text-align:center; font-size:0.72rem; "
+                        f"color:#94A3B8; margin-top:-14px; margin-bottom:10px;'>"
+                        f"{esc(_age)} &middot; <span style='color:{_qc_col}; "
+                        f"font-weight:700;'>{esc(_qc_txt)}</span></div>",
+                        unsafe_allow_html=True)
+
+                if can("manage_qc") and _batch:
+                    with st.expander(f"🧪 QC — {r_name}", expanded=False):
+                        _now = datetime.now()
+                        _sent_on = st.date_input(
+                            "Sample sent", value=(_batch["qc_sent_at"] or _now).date(),
+                            key=f"qc_sd_{_batch['id']}")
+                        _sent_at = st.time_input(
+                            "at", value=(_batch["qc_sent_at"] or _now).time(),
+                            key=f"qc_st_{_batch['id']}")
+                        _has_result = st.checkbox(
+                            "The result has come back",
+                            value=bool(_batch["qc_result_at"]),
+                            key=f"qc_has_{_batch['id']}")
+                        _res_on = _res_at = None
+                        _result = ""
+                        if _has_result:
+                            _res_on = st.date_input(
+                                "Result received",
+                                value=(_batch["qc_result_at"] or _now).date(),
+                                key=f"qc_rd_{_batch['id']}")
+                            _res_at = st.time_input(
+                                "at ",
+                                value=(_batch["qc_result_at"] or _now).time(),
+                                key=f"qc_rt_{_batch['id']}")
+                            _result = st.radio(
+                                "Result", ("pass", "hold", "fail"),
+                                index=("pass", "hold", "fail").index(
+                                    _batch["qc_result"] or "pass"),
+                                horizontal=True, key=f"qc_r_{_batch['id']}")
+                        _note = st.text_input("Note (optional)",
+                                              value=_batch["qc_note"],
+                                              max_chars=200,
+                                              key=f"qc_n_{_batch['id']}")
+                        st.caption(
+                            "Times are typed rather than stamped, because the "
+                            "result usually arrives before anybody is at a "
+                            "screen. Put in when it actually happened.")
+                        if st.button("💾 Save QC", key=f"qc_save_{_batch['id']}",
+                                     use_container_width=True):
+                            _ok, _msg = set_batch_qc(
+                                _batch["id"],
+                                sent_at=datetime.combine(_sent_on, _sent_at),
+                                result_at=(datetime.combine(_res_on, _res_at)
+                                           if _has_result else None),
+                                result=_result if _has_result else "",
+                                note=_note,
+                                by=st.session_state.get("user_name", ""))
+                            st.toast(("✅ " if _ok else "❌ ") + _msg)
+                            if _ok:
+                                st.rerun()
+                        if _batch.get("qc_by"):
+                            st.caption(f"Last recorded by {esc(_batch['qc_by'])}.")
+
+                if can("manage_reactors") and _batch:
+                    if st.button(f"Mark {r_name} empty", key=f"empty_{_batch['id']}",
+                                 use_container_width=True,
+                                 help="Ends this filling and stops its clock. The "
+                                      "next changeover opens the next one."):
+                        close_batch(r_name, by=st.session_state.get("user_name", ""))
+                        st.toast(f"✅ {r_name} closed off.")
+                        st.rerun()
 else:
     st.info("No active physical reactors allocated by management. Add them in the settings menu above.")

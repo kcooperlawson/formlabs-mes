@@ -139,6 +139,31 @@ def revoke_ability(user_id, ability, by_name=""):
     return ok, msg
 
 
+# --- batches and QC ------------------------------------------------------
+def current_batch(reactor_name):
+    return _crud.current_batch(reactor_name)
+
+
+def batch_for_pump(pump_station, resin_type):
+    return _crud.batch_for_pump(pump_station, resin_type)
+
+
+def get_batches(**kwargs):
+    return _crud.get_batches(**kwargs)
+
+
+def set_batch_qc(batch_id, **kwargs):
+    return _crud.set_batch_qc(batch_id, **kwargs)
+
+
+def open_batch(*args, **kwargs):
+    return _crud.open_batch(*args, **kwargs)
+
+
+def close_batch(*args, **kwargs):
+    return _crud.close_batch(*args, **kwargs)
+
+
 def abilities_of(user_id, role):
     return _crud.abilities_of(user_id, role)
 

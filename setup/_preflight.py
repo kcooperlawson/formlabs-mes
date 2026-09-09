@@ -257,6 +257,19 @@ def check_files():
         line(OK if p.exists() else BAD, rel,
              "" if p.exists() else "missing - unzip the whole package")
 
+    # The two documents the application hands out from inside itself: the
+    # question mark on the operator form and the grey line at the bottom of
+    # the manager menu. They are served off disk, so a package that arrived
+    # without them gives an operator a help link that 404s - which tells them
+    # the guide does not exist, rather than that a file is missing.
+    for rel in ["static/Formlabs_MES_Operator_Guide.pdf",
+                "static/Formlabs_MES_Handbook.pdf"]:
+        p = ROOT / rel
+        if p.is_file() and p.stat().st_size > 10000:
+            line(OK, rel, f"{p.stat().st_size // 1024} KB")
+        else:
+            line(WARN, rel, "missing - the in-app link will not open")
+
 
 def main():
     if "--address-only" in sys.argv:

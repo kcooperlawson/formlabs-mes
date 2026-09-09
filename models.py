@@ -60,6 +60,53 @@ class UserAbility(Base):
     revoked_at = Column(DateTime, nullable=True, index=True)
 
 
+class ReactorBatch(Base):
+    """One filling of one vessel: what went in, when, and when it left.
+
+    Until now a batch was not a thing the system stored. A tank's level was
+    worked out from the logs every time somebody looked at it, which answers
+    "how much is left" perfectly well and cannot answer "how long has this been
+    sitting there" at all - there was nothing for a duration to be measured
+    between, and nothing for a QC result to be attached to.
+
+    So a batch is a row now. It opens when a vessel is changed over to a resin
+    and closes when the next changeover happens or somebody says it is empty.
+    Both of those are events the floor already produces, so the dwell time
+    starts being right without anybody typing anything new.
+
+    The QC fields are the exception: those are two times a person enters, and
+    they are only as good as the moment somebody types them. That is a floor
+    process question rather than a software one, and the columns are nullable
+    because "we have not heard back yet" is the normal state for hours at a
+    time.
+    """
+    __tablename__ = "reactor_batches"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reactor_name = Column(String(100), nullable=False, index=True)
+    resin_type = Column(String(100), nullable=True, index=True)
+    lot_number = Column(String(50), nullable=True)
+    pump_station = Column(String(50), nullable=True)
+
+    # The clock for "how long does it sit in the reactor". No default on
+    # purpose: a row with no start time is a vessel whose filling nobody
+    # recorded, and that has to read as unknown rather than as new.
+    filled_at = Column(DateTime, nullable=True, index=True)
+    emptied_at = Column(DateTime, nullable=True, index=True)
+
+    # The clock for "how long is it at QC". Entered by a manager, which is why
+    # both are free times rather than a button that stamps now: the result
+    # usually arrives before anybody gets to a screen.
+    qc_sent_at = Column(DateTime, nullable=True, index=True)
+    qc_result_at = Column(DateTime, nullable=True)
+    qc_result = Column(String(12), nullable=True, index=True)   # pass|fail|hold
+    qc_note = Column(String(240), nullable=True)
+    qc_by = Column(String(100), nullable=True)
+
+    opened_by = Column(String(100), nullable=True)
+    closed_by = Column(String(100), nullable=True)
+    note = Column(String(240), nullable=True)
+
+
 class ProductionLog(Base):
     __tablename__ = "production_logs"
     id = Column(Integer, primary_key=True, autoincrement=True)
