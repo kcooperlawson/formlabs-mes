@@ -85,6 +85,27 @@ STATION, CART, RESIN = "Pump 1", "V1 (1L Cartridge)", "Draft Grey V5"
 runs = crud.get_assigned_runs_df()
 row = runs[runs["pump_station"] == STATION]
 GOOD_LOT = str(row["lot_number"].iloc[0])
+
+# That run has to still be OPEN, or the gate has no lot to check against and
+# every assertion below fails for a reason that has nothing to do with the
+# gate. The database these suites share keeps its rows between runs, so the
+# logs pile up until the run completes itself - which took a few weeks of
+# running the suite, and then looked exactly like the lot check had broken.
+# Reopening it here costs nothing and makes the file say what it needs.
+if str(row["status"].iloc[0]).lower() != "active" or \
+        int(row["current_units"].iloc[0]) >= int(row["target_units"].iloc[0]):
+    from db_core import ScopedSession as _S
+    from models import AssignedRun as _R
+    _s = _S()
+    _run = _s.query(_R).filter(_R.id == int(row["id"].iloc[0])).first()
+    if _run is not None:
+        _run.status, _run.current_units = "Active", 0
+        _run.target_units = max(int(_run.target_units or 0), 100000)
+        _s.commit()
+    _s.close()
+    crud.get_assigned_runs_df.clear() if hasattr(crud.get_assigned_runs_df, "clear") else None
+    runs = crud.get_assigned_runs_df()
+    row = runs[runs["pump_station"] == STATION]
 submit_daily_checklist(OP, "Shift 1", STATION)
 
 at = run_as(OP, h_pump=STATION)

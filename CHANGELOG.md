@@ -8,6 +8,34 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.41 — Wednesday, September 9, 2026
+**Updates arrive as one file I drop in a folder**
+
+Once this is on the floor I cannot patch it the way I do at home, and I am not running git on that PC. I would rather walk over with a USB stick. So: one file, one folder, one menu option.
+
+- **START_HERE.bat, option 7: Apply an update.** Copy the zip into `updates\`, run it, type YES.
+- **The thing on the stick is only files and a list of them.** No script in the package runs. The program that reads it is already on the PC, installed with the app. A USB stick that can run code on a plant PC is a different thing to one that carries files, and this is the second kind.
+- **It checks the package before it touches anything.** Every file has a checksum. A half-copied stick looks exactly like a good one until you read them, and that is the failure I expect to actually have.
+- **It refuses the wrong package.** One built for a different version, one already applied, or an older one going backwards. Each of those stops before anything is written.
+
+**What it does before it changes a file**
+
+- **Takes a database backup**, and stops if that fails. An update with no backup behind it is the one that cannot be undone.
+- **Copies the whole project into `rollback\`** with the date on it.
+- Leaves `.env`, `backups\`, `logs\`, `uploads\` and the virtual environment alone. Those belong to the machine, not to the release. A package that tries to write to any of them is refused.
+
+**And it checks its own work**
+
+After the files are in, it compiles every one of them and then starts the app, which is what runs any new migration. If that fails it puts the old version back on its own and says so. The worst case is that nothing changed, rather than a broken screen and me standing there with a USB stick.
+
+- Files a release removes are removed here too. One left behind still shows in the menu and still opens.
+- New Python packages install from the bundled wheels first, the internet second, and roll the update back if neither works.
+- Every run is written to `logs\updates.log`, and the package is moved to `updates\applied\` so the same one cannot be run twice.
+
+On my side `dev/make_update.py` builds the zip from whatever changed since the version on the plant PC.
+
+---
+
 ## 3.40 — Wednesday, September 9, 2026
 **A manager can give one person extra abilities**
 

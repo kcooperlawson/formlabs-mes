@@ -32,6 +32,10 @@ echo     4  Start the Device Gateway
 echo.
 echo     5  Diagnose this PC ^(what is missing, what is wrong^)
 echo     6  Package this project for another PC
+echo.
+echo   UPDATE
+echo     7  Apply an update ^(from the updates folder^)
+echo.
 echo     Q  Quit
 echo.
 set "PICK="
@@ -43,6 +47,7 @@ if /i "%PICK%"=="3" goto :run_mes
 if /i "%PICK%"=="4" goto :run_gw
 if /i "%PICK%"=="5" goto :diagnose
 if /i "%PICK%"=="6" goto :package
+if /i "%PICK%"=="7" goto :update
 if /i "%PICK%"=="Q" goto :eof
 goto :menu
 
@@ -110,6 +115,18 @@ if not exist "Move_To_New_PC.bat" (
     goto :menu
 )
 call "Move_To_New_PC.bat"
+goto :menu
+
+:update
+rem Applies a package somebody built at home and carried over. The applier
+rem lives here, on this PC; the thing on the USB stick is only files and a
+rem list of them, so nothing arriving on a stick ever executes.
+if not exist "venv\Scripts\python.exe" goto :not_setup
+if not exist "updates" mkdir "updates"
+echo.
+venv\Scripts\python.exe "setup\apply_update.py"
+echo.
+pause
 goto :menu
 
 :not_setup
