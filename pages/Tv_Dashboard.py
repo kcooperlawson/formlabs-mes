@@ -7,7 +7,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 from database import (
     get_production_logs_df,
@@ -28,6 +27,7 @@ from database import (
 from database import esc
 from resin_palette import resin_chip, stored_color_map
 from record_health import record_state
+import pace
 from shift_clock import compute_shift_status
 from print_build import (build_finale, cartridge_build, layer_bar, odometer,
                          screen_sweep)
@@ -83,12 +83,17 @@ except Exception:
 # ===================== ROLE-BASED TOP NAVIGATION =====================
 current_role = st.session_state.get("user_role", "operator")
 
-from ui_shell import nav_bar
-nav_bar()
+# No bar across the top of this one. It is a wall display, and a row of page
+# links is the one thing on it nobody standing at the far end of the floor is
+# ever going to press. The same menu is in the sidebar, which is collapsed
+# unless somebody has walked over to use it. Still the shared definition, so
+# this page cannot drift away from what the abilities actually allow.
+from ui_shell import nav_menu
 
 
 # ===================== SIDEBAR: PROFILE & SETTINGS =====================
 with st.sidebar:
+    nav_menu()
     st.markdown("---")
     from database import get_avatar_path
     _avatar_path = get_avatar_path(st.session_state.get("avatar_filename"))
@@ -200,6 +205,24 @@ st.markdown("""
     .tv-label { font-size: 1rem; font-weight: 700; color: #94A3B8; letter-spacing: 0.1em; text-transform: uppercase; }
     .tv-header { font-size: clamp(1.3rem, 3.4vw, 2.2rem); flex-wrap: wrap; gap: 8px; font-weight: 900; color: #FFFFFF; border-bottom: 2px solid #1E2B45; padding-bottom: 10px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; }
     .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1E2B45; font-size: 1.15rem; }
+
+    /* Built as one string and emitted in one markdown call. An opening div in
+       one call and its closing tag in another does not make a card: Streamlit
+       closes unbalanced HTML inside each call, so what you get is an empty
+       bordered box with the contents loose underneath it, and the stray
+       fragments stop it matching elements between refreshes, which is what
+       left a dimmed second copy of the leaderboard sitting on the wall. */
+    .tv-card-body { text-align: left; margin-top: 4px; }
+    .pourer { display: grid; grid-template-columns: 2.2rem 1fr auto; align-items: center; gap: 14px; padding: 9px 0; border-bottom: 1px solid #16213A; }
+    .pourer:last-child { border-bottom: none; }
+    .pourer-rank { font-size: 1.1rem; font-weight: 900; color: #475569; text-align: center; }
+    .pourer-name { font-size: 1.35rem; font-weight: 700; color: #E2E8F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pourer-rate { font-size: 1.5rem; font-weight: 900; color: #00D2FF; font-variant-numeric: tabular-nums; }
+    .pourer-bar { grid-column: 2 / 4; height: 6px; border-radius: 3px; background: #16213A; overflow: hidden; margin-top: -4px; }
+    .pourer-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #0891B2, #00D2FF); }
+    .pace-strip { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-top:14px; padding-top:12px; border-top:1px solid #1E2B45; }
+    .pace-figure { font-size: 2.1rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .pace-cap { font-size:0.7rem; color:#94A3B8; font-weight:bold; letter-spacing:0.1em; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -304,23 +327,57 @@ else:
 
 current_run_rate = current_output / elapsed_hours
 
+# Every card reads the same slice of the day the headline does. The
+# leaderboard used to read the whole day while the cards above it read the
+# active shift, so the wall could say the plant had poured nothing and that a
+# named person was pouring 353 L/h, at the same time, a hand's width apart. It
+# divided by the shift clock as well, so the rate was a day's litres over a
+# shift's hours and belonged to neither.
+if active_shift == "Shift 1":
+    df_scope_pour = df_s1
+    df_scope_pack = (df_today_pack[df_today_pack["shift"] == "Shift 1"]
+                     if not df_today_pack.empty else df_today_pack)
+elif active_shift == "Shift 2":
+    df_scope_pour = df_s2
+    df_scope_pack = (df_today_pack[df_today_pack["shift"] == "Shift 2"]
+                     if not df_today_pack.empty else df_today_pack)
+else:
+    df_scope_pour = df_today_pour
+    df_scope_pack = df_today_pack
+
+scope_packed = (int(df_scope_pack["bottles_filled"].sum())
+                if not df_scope_pack.empty else 0)
+
 # --- NEW LIVE TICKING MATH ---
 if active_shift == "ALL SHIFTS (DAILY TOTAL)":
     remaining_hrs = max(0.0, total_shift_length - elapsed_hours)
 else:
     remaining_hrs = max(0.0, shift_length_hrs - elapsed_hours)
 
+# What the floor is expected to do, worked out from the pumps that were
+# actually certified for this shift rather than one number somebody typed. A
+# day with one pourer expects one pump's worth and a day with three expects
+# three, and an old pump expects less than a new one, without management
+# touching anything. Falls back to the plant figure when nothing was
+# certified, which is every day before this shipped.
+if active_shift == "ALL SHIFTS (DAILY TOTAL)":
+    _pace = pace.expected_for_day(settings, now=time_now)
+else:
+    _pace = pace.expected_for_shift(settings, active_shift, shift_start, now=time_now)
+expected_now = _pace["expected_l"]
+target_lph = _pace["rate_lph"]
+
 blended_rate = current_run_rate if elapsed_hours > 0.5 else target_lph
 projected_total = current_output + (blended_rate * remaining_hrs)
-expected_now = target_lph * elapsed_hours
 
 # --- the shift, as a print job ---------------------------------------------
 # Against the whole shift's target rather than what is expected by now, so the
 # part is finished when the shift is finished. "Expected now" already has a
 # figure of its own two cards over; a second reading of the same thing drawn
 # differently is how a wall display stops being read at all.
-build_hours = total_shift_length if active_shift.startswith("ALL") else shift_length_hrs
-shift_target_l = target_lph * max(0.0, build_hours)
+# The whole shift's worth, from the same breakdown, so the cartridge and the
+# pace line cannot disagree about what a full shift is.
+shift_target_l = max(0.0, _pace["shift_target_l"])
 build_pct = (current_output / shift_target_l * 100.0) if shift_target_l > 0 else 0.0
 
 # Finishing is a moment, so it gets played once and then it is over. This page
@@ -356,20 +413,22 @@ if shift_target_l > 0 and build_pct >= 99.95:
 _shift = compute_shift_status(settings)
 _health = record_state(last_log_at(), _shift["is_active"],
                        shift_started_at=_shift.get("started_at"))
+_health_html = ""
 if _health["is_alarm"]:
-    st.markdown(
+    _health_html = (
         f"<div style='background:#7F1D1D; border:3px solid #EF4444; border-radius:10px;"
         f" padding:14px 20px; margin-bottom:16px; text-align:center;'>"
         f"<div style='font-size:2rem; font-weight:900; color:#FFFFFF;"
         f" letter-spacing:0.04em;'>⚠ NOTHING IS BEING LOGGED</div>"
         f"<div style='font-size:1.1rem; color:#FECACA; margin-top:4px;'>"
-        f"{_health['message']}</div></div>", unsafe_allow_html=True)
+        f"{_health['message']}</div></div>")
 elif _health["state"] == "quiet":
-    st.markdown(
+    _health_html = (
         f"<div style='background:#78350F; border:2px solid #F59E0B; border-radius:10px;"
         f" padding:10px 18px; margin-bottom:14px; text-align:center;"
         f" font-size:1.3rem; font-weight:800; color:#FDE68A;'>"
-        f"{_health['message']}</div>", unsafe_allow_html=True)
+        f"{_health['message']}</div>")
+st.markdown(_health_html, unsafe_allow_html=True)
 
 # The board prints itself in when it first opens. Once, on arrival, and then
 # it is a board. This page re-runs itself every ten seconds all shift, so a
@@ -377,8 +436,8 @@ elif _health["state"] == "quiet":
 # would be a fault nobody could switch off.
 _tv_renders = st.session_state.get("_tv_renders", 0) + 1
 st.session_state["_tv_renders"] = _tv_renders
-if _tv_renders <= 2:
-    st.markdown(screen_sweep(uid="tvarrive"), unsafe_allow_html=True)
+st.markdown(screen_sweep(uid="tvarrive") if _tv_renders <= 2 else "",
+            unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class='tv-header'>
@@ -394,43 +453,54 @@ st.markdown(f"""
 # which is 130 px wide and wraps "BUILD COMPLETE" onto three lines. This is
 # the one moment on this screen worth looking up for, so it gets the width the
 # stopped-record alarm gets, and takes itself away afterwards.
-if build_finale_now:
-    st.markdown(build_finale(current_output, shift_target_l, "L", uid="tvfin"),
-                unsafe_allow_html=True)
+st.markdown(
+    build_finale(current_output, shift_target_l, "L", uid="tvfin")
+    if build_finale_now else "", unsafe_allow_html=True)
 
 # ===================== DYNAMIC KPI ROW =====================
 # The build column is narrow on purpose: it is a tall object, it carries no
 # digits anyone has to read, and it must not take width from the gauges.
+# The gauge that used to sit here is gone. It was the only object on this wall
+# drawn by a chart library, so it arrived with its own fonts and a red-olive-
+# green arc matching nothing else on the screen, and it took a third of the
+# width to print one number that the card beside it was already carrying. Pace
+# belongs with volume anyway: how much, and whether that is enough, is one
+# question asked twice.
 if packing_enabled:
-    col1, col2, col3, col4, col_build = st.columns([1.15, 1.15, 1.15, 1.15, 0.75])
+    col2, col3, col4, col_build = st.columns([1.7, 1.2, 1.2, 0.8])
 else:
-    col1, col2, col_build = st.columns([1.5, 1.5, 0.8])
+    col2, col_build = st.columns([2.6, 0.8])
 
-with col1:
-    fig_rate = go.Figure(go.Indicator(
-        mode="gauge+number", value=current_run_rate,
-        number={'suffix': " L/h", 'font': {'size': 48, 'color': '#FFFFFF'}},
-        gauge={
-            'axis': {'range': [None, 600], 'tickwidth': 1, 'tickcolor': "#94A3B8"},
-            'bar': {'color': "#00D2FF"}, 'bgcolor': "#1E2B45",
-            'steps': [{'range': [0, 300], 'color': "rgba(239, 68, 68, 0.3)"},
-                      {'range': [300, 400], 'color': "rgba(245, 158, 11, 0.3)"},
-                      {'range': [400, 600], 'color': "rgba(16, 185, 129, 0.3)"}],
-            'threshold': {'line': {'color': "#FFFFFF", 'width': 4}, 'thickness': 0.75, 'value': target_lph}
-        }
-    ))
-    fig_rate.update_layout(margin=dict(l=15, r=15, t=15, b=15), height=230, paper_bgcolor="rgba(0,0,0,0)",
-                           font={'color': "#94A3B8"})
-
-    st.markdown("<div class='tv-card'><div class='tv-label'>💧 LIVE RUN VELOCITY</div>", unsafe_allow_html=True)
-    st.plotly_chart(fig_rate, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+# Ahead or behind is the reading, not the rate. A rate on its own needs the
+# target held in your head to mean anything, and nobody standing at the far
+# end of the floor is doing that.
+_gap = current_output - expected_now
+if expected_now <= 0:
+    _pace_col, _pace_word = "#94A3B8", "not started"
+elif _gap >= 0:
+    _pace_col, _pace_word = "#10B981", f"{_gap:,.0f} L ahead"
+elif current_output >= expected_now * 0.9:
+    _pace_col, _pace_word = "#F59E0B", f"{abs(_gap):,.0f} L behind"
+else:
+    _pace_col, _pace_word = "#EF4444", f"{abs(_gap):,.0f} L behind"
+_pace_pct = min(100.0, (current_output / expected_now * 100.0)) if expected_now > 0 else 0.0
 
 with col2:
     st.markdown(f"""
         <div class="tv-card" style="padding: 15px;">
             <div class="tv-label">💧 TOTAL VOLUME POURED</div>
             <div class="tv-value" style="font-size: 3rem;">{odometer(current_output, uid="tvvol")} <span style="font-size:1.2rem; color:#94A3B8;">Liters</span></div>
+            <div class="pace-strip">
+                <div style="text-align:left;">
+                    <div class="pace-cap">PACE</div>
+                    <div class="pace-figure" style="color:{_pace_col};">{current_run_rate:,.0f} <span style="font-size:1rem; color:#94A3B8; font-weight:bold;">L/h</span></div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="pace-cap">TARGET {target_lph:,.0f} L/H{' · SET' if not _pace['derived'] else ' · ' + str(len(_pace['stations'])) + ' PUMP' + ('S' if len(_pace['stations']) != 1 else '')}</div>
+                    <div style="color:{_pace_col}; font-size:1.35rem; font-weight:900;">{_pace_word}</div>
+                </div>
+            </div>
+            <div style="margin-top:10px;">{layer_bar(_pace_pct, height_px=14)}</div>
             <div style="display:flex; justify-content: space-between; border-top: 1px solid #1E2B45; margin-top: 12px; padding-top: 12px;">
                 <div style="text-align: left;">
                     <div style="font-size:0.7rem; color:#94A3B8; font-weight:bold; letter-spacing:0.1em;">EXPECTED NOW</div>
@@ -447,14 +517,14 @@ with col2:
 if packing_enabled:
     with col3:
         st.markdown(f"""<div class="tv-card" style="border-color:#A855F7;"><div class="tv-label" style="color:#A855F7;">📦 TOTAL UNITS PACKED</div>
-            <div class="tv-value" style="color:#A855F7;">{odometer(total_packed, uid="tvpack")} <span style="font-size:1.5rem; color:#94A3B8;">Units</span></div>
-            <div style="color:#A855F7; font-size:1.2rem; font-weight:bold; margin-top:20px;">Est. Skids Built: {(total_packed / 500):,.1f}</div></div>""",
+            <div class="tv-value" style="color:#A855F7;">{odometer(scope_packed, uid="tvpack")} <span style="font-size:1.5rem; color:#94A3B8;">Units</span></div>
+            <div style="color:#A855F7; font-size:1.2rem; font-weight:bold; margin-top:20px;">Est. Skids Built: {(scope_packed / 500):,.1f}</div></div>""",
                     unsafe_allow_html=True)
 
     with col4:
         st.markdown(f"""<div class="tv-card" style="border-color:#F59E0B;"><div class="tv-label" style="color:#F59E0B;">⚠️ UNPACKED FLOOR W.I.P.</div>
             <div class="tv-value" style="color:#F59E0B;">{odometer(total_poured - total_packed, uid="tvwip")} <span style="font-size:1.5rem; color:#94A3B8;">Pending</span></div>
-            <div style="color:#94A3B8; font-size:1.2rem; font-weight:bold; margin-top:20px;">Units awaiting pack-out</div></div>""",
+            <div style="color:#94A3B8; font-size:1.2rem; font-weight:bold; margin-top:20px;">Awaiting pack-out · whole day</div></div>""",
                     unsafe_allow_html=True)
 
 with col_build:
@@ -490,11 +560,11 @@ else:
     b3 = None
 
 with b1:
-    st.markdown("<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>💧 TOP POURERS (L/h)</div>", unsafe_allow_html=True)
-    if not df_today_pour.empty:
+    _rows = ""
+    if not df_scope_pour.empty:
         op_stats = []
-        for op in df_today_pour["display_operator"].unique():
-            op_data = df_today_pour[df_today_pour["display_operator"] == op]
+        for op in df_scope_pour["display_operator"].unique():
+            op_data = df_scope_pour[df_scope_pour["display_operator"] == op]
 
             # 1. Calculate liters
             op_liters = 0.0
@@ -515,21 +585,33 @@ with b1:
         # Sort by velocity descending
         op_stats.sort(key=lambda x: x[1], reverse=True)
 
-        for rank, (op, vel) in enumerate(op_stats[:5]):
-            st.markdown(f"<div class='stat-row'><span>👤 {op}</span><span style='color:#00D2FF; font-weight:bold;'>{vel:,.0f} L/h</span></div>", unsafe_allow_html=True)
-    else:
-        st.caption("No pouring data logged yet today.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        # Each rate is drawn against the fastest one as well as printed. From
+        # the far side of the floor the bar is the part that reads.
+        _top = max((v for _n, v in op_stats), default=0.0)
+        for rank, (op, vel) in enumerate(op_stats[:5], start=1):
+            _w = (vel / _top * 100.0) if _top > 0 else 0.0
+            _rows += (f"<div class='pourer'>"
+                      f"<span class='pourer-rank'>{rank}</span>"
+                      f"<span class='pourer-name'>{esc(op)}</span>"
+                      f"<span class='pourer-rate'>{vel:,.0f} L/h</span>"
+                      f"<span class='pourer-bar'><i style='width:{_w:.1f}%'></i></span>"
+                      f"</div>")
+    if not _rows:
+        _rows = ("<div style='color:#64748B; padding:18px 0; text-align:center;'>"
+                 "Nothing poured on this shift yet.</div>")
+    st.markdown(
+        "<div class='tv-card'>"
+        "<div class='tv-label' style='margin-bottom:6px;'>💧 TOP POURERS (L/h)</div>"
+        f"<div class='tv-card-body'>{_rows}</div>"
+        "</div>", unsafe_allow_html=True)
 
 if packing_enabled:
     with b2:
-        st.markdown(
-            "<div class='tv-card' style='border-color:#A855F7;'><div class='tv-label' style='margin-bottom:15px; color:#A855F7;'>📦 PACKING BREAKDOWN</div>",
-            unsafe_allow_html=True)
-        if not df_today_pack.empty:
+        _pk_rows = ""
+        if not df_scope_pack.empty:
             specs_df = get_all_resin_specs_df("ALL")
             _pack_colours = stored_color_map(specs_df)
-            pack_grp = df_today_pack.groupby(["resin_type", "lot_number"])["bottles_filled"].sum().reset_index()
+            pack_grp = df_scope_pack.groupby(["resin_type", "lot_number"])["bottles_filled"].sum().reset_index()
 
             for _, row in pack_grp.iterrows():
                 res = row['resin_type']
@@ -543,38 +625,50 @@ if packing_enabled:
                         skid_size = float(match.iloc[0].get("units_per_skid", 500))
 
                 skids = qty / skid_size if skid_size > 0 else 0
-                st.markdown(
-                    f"<div style='text-align:left; margin-bottom: 8px; border-bottom:1px solid #1E2B45; padding-bottom:6px;'>{resin_chip(res, _pack_colours.get(str(res)), size='lg')} &nbsp;<span style='color:#94A3B8; font-size:0.8rem;'>({esc(lot)})</span><div style='float:right;'><span style='color:#A855F7; font-weight:bold; font-size:1.1rem;'>{qty:,} Units</span> <span style='color:#64748B; font-size:0.9rem;'>({skids:.1f} Skids)</span></div></div>",
-                    unsafe_allow_html=True)
-        else:
-            st.caption("No packing data logged yet today.")
-        st.markdown("</div>", unsafe_allow_html=True)
+                _pk_rows += (
+                    f"<div style='margin-bottom: 8px; border-bottom:1px solid #16213A; padding-bottom:6px; overflow:hidden;'>"
+                    f"{resin_chip(res, _pack_colours.get(str(res)), size='lg')} &nbsp;"
+                    f"<span style='color:#94A3B8; font-size:0.8rem;'>({esc(lot)})</span>"
+                    f"<div style='float:right;'><span style='color:#A855F7; font-weight:bold; font-size:1.1rem;'>{qty:,} Units</span> "
+                    f"<span style='color:#64748B; font-size:0.9rem;'>({skids:.1f} Skids)</span></div></div>")
+        if not _pk_rows:
+            _pk_rows = ("<div style='color:#64748B; padding:18px 0; text-align:center;'>"
+                        "Nothing packed on this shift yet.</div>")
+        st.markdown(
+            "<div class='tv-card' style='border-color:#A855F7;'>"
+            "<div class='tv-label' style='margin-bottom:12px; color:#A855F7;'>📦 PACKING BREAKDOWN</div>"
+            f"<div class='tv-card-body'>{_pk_rows}</div>"
+            "</div>", unsafe_allow_html=True)
 
 if b3 is not None:
     with b3:
-        st.markdown(
-            "<div class='tv-card'><div class='tv-label' style='margin-bottom:15px;'>⚙️ ACTIVE REACTOR WORK ORDERS</div>",
-            unsafe_allow_html=True)
         df_runs = get_assigned_runs_df()
         _run_colours = stored_color_map(get_all_resin_specs_df("ALL"))
+        _wo_rows = ""
+        _wo_empty = "No Work Orders configured."
         if not df_runs.empty:
+            _wo_empty = "No active Work Orders in progress."
             active_runs = df_runs[df_runs["status"].isin(["Active", "Pouring"])]
-            if not active_runs.empty:
-                for _, run in active_runs.iterrows():
-                    prog_pct = min(1.0, run["current_units"] / run["target_units"]) if run["target_units"] > 0 else 0.0
-                    st.markdown(
-                        f"<div style='text-align:left; margin-bottom: 4px; margin-top:8px;'>{resin_chip(run['resin_type'], _run_colours.get(str(run['resin_type'])), size='lg')} &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span><span style='float:right; color:#00D2FF; font-weight:bold;'>{run['current_units']:,} / {run['target_units']:,}</span></div>",
-                        unsafe_allow_html=True)
-                    # Laid down in layers rather than poured as one block -
-                    # same reading, same colour, and it looks like it belongs
-                    # to the company running it.
-                    st.markdown(layer_bar(prog_pct * 100.0, height_px=16),
-                                unsafe_allow_html=True)
-            else:
-                st.info("No active Work Orders in progress.")
-        else:
-            st.info("No Work Orders configured.")
-        st.markdown("</div>", unsafe_allow_html=True)
+            for _, run in active_runs.iterrows():
+                prog_pct = min(1.0, run["current_units"] / run["target_units"]) if run["target_units"] > 0 else 0.0
+                # Laid down in layers rather than poured as one block - same
+                # reading, same colour, and it looks like it belongs to the
+                # company running it.
+                _wo_rows += (
+                    f"<div style='margin-bottom: 4px; margin-top:8px;'>"
+                    f"{resin_chip(run['resin_type'], _run_colours.get(str(run['resin_type'])), size='lg')}"
+                    f" &nbsp;|&nbsp; <span style='color:#94A3B8;'>{esc(run['pump_station'])}</span>"
+                    f"<span style='float:right; color:#00D2FF; font-weight:bold;'>"
+                    f"{run['current_units']:,} / {run['target_units']:,}</span></div>"
+                    + layer_bar(prog_pct * 100.0, height_px=16))
+        if not _wo_rows:
+            _wo_rows = (f"<div style='color:#64748B; padding:18px 0; text-align:center;'>"
+                        f"{_wo_empty}</div>")
+        st.markdown(
+            "<div class='tv-card'>"
+            "<div class='tv-label' style='margin-bottom:12px;'>⚙️ ACTIVE REACTOR WORK ORDERS</div>"
+            f"<div class='tv-card-body'>{_wo_rows}</div>"
+            "</div>", unsafe_allow_html=True)
 
 
 # Wait 10 seconds, then force the entire script to run again from top to bottom.

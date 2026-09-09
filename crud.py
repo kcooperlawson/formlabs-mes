@@ -2798,6 +2798,109 @@ def vessels_on_pump(pump_station: str) -> list:
         session.close()
 
 
+def vessels_for_pump_picker(pump_station: str = "") -> list:
+    """Every active vessel an operator could put on this pump.
+
+    The startup checklist used to offer only vessels with no pump on them at
+    all. That left two ways to end up stuck. A tank plumbed to the wrong
+    station could not be moved by the person standing at it, and a tank
+    created after that morning's checklist could not be linked until the next
+    one, because the checklist is asked once per day per station. Both ended
+    with a manager opening a settings page, which is the thing this was built
+    to avoid.
+
+    So the list is every active vessel that is not already on this pump, and
+    each entry carries the pump it is currently on so the picker can say so
+    out loud. Picking one moves it. Unplaced vessels sort first, because that
+    is the ordinary case and moving somebody else's tank should be a
+    deliberate scroll rather than the first thing under the cursor.
+    """
+    pump = str(pump_station or "").strip().lower()
+    session = ScopedSession()
+    try:
+        out = []
+        for r in session.query(Reactor).all():
+            if str(r.status or "").strip().lower() in ("retired", "inactive"):
+                continue
+            on = str(r.assigned_pump or "").strip()
+            if on.lower() == "none":
+                on = ""
+            if pump and on.lower() == pump:
+                continue
+            out.append({"id": r.id, "reactor_name": r.reactor_name,
+                        "asset_tag": r.asset_tag, "current_pump": on,
+                        "current_resin": str(r.current_resin or "").strip()})
+        out.sort(key=lambda v: (bool(v["current_pump"]),
+                                str(v["reactor_name"]).lower()))
+        return out
+    except Exception:
+        return []
+    finally:
+        session.close()
+
+
+def adopt_vessel_resin(pump_station: str, resin_name: str, operator: str = "",
+                       shift: str = "") -> str:
+    """Record what the tank on this pump holds, when nothing is recorded yet.
+
+    A blank is not a changeover. There is no previous material for the
+    operator to disagree with, so there is nothing for them to confirm, and
+    asking anyway put a button in front of somebody whose only sensible answer
+    was yes. Until it is filled in the level arithmetic cannot match a single
+    log to the vessel, so the tank reads full while the floor empties it.
+
+    Called at the moment a log is written rather than while the form is being
+    filled in. A resin picked and then corrected would otherwise be adopted on
+    the way past, and the correction would then arrive as a real changeover
+    needing a tap. Submitting is the deliberate act.
+
+    Does nothing when the tank already holds something. That case is a real
+    changeover and it keeps its confirmation. Does nothing when two tanks sit
+    on one pump either, because which of them the pour came out of is exactly
+    what the app cannot tell.
+
+    Returns the vessel's name when it adopted one, otherwise "".
+    """
+    pump = str(pump_station or "").strip()
+    resin = str(resin_name or "").strip()
+    if not pump or not resin:
+        return ""
+    session = ScopedSession()
+    name = ""
+    try:
+        hits = [r for r in session.query(Reactor).all()
+                if str(r.status or "").strip().lower() not in ("retired", "inactive")
+                and str(r.assigned_pump or "").strip().lower() == pump.lower()]
+        if len(hits) != 1:
+            return ""
+        r = hits[0]
+        if str(r.current_resin or "").strip():
+            return ""
+        r.current_resin = resin
+        r.current_resin_id = _resolve_resin_id(session, resin)
+        name = r.reactor_name
+        session.commit()
+    except Exception:
+        session.rollback()
+        return ""
+    finally:
+        session.close()
+
+    # Written down for the same reason a changeover is. The row carries no
+    # units and its log type is outside the two the level arithmetic reads, so
+    # it cannot move an output figure or a tank level of its own accord.
+    try:
+        add_hourly_log(
+            operator or "System", pump, shift or "", "", resin, "",
+            0, 0, 0,
+            notes=f"{name} recorded as holding {resin}, from the first log "
+                  f"written at {pump}.",
+            log_type="Resin Changeover")
+    except Exception:
+        pass
+    return name
+
+
 def record_changeover(reactor_name: str, new_resin: str, operator: str = "",
                       shift: str = "", pump_station: str = "") -> bool:
     """Move a vessel onto a different resin, and say so in the record.

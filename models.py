@@ -190,6 +190,12 @@ class PumpStation(Base):
     station_name = Column(String(100), unique=True, nullable=False)
     status = Column(String(20), default="Active")
     notes = Column(String(255), nullable=True)
+    # What this pump is expected to do in an hour. On the pump because that is
+    # where the difference actually lives: an old pump is slower than a new one
+    # every day of the year, while the number of people pouring changes every
+    # shift. NULL means nobody has set this one yet and it falls back to the
+    # plant's global figure.
+    target_lph = Column(Float, nullable=True)
 
 class DowntimeReason(Base):
     __tablename__ = "downtime_reasons"

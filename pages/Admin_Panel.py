@@ -541,7 +541,7 @@ with tab_settings:
                                       help="Existing logs on a shift you stop running keep their "
                                            "label and stay in every report - the pickers just stop "
                                            "offering it for new entries.")
-            t_lph = st.number_input("Global Target Rate (L/h)", value=float(current_settings.get("target_lph", 400.0)),
+            t_lph = st.number_input("Fallback Rate (L/h) — used by pumps with no rate of their own", value=float(current_settings.get("target_lph", 400.0)),
                                     step=10.0, key="t_lph_input")
             t_yield = st.number_input("Yield Target (%)", value=float(current_settings.get("yield_target_pct", 99.0)),
                                       step=0.5, key="t_yield_input")
@@ -757,64 +757,19 @@ with tab_settings:
     st.markdown("---")
     st.subheader("⚙️ Master Plant Equipment & Configuration")
     st.caption(
-        "Add or remove physical assets from the SCADA network. Updates instantly propagate to the Manager Cockpit.")
+        "Pump stations and downtime codes. Updates instantly propagate to the Manager Cockpit. "
+        "Vessels are registered and edited on the Live Reactors page.")
+    st.page_link("pages/Live_Reactors.py", label="Reactor fleet is on Live Reactors",
+                 icon="🛢️")
 
-    col_reactors, col_pumps, col_downtime = st.columns(3)
-
-    # ------------------ 🛢️ REACTOR MANAGEMENT ------------------
-    with col_reactors:
-        st.markdown("#### 🛢️ Reactor Fleet")
-        # The pump and the resin are on this form for a reason. A vessel's
-        # level is worked out from the logs that match its pump and its resin,
-        # and until now this form captured neither - so a tank added here was
-        # never linked to anything, never registered a pour, and read full for
-        # ever. Both can be changed later on the Live Reactors page.
-        _pumps_for_r = ["— not set yet —"] + [str(x) for x in crud.get_active_pumps()]
-        _specs_for_r = crud.get_all_resin_specs_df()
-        _resins_for_r = ["— not set yet —"] + (
-            sorted(_specs_for_r["resin_name"].dropna().astype(str).unique().tolist())
-            if not _specs_for_r.empty else [])
-        with st.form("admin_add_reactor_form", clear_on_submit=True):
-            new_r_name = st.text_input("Reactor Name", placeholder="e.g. Reactor 5")
-            new_r_cap = st.number_input("Max Capacity (Liters)", value=5000, step=500)
-            new_r_pump = st.selectbox("Feeds which pump station?", _pumps_for_r)
-            new_r_resin = st.selectbox("Resin currently in it", _resins_for_r)
-            new_r_tag = st.text_input("Asset tag", placeholder="e.g. M-205")
-            new_r_bay = st.text_input("Bay marker", placeholder="e.g. E2", max_chars=2)
-            st.caption("The pump and the resin are what tell the app a pour came out of "
-                       "**this** tank. Leave them unset and the level will not move.")
-            if st.form_submit_button("➕ Add Reactor", type="primary", use_container_width=True):
-                if new_r_name.strip():
-                    from database import add_reactor
-
-                    add_reactor(
-                        new_r_name, new_r_cap,
-                        asset_tag=new_r_tag,
-                        bay_marker=new_r_bay,
-                        assigned_pump="" if new_r_pump.startswith("—") else new_r_pump,
-                        current_resin="" if new_r_resin.startswith("—") else new_r_resin)
-                    st.toast(f"✅ Added {new_r_name}!")
-                    st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        from database import get_all_reactors_df, delete_reactor
-
-        df_reactors = get_all_reactors_df()
-
-        if not df_reactors.empty:
-            for _, r in df_reactors.iterrows():
-                with st.container():
-                    st.markdown(
-                        f"<div style='background:#0F172A; padding:10px; border-radius:6px; border:1px solid #1E293B; margin-bottom:5px;'>"
-                        f"<b style='color:#38BDF8;'>{esc(r['reactor_name'])}</b> <br>"
-                        f"<span style='color:#94A3B8; font-size:0.85rem;'>Capacity: {r['max_capacity_l']:,} L</span>"
-                        f"</div>", unsafe_allow_html=True
-                    )
-                    if st.button("🗑️ Delete", key=f"del_r_{r['id']}", use_container_width=True):
-                        delete_reactor(int(r['id']))
-                        st.rerun()
-                    st.markdown("<hr style='margin: 8px 0; border-color: rgba(255,255,255,0.1);'>",
-                                unsafe_allow_html=True)
+    # The reactor fleet used to be a third column here. It has gone to the
+    # Live Reactors page, which already did all of this and more: vessel type,
+    # which the wall display draws and which this form never asked for, and
+    # editing a tank's pump and resin after it exists, which this one could
+    # only set at the moment of creation. Two places to register a vessel
+    # meant the worse-configured one was a coin flip away, and a tank added
+    # here with no vessel type had its shape guessed from its capacity.
+    col_pumps, col_downtime = st.columns(2)
 
     # ------------------ 🏷️ PUMP STATION MANAGEMENT ------------------
     with col_pumps:
@@ -831,8 +786,21 @@ with tab_settings:
 
         st.markdown("<br>", unsafe_allow_html=True)
         from database import get_all_pumps_df, delete_pump_station
+        import pace
 
         df_pumps = get_all_pumps_df()
+        _plant_lph = float(current_settings.get("target_lph", 400.0) or 400.0)
+        # What each pump has actually run at, so a target is reviewed rather
+        # than invented. Read once for the whole list, not once per pump.
+        _measured = pace.measured_rates()
+
+        st.caption(
+            "The expected rate lives on the pump, because that is the part that "
+            "does not change day to day. What the plant is expected to pour is "
+            "worked out from the pumps certified for the shift, so nobody has to "
+            "retype a target when two people pour instead of three. A pump left "
+            "blank uses the plant figure of "
+            f"{_plant_lph:,.0f} L/h.")
 
         if not df_pumps.empty:
             for _, p in df_pumps.iterrows():
@@ -840,13 +808,49 @@ with tab_settings:
                     status_color = "#10B981" if p.get('status', 'Active') == "Active" else "#F59E0B"
                     pump_display_name = p.get('station_name', p.get('pump_station', p.get('pump_name', p.get('name',
                                                                                                              'Unknown Station'))))
+                    _set = p.get('target_lph')
+                    _set = float(_set) if _set and float(_set) > 0 else 0.0
+                    _rate_txt = (f"{_set:,.0f} L/h" if _set
+                                 else f"{_plant_lph:,.0f} L/h (plant default)")
+                    _m = _measured.get(str(pump_display_name))
 
                     st.markdown(
                         f"<div style='background:#0F172A; padding:10px; border-radius:6px; border:1px solid #1E293B; margin-bottom:5px;'>"
                         f"<b style='color:#FFFFFF;'>{pump_display_name}</b> <br>"
                         f"<span style='color:{status_color}; font-size:0.85rem; font-weight:bold;'>● {esc(p.get('status', 'Active'))}</span>"
+                        f"<span style='color:#94A3B8; font-size:0.85rem;'> &nbsp;·&nbsp; expects {_rate_txt}</span>"
                         f"</div>", unsafe_allow_html=True
                     )
+
+                    if _m:
+                        st.caption(
+                            f"Measured: **{_m['median_lph']:,.0f} L/h** median over "
+                            f"{_m['samples']} shifts.")
+                    else:
+                        st.caption("Not enough shifts logged yet to measure this one.")
+
+                    _c1, _c2 = st.columns([2, 1])
+                    with _c1:
+                        _new = st.number_input(
+                            "Expected L/h", min_value=0.0, max_value=5000.0, step=10.0,
+                            value=float(_set), key=f"pump_rate_{p['id']}",
+                            help="0 puts this pump back on the plant figure.",
+                            label_visibility="collapsed")
+                    with _c2:
+                        if st.button("💾", key=f"save_rate_{p['id']}",
+                                     use_container_width=True, help="Save this rate"):
+                            pace.set_pump_rate(int(p['id']), _new)
+                            st.toast(f"✅ {pump_display_name} expects {_new:,.0f} L/h"
+                                     if _new else
+                                     f"✅ {pump_display_name} back on the plant figure")
+                            st.rerun()
+
+                    if _m and abs(_m['median_lph'] - (_set or _plant_lph)) >= 25:
+                        if st.button(f"↩️ Use the measured {_m['median_lph']:,.0f} L/h",
+                                     key=f"use_meas_{p['id']}", use_container_width=True):
+                            pace.set_pump_rate(int(p['id']), _m['median_lph'])
+                            st.rerun()
+
                     if st.button("🗑️ Delete", key=f"del_p_{p['id']}", use_container_width=True):
                         delete_pump_station(int(p['id']))
                         st.rerun()

@@ -8,79 +8,12 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
-## 3.41 — Wednesday, September 9, 2026
-**Updates arrive as one file I drop in a folder**
+## 3.38 – 3.45 — Wednesday, September 9, 2026
+**The day before test day**
 
-Once this is on the floor I cannot patch it the way I do at home, and I am not running git on that PC. I would rather walk over with a USB stick. So: one file, one folder, one menu option.
+Eight releases. Same as the 7th, they are under one heading and sorted by subject, with the version numbers in brackets so I can still find any of it in the history.
 
-- **START_HERE.bat, option 7: Apply an update.** Copy the zip into `updates\`, run it, type YES.
-- **The thing on the stick is only files and a list of them.** No script in the package runs. The program that reads it is already on the PC, installed with the app. A USB stick that can run code on a plant PC is a different thing to one that carries files, and this is the second kind.
-- **It checks the package before it touches anything.** Every file has a checksum. A half-copied stick looks exactly like a good one until you read them, and that is the failure I expect to actually have.
-- **It refuses the wrong package.** One built for a different version, one already applied, or an older one going backwards. Each of those stops before anything is written.
-
-**What it does before it changes a file**
-
-- **Takes a database backup**, and stops if that fails. An update with no backup behind it is the one that cannot be undone.
-- **Copies the whole project into `rollback\`** with the date on it.
-- Leaves `.env`, `backups\`, `logs\`, `uploads\` and the virtual environment alone. Those belong to the machine, not to the release. A package that tries to write to any of them is refused.
-
-**And it checks its own work**
-
-After the files are in, it compiles every one of them and then starts the app, which is what runs any new migration. If that fails it puts the old version back on its own and says so. The worst case is that nothing changed, rather than a broken screen and me standing there with a USB stick.
-
-- Files a release removes are removed here too. One left behind still shows in the menu and still opens.
-- New Python packages install from the bundled wheels first, the internet second, and roll the update back if neither works.
-- Every run is written to `logs\updates.log`, and the package is moved to `updates\applied\` so the same one cannot be run twice.
-
-On my side `dev/make_update.py` builds the zip from whatever changed since the version on the plant PC.
-
----
-
-## 3.40 — Wednesday, September 9, 2026
-**A manager can give one person extra abilities**
-
-A role is a starting point, not a description of a person. I am a floor operator and I built this, so I need screens no operator needs, and the answer to that should not be to hand me a manager account and have every report count me as one. Somebody else will end up in the same spot.
-
-- **IT Admin, Personnel, Extra Abilities.** Pick a person, tick what they can also do. Their role does not change. An operator with the plant dashboard still logs as an operator and still shows up as one everywhere.
-- **Eight abilities to hand out.** See the plant dashboard. See the analytics hub. See the manager cockpit and its reports. Add and edit reactors. Edit master resin specifications. Log management and bulk cleanup. Floor roster and PIN resets. Export and sync.
-- **Each one is written for the person handing it out**, not for me. The tick box says what it lets somebody do.
-- **Two rules that are enforced in the code, not just hidden on the screen.** You cannot give away an ability you do not have yourself, and only somebody who administers the plant can give anything at all.
-- **Every grant is recorded** with who gave it and when, and a removed grant keeps its row with who removed it. That history is on the same screen, because the first question anybody asks about a permission is how somebody came to have it.
-- Nothing is granted by the upgrade. Every account keeps exactly what its role gave it until somebody ticks a box.
-
-**The reason it is built this way**
-
-The bug I keep hitting is not a permission hole, it is the same rule written down in more than one place. The door on a page said one thing and six navigation bars said another, so a link would go on being offered after the page stopped accepting it.
-
-- **One function answers now.** The door on the page asks it and so does the link that offers the page. A link you can see is a page that opens.
-- **One menu.** Every navigation bar and every sidebar list in the app is drawn from a single definition. There were six copies of that list. A test fails if a seventh appears.
-- Every management screen refuses on the ability, not on a role name. Thirteen doors, one rule.
-
----
-
-## 3.39 — Wednesday, September 9, 2026
-**The dashboard link that was still there in four places**
-
-I fixed this yesterday and I only fixed one of them. Running today I still had Live SCADA on the operator form's side menu, and on the reactor screen it was on the top bar and in the side menu as well. The top bar of the form was the one I had fixed, so the two bars on the same screen disagreed with each other, which is worse than not having started.
-
-The cause is that the list of pages is written out by hand in six navigation bars, and the rule about who gets the dashboard lived somewhere else again. Change one and the other five carry on as they were.
-
-- **One function decides it now.** `can_view_scada`. The door on the SCADA page asks it, and so does every navigation bar. A link that gets drawn is a page that opens.
-- **The four bars that still offered it don't.** Operator form side menu, reactor screen top bar and side menu, and the wall display's bar.
-- **The reactor screen's side menu was listing every page to everybody** and leaving each page to refuse them at the door. An operator standing there was offered five links and could open two.
-- **A test that fails if it happens again.** Every link to the SCADA page has to sit inside a branch that checked who is looking, or the navigation suite fails and names the file and line.
-
-**And that test found a real hole**
-
-Analytics Hub had no door on it at all. It came off the operator's menu when I narrowed their navigation, and that was the whole of it — the address still worked, so any signed-in operator who typed it or was sent the link saw the plant's full analytics. The handbook says operators do not have analytics. Now they do not.
-
-- **Analytics Hub refuses anyone who is not a manager or an admin**, the same way the Manager Cockpit already did.
-- The roles suite now checks both pages have that door, not just that the menu is right.
-
----
-
-## 3.38 — Wednesday, September 9, 2026
-**Going over the documents before test day**
+### Going over the documents before test day *(3.38)*
 
 My lead told me tomorrow is test day, so I read the handbook, the operator guide and the one-pager against what the app actually does now. Some of it was out of date and some of it was wrong.
 
@@ -107,10 +40,165 @@ Every page in those documents is a fixed sheet with the overflow hidden, so anyt
 
 - **The operator nav had a Live SCADA link that bounces.** The page is manager and admin only now and sends an operator straight back to the form, so the link went. The sidebar was narrowed when that changed and this bar was missed.
 
+### The dashboard link that was still there in four places *(3.39)*
+
+I fixed this yesterday and I only fixed one of them. Running today I still had Live SCADA on the operator form's side menu, and on the reactor screen it was on the top bar and in the side menu as well. The top bar of the form was the one I had fixed, so the two bars on the same screen disagreed with each other, which is worse than not having started.
+
+The cause is that the list of pages is written out by hand in six navigation bars, and the rule about who gets the dashboard lived somewhere else again. Change one and the other five carry on as they were.
+
+- **One function decides it now.** `can_view_scada`. The door on the SCADA page asks it, and so does every navigation bar. A link that gets drawn is a page that opens.
+- **The four bars that still offered it don't.** Operator form side menu, reactor screen top bar and side menu, and the wall display's bar.
+- **The reactor screen's side menu was listing every page to everybody** and leaving each page to refuse them at the door. An operator standing there was offered five links and could open two.
+- **A test that fails if it happens again.** Every link to the SCADA page has to sit inside a branch that checked who is looking, or the navigation suite fails and names the file and line.
+
+**And that test found a real hole**
+
+Analytics Hub had no door on it at all. It came off the operator's menu when I narrowed their navigation, and that was the whole of it — the address still worked, so any signed-in operator who typed it or was sent the link saw the plant's full analytics. The handbook says operators do not have analytics. Now they do not.
+
+- **Analytics Hub refuses anyone who is not a manager or an admin**, the same way the Manager Cockpit already did.
+- The roles suite now checks both pages have that door, not just that the menu is right.
+
+### A manager can give one person extra abilities *(3.40)*
+
+A role is a starting point, not a description of a person. I am a floor operator and I built this, so I need screens no operator needs, and the answer to that should not be to hand me a manager account and have every report count me as one. Somebody else will end up in the same spot.
+
+- **IT Admin, Personnel, Extra Abilities.** Pick a person, tick what they can also do. Their role does not change. An operator with the plant dashboard still logs as an operator and still shows up as one everywhere.
+- **Eight abilities to hand out.** See the plant dashboard. See the analytics hub. See the manager cockpit and its reports. Add and edit reactors. Edit master resin specifications. Log management and bulk cleanup. Floor roster and PIN resets. Export and sync.
+- **Each one is written for the person handing it out**, not for me. The tick box says what it lets somebody do.
+- **Two rules that are enforced in the code, not just hidden on the screen.** You cannot give away an ability you do not have yourself, and only somebody who administers the plant can give anything at all.
+- **Every grant is recorded** with who gave it and when, and a removed grant keeps its row with who removed it. That history is on the same screen, because the first question anybody asks about a permission is how somebody came to have it.
+- Nothing is granted by the upgrade. Every account keeps exactly what its role gave it until somebody ticks a box.
+
+**The reason it is built this way**
+
+The bug I keep hitting is not a permission hole, it is the same rule written down in more than one place. The door on a page said one thing and six navigation bars said another, so a link would go on being offered after the page stopped accepting it.
+
+- **One function answers now.** The door on the page asks it and so does the link that offers the page. A link you can see is a page that opens.
+- **One menu.** Every navigation bar and every sidebar list in the app is drawn from a single definition. There were six copies of that list. A test fails if a seventh appears.
+- Every management screen refuses on the ability, not on a role name. Thirteen doors, one rule.
+
+### Updates arrive as one file I drop in a folder *(3.41)*
+
+Once this is on the floor I cannot patch it the way I do at home, and I am not running git on that PC. I would rather walk over with a USB stick. So: one file, one folder, one menu option.
+
+- **START_HERE.bat, option 7: Apply an update.** Copy the zip into `updates\`, run it, type YES.
+- **The thing on the stick is only files and a list of them.** No script in the package runs. The program that reads it is already on the PC, installed with the app. A USB stick that can run code on a plant PC is a different thing to one that carries files, and this is the second kind.
+- **It checks the package before it touches anything.** Every file has a checksum. A half-copied stick looks exactly like a good one until you read them, and that is the failure I expect to actually have.
+- **It refuses the wrong package.** One built for a different version, one already applied, or an older one going backwards. Each of those stops before anything is written.
+
+**What it does before it changes a file**
+
+- **Takes a database backup**, and stops if that fails. An update with no backup behind it is the one that cannot be undone.
+- **Copies the whole project into `rollback\`** with the date on it.
+- Leaves `.env`, `backups\`, `logs\`, `uploads\` and the virtual environment alone. Those belong to the machine, not to the release. A package that tries to write to any of them is refused.
+
+**And it checks its own work**
+
+After the files are in, it compiles every one of them and then starts the app, which is what runs any new migration. If that fails it puts the old version back on its own and says so. The worst case is that nothing changed, rather than a broken screen and me standing there with a USB stick.
+
+- Files a release removes are removed here too. One left behind still shows in the menu and still opens.
+- New Python packages install from the bundled wheels first, the internet second, and roll the update back if neither works.
+- Every run is written to `logs\updates.log`, and the package is moved to `updates\applied\` so the same one cannot be run twice.
+
+On my side `dev/make_update.py` builds the zip from whatever changed since the version on the plant PC.
+
+### A tank sets itself up from what the operator already types *(3.42)*
+
+I added a reactor in IT Admin and the level still did not move. I had to go back in as a manager and set the pump and the resin on it by hand. That is the exact thing 3.30 was meant to end.
+
+Three holes in it.
+
+- **The startup checklist only offered tanks with no pump on them at all.** The checklist is asked once per day per station. Add a tank after that morning's checklist and there was no way to link it until the next one.
+- **The pouring form was a dead end.** With no vessel on the station it printed a warning telling the operator to answer the startup checklist, which had already gone for the day.
+- **A blank resin was treated as a changeover.** The form asked the operator to confirm that a tank had been changed over from nothing to something. There is only one sensible answer to that question, so it should not have been a question.
+
+What it does now.
+
+- **The same question is on the pouring form.** Any time the station has no tank on it, the operator picks one and links it, standing at the pump.
+- **Tanks already on another pump are offered too**, labelled with where they are now. They used to be filtered out, so a tank plumbed to the wrong station could only be moved by a manager.
+- **A blank tank fills itself in from the first log written at that pump.** The form says what it is about to record before you submit. A real changeover, where the tank already holds something else, still needs the tap.
+- Adoption happens after the log is written rather than while the form is open. A resin picked and then corrected would otherwise be adopted on the way past.
+- Retired and inactive vessels are out of both pickers.
+
+Ten new checks in `tests/test_reactor_level.py` cover all three holes and the two cases that still have to refuse. One of those is two tanks on one pump, where which of them a pour came out of is the thing the app genuinely cannot work out.
+
+Also `dev/run_tests.py`. The test scripts wanted `pgserver`, which only builds on Linux and macOS, so on this machine every one of them died before it ran a single check. It reads the address out of `.env`, points a scratch database at the same server, and runs whichever script you name.
+
+### One place to register a vessel *(3.45)*
+
+The reactor fleet is off the Master Plant Equipment section in IT Admin. It lives on the Live Reactors page, which is where I actually go.
+
+Both screens could add and delete a tank. The reactor page does more. It sets the vessel type, which the fleet wall draws and which the IT Admin form never asked for, so a tank added there had its shape guessed from its capacity band. It also edits the pump and the resin after the tank exists, which the IT Admin form could only do at the moment of creation.
+
+- IT Admin is pump stations and downtime codes now. Two columns instead of three, with a link across to the reactor page.
+- Nobody loses anything. Adding and editing reactors is one ability and both administrators and managers hold it, so anyone who could open that section can already open the fleet expander.
+
+### What the plant is expected to pour, worked out instead of typed *(3.44)*
+
+One number for the whole floor. Four hundred litres an hour, times however long the shift had been running, and that was every pace figure in the application. It cannot be right two days running. A day with one pourer read sixty per cent behind and a day with three read comfortably ahead, and the only lever anybody had was to retype the number, which then had to be retyped tomorrow.
+
+Two different things were sitting inside that one figure. How fast a pump goes, which does not change from one day to the next, and how many pumps are running, which changes every shift.
+
+- **The rate is on the pump now** (migration 0020). Set once when a pump is installed or rebuilt. An old pump expects less than a new one and it stays that way without anybody thinking about it.
+- **Expected output is the pumps that were actually certified for the shift**, each at its own rate, for the hours it has been certified. One pourer expects one pump's worth. Three expects three. Nothing gets typed.
+- **The hours come off the startup checklist, not off the pouring logs.** Taken from the logs, a station that poured nothing would be expected to pour nothing and the target would slide down to meet the output. Certifying a pump is a statement that it is running and it happens before a drop is poured, so a pump that goes quiet after being certified is still counted against the shift.
+- **Logged downtime comes off.** A pump down for a changeover or a fault is not held against pace. That is also the first thing that has ever made logging downtime worth an operator's time.
+- **IT Admin shows what each pump has actually run at.** A median over its recent shifts with the number of shifts behind it, next to what its target says, and a button to take the measured figure. Management reviews a number the floor produced rather than inventing one. A pump with fewer than three shifts on record is left out entirely.
+- Every pump was seeded from the plant's own figure on the day this shipped, read out of the settings rather than written into the migration, so nothing moved. A pump nobody has set still uses it, and a shift with nothing certified falls back to the old arithmetic, so every day before this reads the way it always did.
+- The old global field is relabelled as the fallback rate, because that is all it is now.
+
+Three things I decided against. Dividing the plant target by how many people are pouring, since two on old pumps and two on new pumps are not the same expectation. Letting the target follow recent output, because a target that moves to meet the output can never be missed. And putting the rate on the operator instead of the pump. There is a `target_lph` column on the user record that nothing has ever read, and it stays dead. A rate against somebody's name changes what the wall leaderboard is for, and that is a decision about how the floor is run rather than a dashboard setting.
+
+New `pace.py`, and `tests/test_pace.py` covering all of it, including the case where a certified pump pours nothing and is still expected to have poured.
+
+### The wall display *(3.43)*
+
+Four things, and two of them had been wrong since I built it.
+
+**The cards were not wrapping anything.** Three of them opened a card in one `st.markdown` call and closed it in another. Streamlit closes unbalanced HTML inside each call, so what I actually had was an empty bordered box with the contents sitting loose underneath it. Live Run Velocity, Top Pourers and Active Reactor Work Orders. All three are built as one string and drawn in one call now.
+
+- `tests/test_card_markup.py` reads the source and fails if any page splits a card across two calls again. It needs no database. It found six more of the same fault, four in `Home.py` including the SCADA leaderboard and two on the cleanliness page. They are recorded there as a known list with counts, so nothing new can appear and the numbers only go down.
+
+**A second Top Pourers card underneath the first, dimmed, with the previous run's numbers on it.** Streamlit lines up what it has already drawn against the new run position by position, and three blocks on this page came and went between runs. The arrival sweep, which stops after the second render. The stopped-record band. The finished-shift band. Each one that vanished shifted everything below it up a slot, and what fell off the end was the leaderboard. All three draw on every pass now, empty when there is nothing to put in them.
+
+**The leaderboard was reading the whole day while every card above it read the active shift.** So the wall could say the plant had poured nothing and that a named person was pouring 353 litres an hour, at the same time, a hand's width apart. It divided by the shift clock as well, so the rate was a day of litres over a shift of hours and belonged to neither. Every card reads the same slice now. Unpacked floor work in progress stays a whole-day figure on purpose and says so on the card.
+
+**The gauge is gone.** It was the only object on that wall drawn by a chart library, so it turned up with its own fonts and a red and olive and green arc that matched nothing else on the screen, and it spent a third of the width printing one number the card beside it already carried. Pace sits on the volume card now, as a rate and as how far ahead or behind in litres, green when ahead and amber or red when not, with a bar under it. Volume took the width back.
+
+- The leaderboard is ranked rows with a bar under each name sized against the fastest, and larger type. It reads from across the floor.
+- **No bar across the top of this page.** A row of page links is not something anybody presses from the far end of a plant. The same menu is in the sidebar, drawn from the same shared definition, so this page still cannot drift from what the abilities allow.
 ---
 
-## 3.37 — Tuesday, September 8, 2026
-**The submit button goes away for five seconds after a log lands**
+## 3.27 – 3.37 — Tuesday, September 8, 2026
+**Everything the first real shift turned up**
+
+Eleven releases. Nearly all of it came out of watching the app get used for real instead of me testing it at home. One heading, sorted by subject, version numbers in brackets.
+
+### Eleven manager pages refused a refresh *(3.28)*
+
+Scrap Intelligence, Historical, Log Management, Assigned Runs, Lot Verification, Cleanliness, Resin Canvas, Roster, Google Sync, Floor Comms and the Theme Gallery all checked your role before restoring your session. On a cold load there is no session yet, so all eleven answered Access Denied to a manager with every right to be there.
+
+Press F5 on any of them and you were locked out. Same for a bookmark, or a link opened in a new tab. It only ever looked fine because arriving from another page carries the session in memory, and the one thing nobody does while testing is refresh.
+
+- All eleven restore the session first now.
+- I found it by accident. Five figures in the handbook turned out to be screenshots of the Access Denied message, taken by a script that only knew how to spot the login screen.
+- That script now checks for text unique to the page before it writes anything.
+
+Still open: Analytics Hub and IT Admin come back as an empty shell when opened by URL. They restore the session properly, so it is something else. Clicking through to them works, which is why nobody has hit it.
+
+### Two from the first day of real use *(3.29)*
+
+**A tank could not be linked to anything.** I created a reactor in IT Admin and the level never moved. It turns out a vessel's level is worked out from the logs matching its pump and its resin, and the only code that ever set those two fields was work-order dispatch. We run with work orders off. So the add form asked for a name and a capacity, nothing set the other two ever, and every tank sat at full while the floor emptied it.
+
+- The add form asks for the pump, the resin, the asset tag and the bay marker now, and says what happens if you leave the first two blank.
+- `update_reactor_config` had been written months ago and imported into the reactor page. Nothing ever called it. There is a control for it now, so a tank already created can be linked without deleting it.
+- **The pouring form says which vessel it thinks you are drawing from.** "Drawing from M-205 · bay E2". Nobody picks it, it comes off the station and the resin. If nothing matches it says so, and if two tanks match it says that instead of guessing. Your log records either way.
+
+**The confirmation was drawing where you could not see it.** It goes at the top of the page and the form is four phone screens tall, so after submitting you were at the bottom looking at nothing and scrolling up every hour to check the entry saved. Which is the thing the banner exists to stop you doing.
+
+- On a phone it is pinned to the bottom of the screen now, where the thumb already is. On anything wider it stays where it was.
+
+### The submit button goes away for five seconds after a log lands *(3.37)*
 
 On the run where the confirmation was not showing up, I kept pressing Submit because I could not tell whether anything had happened. Every one of those presses wrote a real log with a real photo attached. Nothing looked wrong afterwards, which is the problem with a duplicate hourly count.
 
@@ -122,10 +210,23 @@ The banner is fixed and it sits at the bottom of the screen on a phone now. This
 - **Packing gets the same lock.** A packing count is as easy to send twice.
 - Five seconds because a second press after that is a decision rather than a reflex, and because two real pours back to back should not leave anybody standing there waiting.
 
----
+### The floor sets it up, not a manager *(3.30)*
 
-## 3.36 — Tuesday, September 8, 2026
-**Logging a pour into a container the app has never heard of**
+We run this as a logging system, so a manager opening a settings page to make the app work is a design fault. The operator already picks the pump and the resin every hour. The only thing missing was which physical tank the pump draws from, and that is not in any log.
+
+- **The startup checklist asks which vessel this pump draws from.** One line, under the pump picker, where the operator is standing at the pump and can read the tag off the side of the tank. Asked only when that pump has no vessel on it yet. Answered once, never asked again, and the manager never touches it.
+- **A resin change is confirmed at the pump.** Pick a resin the tank is not recorded as holding and the form says so: "M-311 is recorded as holding Op Set A, and you have picked Op Set B." One tap confirms the changeover. It is a tap rather than automatic because a changeover restarts that tank's level accounting, and a mis-picked resin doing that silently is worse than a question.
+- The changeover is written down as its own row with no units on it, so it cannot move an output figure and the history says when a tank changed and who said so.
+
+**The form opens where you left it** (migration 0016)
+
+- Station, container format and resin are remembered and pre-filled. Twelve logs a shift and all three are the same every time.
+- Remembered against the account, not the browser. A phone locking, a session dropping, a dead battery or a different handset are the normal cases on a floor, and a memory that lives in the tab survives none of them.
+- The station is seeded before the checklist reads it. I had it in the wrong place first and an operator coming back would have been asked to redo the checklist for a pump they were not standing at.
+
+The lot check is what protects all of this. A pre-filled resin is a box that already holds a plausible answer, but the lot number is still typed off the container every hour, and that is what actually catches the wrong material.
+
+### Logging a pour into a container the app has never heard of *(3.36)*
 
 Today I poured out of a drum into brown 1L bottles. There is no SKU for those bottles and no spec on file, and the Container Format dropdown only offers things the app knows the size of, so there was no honest way to log it. I know how many bottles I filled and how much went in. That should be enough.
 
@@ -146,10 +247,34 @@ The bigger problem was quieter. Every log takes its litres off the tank on that 
 
 Every log written before today is recorded as coming off the tank, which is what they were.
 
----
+### The SCADA page was answering the question fifth *(3.33)*
 
-## 3.35 — Tuesday, September 8, 2026
-**The handbook link was only on two screens, and the machine gateway has a switch now**
+Six controls sat above every number on it: the time horizon, a date picker, then pump, resin, operator and shift. A manager opens that page to find out how the shift is going, and the first full screen was a control panel. The figures started below the fold.
+
+Nobody touches those controls on most visits. Live Today, all pumps, all resins, all operators, all shifts is the question they came to ask. The filters are for an investigation that happens maybe one visit in ten.
+
+- **The answer goes first.** One line at the top: how much has been poured this shift and whether that is ahead of or behind pace, with the shift, how far through it is, and what was expected by now underneath. You used to assemble that yourself out of four cards and a chart.
+- **The six filters are one line and a closed drawer.** The line says what is applied. When anything is set away from its default it turns amber and says so outright, because reading filtered numbers without realising they are filtered is the one genuinely dangerous thing a dashboard can do to you.
+- **The three-way view radio is gone.** Packing is a plant setting, not a view somebody picks. Its "Master" option showed exactly what the other two showed together, so it was three states and a decision in front of a page whose whole job is one glance.
+
+The headline, the filter line and all four telemetry cards now fit above the fold on a 1400 px screen. Nothing was removed except the radio.
+
+### Operators get one screen, and both documents are one tap away *(3.34)*
+
+Operators had the full SCADA page. Not the plant figures that bothered me — their own numbers are on their own form and the guide promises those are the same ones management sees. It is that the whole page is a management view: every station at once, every operator ranked by name, the plant's pace against target. That is the right screen for whoever is running the shift and the wrong one to have open at a pump, where the job in front of you is one station and one cartridge. Rate still matters, and the people who act on it still see it.
+
+- The SCADA page is manager and admin only. An operator who lands on it is sent to their workstation.
+- Their nav is two links instead of three.
+- The sidebar menu is role-aware now. It used to list every page to everybody and let each page refuse them at the door, so an operator was offered five links and could open two.
+
+**The documents**
+
+- **A question mark, top right of the operator form.** Opens the eleven-page guide in its own tab, so nothing half-typed is lost. Small and grey — there when you want it, invisible when you do not. The guide, not the handbook: an operator has no use for the manager's document.
+- **A grey line at the bottom of the manager menu** for the operations handbook. Deliberately not a button. It is something you go and find once.
+- Both are served out of `static/`, and `dev/topdf.py` writes a copy there on every rebuild — otherwise the app would keep handing people last month's document with no sign that it had.
+- A test now checks that every document the app links to actually exists where it serves it from, and is not an empty file. A help link that 404s is worse than no help link: it tells an operator the guide does not exist.
+
+### The handbook link was only on two screens, and the machine gateway has a switch now *(3.35)*
 
 I added the handbook link and then could not find it. The operator guide showed up on the form the way it should, but the manager one was missing from every page I actually work on.
 
@@ -170,121 +295,7 @@ That was the wrong way to say "not yet". A plant that did want to wire something
 - That screen used to be administrators only while the menu it sits in is open to managers as well. Both use the same rule now, so nobody clicks a link and gets told they are not allowed.
 - Turning the switch on registers nothing and polls nothing. The gateway process still has to be running and a device still has to be added by hand.
 
----
-
-## 3.34 — Tuesday, September 8, 2026
-**Operators get one screen, and both documents are one tap away**
-
-Operators had the full SCADA page. Not the plant figures that bothered me — their own numbers are on their own form and the guide promises those are the same ones management sees. It is that the whole page is a management view: every station at once, every operator ranked by name, the plant's pace against target. That is the right screen for whoever is running the shift and the wrong one to have open at a pump, where the job in front of you is one station and one cartridge. Rate still matters, and the people who act on it still see it.
-
-- The SCADA page is manager and admin only. An operator who lands on it is sent to their workstation.
-- Their nav is two links instead of three.
-- The sidebar menu is role-aware now. It used to list every page to everybody and let each page refuse them at the door, so an operator was offered five links and could open two.
-
-**The documents**
-
-- **A question mark, top right of the operator form.** Opens the eleven-page guide in its own tab, so nothing half-typed is lost. Small and grey — there when you want it, invisible when you do not. The guide, not the handbook: an operator has no use for the manager's document.
-- **A grey line at the bottom of the manager menu** for the operations handbook. Deliberately not a button. It is something you go and find once.
-- Both are served out of `static/`, and `dev/topdf.py` writes a copy there on every rebuild — otherwise the app would keep handing people last month's document with no sign that it had.
-- A test now checks that every document the app links to actually exists where it serves it from, and is not an empty file. A help link that 404s is worse than no help link: it tells an operator the guide does not exist.
-
----
-
-## 3.33 — Tuesday, September 8, 2026
-**The SCADA page was answering the question fifth**
-
-Six controls sat above every number on it: the time horizon, a date picker, then pump, resin, operator and shift. A manager opens that page to find out how the shift is going, and the first full screen was a control panel. The figures started below the fold.
-
-Nobody touches those controls on most visits. Live Today, all pumps, all resins, all operators, all shifts is the question they came to ask. The filters are for an investigation that happens maybe one visit in ten.
-
-- **The answer goes first.** One line at the top: how much has been poured this shift and whether that is ahead of or behind pace, with the shift, how far through it is, and what was expected by now underneath. You used to assemble that yourself out of four cards and a chart.
-- **The six filters are one line and a closed drawer.** The line says what is applied. When anything is set away from its default it turns amber and says so outright, because reading filtered numbers without realising they are filtered is the one genuinely dangerous thing a dashboard can do to you.
-- **The three-way view radio is gone.** Packing is a plant setting, not a view somebody picks. Its "Master" option showed exactly what the other two showed together, so it was three states and a decision in front of a page whose whole job is one glance.
-
-The headline, the filter line and all four telemetry cards now fit above the fold on a 1400 px screen. Nothing was removed except the radio.
-
----
-
-## 3.32 — Tuesday, September 8, 2026
-**More of the thing the sign-in screen does**
-
-The move people liked is an object revealed once as the screen arrives, and then stillness. It only works where there is a real arrival, so it went on the three screens that have one and nowhere else.
-
-- **The wall display prints itself in.** One laser pass down the whole board when it first opens. Checked in a browser across three refresh cycles: it appears once and does not come back.
-- **The fleet reads in.** Every tank fills from empty to what it actually holds, then holds still. It reuses the glide that was already there. A browser that will not animate an SVG level just draws the level, which is the right answer anyway.
-- **The terminal comes to life.** Clear the startup checklist and the laser passes down the form as the tabs unlock. Once a shift, at the moment something actually changed.
-- **The finished part lifts off the plate.** At BUILD COMPLETE the cartridge rises and its shadow deepens, the way you take a print off. It happens inside the twenty-five seconds the band is already up.
-
-Every one of them plays once and then stops. The wall re-runs every ten seconds and the reactor page re-runs whenever somebody touches a control on it, so a sweep on every render would not be an effect, it would be a fault nobody could switch off.
-
-Nothing went on Analytics or the Cockpit. A sweep works because it is rare, and a screen somebody is trying to read quickly is the wrong place to put a second of theatre.
-
----
-
-## 3.31 — Tuesday, September 8, 2026
-**The sign-in laser was striking twice**
-
-Reported as a double glitch, and that is exactly what it was. The screen renders, the cookie component answers a moment later with what it found, and that answer re-runs the script. So the laser started, got about a third of the way down, and was replaced by a fresh one starting from the top. Two half-strokes.
-
-- The stroke waits 1.4 seconds before it starts, which is longer than the cookie takes to come back. The first render's laser is still sitting in its delay when the second replaces it, so only one of them is ever seen moving.
-- It is only asked for on the first two renders. From then on the machine is drawn without it, so typing a PIN or ticking the box does not set it off again.
-- The machine occupies the same space either way, so nothing on the screen nudges at the moment the laser stops.
-
-Measured rather than eyeballed: sampling the laser's position every 150 ms, it holds still, then runs top to bottom once, with no upward jumps.
-
----
-
-## 3.30 — Tuesday, September 8, 2026
-**The floor sets it up, not a manager**
-
-We run this as a logging system, so a manager opening a settings page to make the app work is a design fault. The operator already picks the pump and the resin every hour. The only thing missing was which physical tank the pump draws from, and that is not in any log.
-
-- **The startup checklist asks which vessel this pump draws from.** One line, under the pump picker, where the operator is standing at the pump and can read the tag off the side of the tank. Asked only when that pump has no vessel on it yet. Answered once, never asked again, and the manager never touches it.
-- **A resin change is confirmed at the pump.** Pick a resin the tank is not recorded as holding and the form says so: "M-311 is recorded as holding Op Set A, and you have picked Op Set B." One tap confirms the changeover. It is a tap rather than automatic because a changeover restarts that tank's level accounting, and a mis-picked resin doing that silently is worse than a question.
-- The changeover is written down as its own row with no units on it, so it cannot move an output figure and the history says when a tank changed and who said so.
-
-**The form opens where you left it** (migration 0016)
-
-- Station, container format and resin are remembered and pre-filled. Twelve logs a shift and all three are the same every time.
-- Remembered against the account, not the browser. A phone locking, a session dropping, a dead battery or a different handset are the normal cases on a floor, and a memory that lives in the tab survives none of them.
-- The station is seeded before the checklist reads it. I had it in the wrong place first and an operator coming back would have been asked to redo the checklist for a pump they were not standing at.
-
-The lot check is what protects all of this. A pre-filled resin is a box that already holds a plausible answer, but the lot number is still typed off the container every hour, and that is what actually catches the wrong material.
-
----
-
-## 3.29 — Tuesday, September 8, 2026
-**Two from the first day of real use**
-
-**A tank could not be linked to anything.** I created a reactor in IT Admin and the level never moved. It turns out a vessel's level is worked out from the logs matching its pump and its resin, and the only code that ever set those two fields was work-order dispatch. We run with work orders off. So the add form asked for a name and a capacity, nothing set the other two ever, and every tank sat at full while the floor emptied it.
-
-- The add form asks for the pump, the resin, the asset tag and the bay marker now, and says what happens if you leave the first two blank.
-- `update_reactor_config` had been written months ago and imported into the reactor page. Nothing ever called it. There is a control for it now, so a tank already created can be linked without deleting it.
-- **The pouring form says which vessel it thinks you are drawing from.** "Drawing from M-205 · bay E2". Nobody picks it, it comes off the station and the resin. If nothing matches it says so, and if two tanks match it says that instead of guessing. Your log records either way.
-
-**The confirmation was drawing where you could not see it.** It goes at the top of the page and the form is four phone screens tall, so after submitting you were at the bottom looking at nothing and scrolling up every hour to check the entry saved. Which is the thing the banner exists to stop you doing.
-
-- On a phone it is pinned to the bottom of the screen now, where the thumb already is. On anything wider it stays where it was.
-
----
-
-## 3.28 — Tuesday, September 8, 2026
-**Eleven manager pages refused a refresh**
-
-Scrap Intelligence, Historical, Log Management, Assigned Runs, Lot Verification, Cleanliness, Resin Canvas, Roster, Google Sync, Floor Comms and the Theme Gallery all checked your role before restoring your session. On a cold load there is no session yet, so all eleven answered Access Denied to a manager with every right to be there.
-
-Press F5 on any of them and you were locked out. Same for a bookmark, or a link opened in a new tab. It only ever looked fine because arriving from another page carries the session in memory, and the one thing nobody does while testing is refresh.
-
-- All eleven restore the session first now.
-- I found it by accident. Five figures in the handbook turned out to be screenshots of the Access Denied message, taken by a script that only knew how to spot the login screen.
-- That script now checks for text unique to the page before it writes anything.
-
-Still open: Analytics Hub and IT Admin come back as an empty shell when opened by URL. They restore the session properly, so it is something else. Clicking through to them works, which is why nobody has hit it.
-
----
-
-## 3.27 — Tuesday, September 8, 2026
-**A wall worth looking up at, and somewhere for a crash to go**
+### A wall worth looking up at, and somewhere for a crash to go *(3.27)*
 
 - **The shift finishing is a moment now.** When the pour reaches the target a green band goes across the whole wall and the laser makes one last pass down the finished cartridge. It holds about twenty-five seconds. Second shift gets its own.
 - My first version faded itself out after seven seconds. The timer starts when the browser inserts the element, not when the frame reaches the screen, so on a display nobody is standing at it could hit zero opacity having never been seen. The next refresh takes it away now.
@@ -311,6 +322,29 @@ Still open: Analytics Hub and IT Admin come back as an empty shell when opened b
 - **One type scale.** Five sizes, two weights, one 8 px step. These had grown page by page as raw HTML and drifted a few pixels apart. Nobody can name what is wrong with that, they just feel it.
 - **One rhythm for movement.** It was 0.2s, 0.3s, 0.5s, 0.75s, 0.9s, 1s, 1.2s or 2.6s depending on the day I wrote it. Three durations and one curve now.
 - **A proper icon and name on a phone.** Saved to a home screen it used to be a browser glyph and a chopped-off address. It is the Formlabs mark and **Pouring Log** now. Operators see that every shift before they open anything.
+
+### The sign-in laser was striking twice *(3.31)*
+
+Reported as a double glitch, and that is exactly what it was. The screen renders, the cookie component answers a moment later with what it found, and that answer re-runs the script. So the laser started, got about a third of the way down, and was replaced by a fresh one starting from the top. Two half-strokes.
+
+- The stroke waits 1.4 seconds before it starts, which is longer than the cookie takes to come back. The first render's laser is still sitting in its delay when the second replaces it, so only one of them is ever seen moving.
+- It is only asked for on the first two renders. From then on the machine is drawn without it, so typing a PIN or ticking the box does not set it off again.
+- The machine occupies the same space either way, so nothing on the screen nudges at the moment the laser stops.
+
+Measured rather than eyeballed: sampling the laser's position every 150 ms, it holds still, then runs top to bottom once, with no upward jumps.
+
+### More of the thing the sign-in screen does *(3.32)*
+
+The move people liked is an object revealed once as the screen arrives, and then stillness. It only works where there is a real arrival, so it went on the three screens that have one and nowhere else.
+
+- **The wall display prints itself in.** One laser pass down the whole board when it first opens. Checked in a browser across three refresh cycles: it appears once and does not come back.
+- **The fleet reads in.** Every tank fills from empty to what it actually holds, then holds still. It reuses the glide that was already there. A browser that will not animate an SVG level just draws the level, which is the right answer anyway.
+- **The terminal comes to life.** Clear the startup checklist and the laser passes down the form as the tabs unlock. Once a shift, at the moment something actually changed.
+- **The finished part lifts off the plate.** At BUILD COMPLETE the cartridge rises and its shadow deepens, the way you take a print off. It happens inside the twenty-five seconds the band is already up.
+
+Every one of them plays once and then stops. The wall re-runs every ten seconds and the reactor page re-runs whenever somebody touches a control on it, so a sweep on every render would not be an effect, it would be a fault nobody could switch off.
+
+Nothing went on Analytics or the Cockpit. A sweep works because it is rare, and a screen somebody is trying to read quickly is the wrong place to put a second of theatre.
 
 ---
 
@@ -368,8 +402,24 @@ It was broken because the destination was one line in a settings file, and that 
 
 ---
 
-## 3.18 — Sunday, September 6, 2026
-**Getting the app ready to be carried onto the floor, and moved twice**
+## 3.17 – 3.18 — Sunday, September 6, 2026
+**The app running somewhere I am not standing**
+
+Two releases. Both are about the app looking after itself on a machine nobody is watching.
+
+### Two things failing where nobody is looking *(3.17)*
+
+- **Backups happen on their own now.** The backup function always worked, but nothing ran it on a schedule, so whether the data was protected came down to whoever last pressed the button. There is no scheduler on a floor PC, so the check rides on the app being opened. If the newest backup is over twenty hours old, take one. The last fortnight is kept, because a full disk is the same outage backups exist to survive.
+- IT Admin shows the state. Green with the age of the newest backup, orange when it is days old, red when there has never been one. A section with nothing but a button on it does not tell a manager whether the plant is protected.
+- The clean-up only deletes files matching this app's own naming, so a payroll spreadsheet left in that folder is safe.
+- **The app notices when nothing is being logged.** The usual failure here is not corrupted data. The PC reboots and the database does not come back, or the app gets closed and nobody reopens it. Every figure still looks normal, because they are all worked out from the log and the last good hour is still the last good hour. The floor finds out when somebody tries to log. Management finds out weeks later. After about three hours with nothing logged during a running shift, the SCADA page says so at the top and the wall display carries a band the size of the wall.
+- Silence outside shift hours is not treated as a fault, and a shift that has just started does not get blamed for last night's gap.
+
+Two bugs caught in that work before it shipped. A backup dated in the future was treated as brand new, which would have stopped every real backup until the clock caught up. And the freshness check compared a timestamp with no time zone against one with a time zone, which crashed the home page. Getting that one wrong the other way would have been worse, because the sum would have worked, every log would have read four hours old, and the alarm would have fired all day.
+
+Also deleted some dead code. `Home.py` still carried its own add- and delete-reactor functions, which did not know about vessel type, asset tag or bay marker. Anyone wiring them up would have created half-configured vessels. And the shift clock moved out of a page into `shift_clock.py`, because the wall display needed to know whether a shift was running and the only correct answer lived inside a page.
+
+### Getting the app ready to be carried onto the floor, and moved twice *(3.18)*
 
 Testing starts next week. A laptop on the floor first, then a permanent PC. That is two moves, and the second one carries real production data.
 
@@ -383,41 +433,24 @@ Testing starts next week. A laptop on the floor first, then a permanent PC. That
 
 ---
 
-## 3.17 — Sunday, September 6, 2026
-**Two things failing where nobody is looking**
+## 3.13 – 3.15 — Saturday, September 5, 2026
+**Browser faults, and the tanks**
 
-- **Backups happen on their own now.** The backup function always worked, but nothing ran it on a schedule, so whether the data was protected came down to whoever last pressed the button. There is no scheduler on a floor PC, so the check rides on the app being opened. If the newest backup is over twenty hours old, take one. The last fortnight is kept, because a full disk is the same outage backups exist to survive.
-- IT Admin shows the state. Green with the age of the newest backup, orange when it is days old, red when there has never been one. A section with nothing but a button on it does not tell a manager whether the plant is protected.
-- The clean-up only deletes files matching this app's own naming, so a payroll spreadsheet left in that folder is safe.
-- **The app notices when nothing is being logged.** The usual failure here is not corrupted data. The PC reboots and the database does not come back, or the app gets closed and nobody reopens it. Every figure still looks normal, because they are all worked out from the log and the last good hour is still the last good hour. The floor finds out when somebody tries to log. Management finds out weeks later. After about three hours with nothing logged during a running shift, the SCADA page says so at the top and the wall display carries a band the size of the wall.
-- Silence outside shift hours is not treated as a fault, and a shift that has just started does not get blamed for last night's gap.
+Three releases. The first is three faults reported off the floor that only happen in a browser. The other two are both the vessels.
 
-Two bugs caught in that work before it shipped. A backup dated in the future was treated as brand new, which would have stopped every real backup until the clock caught up. And the freshness check compared a timestamp with no time zone against one with a time zone, which crashed the home page. Getting that one wrong the other way would have been worse, because the sum would have worked, every log would have read four hours old, and the alarm would have fired all day.
+### Three faults from the floor that only happen in a browser *(3.13)*
 
-Also deleted some dead code. `Home.py` still carried its own add- and delete-reactor functions, which did not know about vessel type, asset tag or bay marker. Anyone wiring them up would have created half-configured vessels. And the shift clock moved out of a page into `shift_clock.py`, because the wall display needed to know whether a shift was running and the only correct answer lived inside a page.
+No new features. The three have the same thing in common. Each one was an action that needs the browser to receive the current screen, followed straight away by a refresh that throws that screen away. Python saw success every time.
 
----
+- **"Remember this device" never wrote a cookie. Not once, on any device.** The cookie library does not write from Python. It renders a small component, and the browser has to receive that screen and run its code. A refresh on the very next line tore it down first. The library also updates its own in-memory copy, so the same run read the value back and everything looked fine. I checked in a browser and there was nothing in the cookie jar but Streamlit's own token.
+- This was every cookie in the app. Nine places set a cookie and immediately refresh, so a chosen theme reset on the next visit, glove mode would not stay with a terminal, night dimming would not stick, and the operator's remembered pump station was never remembered.
+- Fixed once in `utils.set_cookie`, which writes the cookie and then waits for the browser. 1.2 seconds, measured rather than guessed. At zero, not one cookie is written. At 1.2 all of them are, on desktop and phone. You only pay it on actions that write a cookie, and an operator opening the terminal triggers none.
+- One guard came out of that. The "remember my station" cookie was compared against a value that is empty on the first run of a fresh page load, so it decided the cookie was wrong and rewrote it. That charged every operator the wait on the screen they open all shift, for a value that was already correct.
+- **The confirmation after submitting a log was not appearing.** Same shape. A pop-up belongs to the current screen, and the refresh straight after can throw it away before the browser paints it. Desktop usually won that race. A phone reliably lost, so the operator at the pump submitted an hour's count, got nothing back, and had to open the last submission to check it existed. Every hour.
+- Confirmations go through `utils.flash` now, which stores the message so it survives the refresh and shows it at the top of the next screen. I made it a banner instead of a pop-up on purpose. A banner stays until the next action. A pop-up vanishes after four seconds whether or not anybody was looking, and looking away is what an operator does between screen and pump. Eleven of them moved over.
+- **The QR checksheet button was on the wrong side of a wall.** The startup checklist asks the operator to confirm they have scanned the daily station QR code, and the button that opens it sat behind the gate they cannot pass until they tick that very box. So entering the address in IT Admin looked like it did nothing.
 
-## 3.15 — Saturday, September 5, 2026
-**The fleet wall redrawn as the vessels actually out there**
-
-I took photographs of the supply vessels and pump carts. They turned out to be three completely different things, and the page had been drawing all of them as the same rounded rectangle.
-
-Every fabricated vessel is built the same way. A bolted top flange, a barrel, a dark band at the joint, and a cone bottom in a steel frame. Only the totes are flat-bottomed. What differs is shape and marking. M-205 and the White V5 beside it are tall and narrow with litre marks painted up the barrel, 200 to 4,400. M-101 is short and wide with ribs down the cone and no printed scale, just two hand-written marks near the rim. The small one is a caged ULTRATAINER tote on a pallet with a red ball valve, about 1,041 L, flat bottomed.
-
-- **Capacity cannot tell those apart.** M-205 and the Black V5 vessel are similar sizes and different shapes, so vessel type is a stored setting now instead of a guess off capacity. Migration 0011 fills it in from the old capacity bands so an existing fleet draws the way it did before, and a manager corrects the wrong ones.
-- The litre marks are the best idea in the photographs. That is what the operator reads the level off, so the tall reactor carries the same scale and the liquid lands on the mark they would read it against. 2,193 L sits just above the 2,000 line, on screen and in the aisle. The squat mixer gets no scale. The real one has none.
-- **The cone shape is in the arithmetic, not just the outline.** Below the joint the surface rises more slowly than the volume, because the vessel narrows underneath. A straight line would make a nearly empty vessel look a third full. That is also why half a tank does not sit half way up one of these.
-- The liquid takes the resin's own colour instead of a fixed blue. A near-black resin is lightened until it reads as liquid rather than a hole, and the percentage over it switches between black and white text depending on what it sits on. White V5 and Black V5 are both in this fleet.
-- Each vessel is stencilled with a tag (M-101, M-205) and stands beside a bollard with an orange bay marker (E2, F3). Two optional fields, drawn where they are in real life. A tank called "Reactor 2" on screen and "M-205" in the aisle is one translation step right at the moment somebody is checking whether the screen is telling the truth.
-- A vessel with no resin says IDLE instead of 0.0%. It is not nought percent full of anything, and a number there sends somebody looking for a leak.
-
-One caught before it shipped. Colour gradients are referenced by name, four vessels share one page, and duplicate names all resolve to the first. So every tank after the first would have drawn the first tank's colour, at the right level, on a wall whose whole job is being recognised by colour from across the room. Nothing would have looked broken.
-
----
-
-## 3.14 — Saturday, September 5, 2026
-**The reactor levels were never a reactor feature**
+### The reactor levels were never a reactor feature *(3.14)*
 
 Reported from the floor. With work orders disabled, the Live Reactor page was confidently wrong. Every tank drained to empty on the first day and stayed there, and the figures on the way down were understated by up to five times.
 
@@ -432,20 +465,20 @@ I reproduced it on a throwaway database first. A 5,000 L tank with two lots behi
 - The tank card's second line is the lot instead of the operator, since that is the thing somebody at the vessel can check against the container in front of them.
 - The kilogram figure no longer depends on container format. A 1,110 g cartridge in 1 L and a 5,550 g jug in 5 L are the same 1.11 kg per litre. It was only ever a density.
 
----
+### The fleet wall redrawn as the vessels actually out there *(3.15)*
 
-## 3.13 — Saturday, September 5, 2026
-**Three faults from the floor that only happen in a browser**
+I took photographs of the supply vessels and pump carts. They turned out to be three completely different things, and the page had been drawing all of them as the same rounded rectangle.
 
-No new features. The three have the same thing in common. Each one was an action that needs the browser to receive the current screen, followed straight away by a refresh that throws that screen away. Python saw success every time.
+Every fabricated vessel is built the same way. A bolted top flange, a barrel, a dark band at the joint, and a cone bottom in a steel frame. Only the totes are flat-bottomed. What differs is shape and marking. M-205 and the White V5 beside it are tall and narrow with litre marks painted up the barrel, 200 to 4,400. M-101 is short and wide with ribs down the cone and no printed scale, just two hand-written marks near the rim. The small one is a caged ULTRATAINER tote on a pallet with a red ball valve, about 1,041 L, flat bottomed.
 
-- **"Remember this device" never wrote a cookie. Not once, on any device.** The cookie library does not write from Python. It renders a small component, and the browser has to receive that screen and run its code. A refresh on the very next line tore it down first. The library also updates its own in-memory copy, so the same run read the value back and everything looked fine. I checked in a browser and there was nothing in the cookie jar but Streamlit's own token.
-- This was every cookie in the app. Nine places set a cookie and immediately refresh, so a chosen theme reset on the next visit, glove mode would not stay with a terminal, night dimming would not stick, and the operator's remembered pump station was never remembered.
-- Fixed once in `utils.set_cookie`, which writes the cookie and then waits for the browser. 1.2 seconds, measured rather than guessed. At zero, not one cookie is written. At 1.2 all of them are, on desktop and phone. You only pay it on actions that write a cookie, and an operator opening the terminal triggers none.
-- One guard came out of that. The "remember my station" cookie was compared against a value that is empty on the first run of a fresh page load, so it decided the cookie was wrong and rewrote it. That charged every operator the wait on the screen they open all shift, for a value that was already correct.
-- **The confirmation after submitting a log was not appearing.** Same shape. A pop-up belongs to the current screen, and the refresh straight after can throw it away before the browser paints it. Desktop usually won that race. A phone reliably lost, so the operator at the pump submitted an hour's count, got nothing back, and had to open the last submission to check it existed. Every hour.
-- Confirmations go through `utils.flash` now, which stores the message so it survives the refresh and shows it at the top of the next screen. I made it a banner instead of a pop-up on purpose. A banner stays until the next action. A pop-up vanishes after four seconds whether or not anybody was looking, and looking away is what an operator does between screen and pump. Eleven of them moved over.
-- **The QR checksheet button was on the wrong side of a wall.** The startup checklist asks the operator to confirm they have scanned the daily station QR code, and the button that opens it sat behind the gate they cannot pass until they tick that very box. So entering the address in IT Admin looked like it did nothing.
+- **Capacity cannot tell those apart.** M-205 and the Black V5 vessel are similar sizes and different shapes, so vessel type is a stored setting now instead of a guess off capacity. Migration 0011 fills it in from the old capacity bands so an existing fleet draws the way it did before, and a manager corrects the wrong ones.
+- The litre marks are the best idea in the photographs. That is what the operator reads the level off, so the tall reactor carries the same scale and the liquid lands on the mark they would read it against. 2,193 L sits just above the 2,000 line, on screen and in the aisle. The squat mixer gets no scale. The real one has none.
+- **The cone shape is in the arithmetic, not just the outline.** Below the joint the surface rises more slowly than the volume, because the vessel narrows underneath. A straight line would make a nearly empty vessel look a third full. That is also why half a tank does not sit half way up one of these.
+- The liquid takes the resin's own colour instead of a fixed blue. A near-black resin is lightened until it reads as liquid rather than a hole, and the percentage over it switches between black and white text depending on what it sits on. White V5 and Black V5 are both in this fleet.
+- Each vessel is stencilled with a tag (M-101, M-205) and stands beside a bollard with an orange bay marker (E2, F3). Two optional fields, drawn where they are in real life. A tank called "Reactor 2" on screen and "M-205" in the aisle is one translation step right at the moment somebody is checking whether the screen is telling the truth.
+- A vessel with no resin says IDLE instead of 0.0%. It is not nought percent full of anything, and a number there sends somebody looking for a leak.
+
+One caught before it shipped. Colour gradients are referenced by name, four vessels share one page, and duplicate names all resolve to the first. So every tank after the first would have drawn the first tank's colour, at the right level, on a wall whose whole job is being recognised by colour from across the room. Nothing would have looked broken.
 
 ---
 

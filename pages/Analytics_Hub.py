@@ -26,6 +26,7 @@ from database import (
 )
 from resin_palette import resin_color_map, stored_color_map
 import fill_weight
+import pace
 
 
 cookie_manager = stx.CookieManager(key="analytics_cookies")
@@ -318,10 +319,14 @@ total_shift_length = float(settings["shift_1_hours"]) + float(settings["shift_2_
 elapsed_hrs = min(total_shift_length, max(0.1, elapsed_hrs))
 remaining_hrs = max(0.0, total_shift_length - elapsed_hrs)
 
-live_target_lph = float(settings.get("target_lph", 400.0))
+# Both shifts of today added up from the pumps actually certified on each,
+# rather than one plant figure times the hours. See pace.py.
+_pace = pace.expected_for_day(settings, now=time_now)
+live_target_lph = float(_pace["rate_lph"] or settings.get("target_lph", 400.0))
 live_today_poured = pour_df[pour_df['date_obj'] == today]['bottles_filled'].sum() if not pour_df.empty else 0
 
-expected_right_now = live_target_lph * elapsed_hrs
+expected_right_now = (_pace["expected_l"] if _pace["derived"]
+                      else live_target_lph * elapsed_hrs)
 live_rate = live_today_poured / elapsed_hrs
 projected_daily = live_today_poured + ((live_rate if elapsed_hrs > 0.5 else live_target_lph) * remaining_hrs)
 

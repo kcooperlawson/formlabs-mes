@@ -32,6 +32,7 @@ _boot.boot(fresh=True, db_name="formlabs_reactor_level")
 import crud  # noqa: E402
 from crud import (container_litres, reactor_draw_litres, reactor_for,  # noqa: E402
                   link_vessel_to_pump, vessels_on_pump, record_changeover,
+                  vessels_for_pump_picker, adopt_vessel_resin,
                   get_last_picks, save_last_picks, get_all_reactors_df,
                   add_pump_station, add_resin_spec, add_reactor, add_hourly_log,
                   calculate_logged_units_for_resin)
@@ -287,6 +288,63 @@ check("the old resin no longer points at it",
 check("and the changeover added no units of its own",
       calculate_logged_units_for_resin("Op Set B V1", "", "Pump 11", ""), 0)
 print("  operator-led setup OK")
+
+# --- nothing about this needs a manager ------------------------------------
+# The three ways the operator used to get stuck and have to go and find one.
+
+# 1. A tank created after that morning's checklist. The checklist is asked
+#    once per day per station, so the question had already gone for the day.
+add_pump_station("Pump 12")
+add_reactor("Late Tank", 4000, asset_tag="M-412")
+check("a tank added mid-shift is offered at the pump",
+      [v["reactor_name"] for v in vessels_for_pump_picker("Pump 12")
+       if v["reactor_name"] == "Late Tank"], ["Late Tank"])
+check("and the operator can place it without the checklist",
+      link_vessel_to_pump("Late Tank", "Pump 12"), True)
+
+# 2. A tank plumbed to the wrong station. The old picker only offered vessels
+#    with no pump at all, so this one was invisible and only a manager could
+#    move it.
+_moved = [v for v in vessels_for_pump_picker("Pump 13")
+          if v["reactor_name"] == "Late Tank"]
+check("a tank on another pump is still offered", len(_moved), 1)
+check("and the picker says where it is now",
+      _moved[0]["current_pump"], "Pump 12")
+check("a tank already on this pump is not offered to itself",
+      [v for v in vessels_for_pump_picker("Pump 12")
+       if v["reactor_name"] == "Late Tank"], [])
+
+# 3. A blank resin. There is no previous material to disagree with, so there
+#    was nothing for the operator to confirm and the tap was noise.
+check("a placed tank still holds nothing", reactor_for("Pump 12", "Op Set A V1"), None)
+check("the first log fills it in",
+      adopt_vessel_resin("Pump 12", "Op Set A V1", operator="Op", shift="Shift 1"),
+      "Late Tank")
+check("and the pour lands on it from then on",
+      reactor_for("Pump 12", "Op Set A V1")["asset_tag"], "M-412")
+check("adoption writes no units of its own",
+      calculate_logged_units_for_resin("Op Set A V1", "", "Pump 12", ""), 0)
+
+# A tank that already holds something is a real changeover and keeps its tap.
+check("adoption refuses a tank that already holds something",
+      adopt_vessel_resin("Pump 12", "Op Set B V1", operator="Op", shift="Shift 1"), "")
+check("so the tank is untouched",
+      reactor_for("Pump 12", "Op Set A V1")["reactor_name"], "Late Tank")
+
+# Two tanks on one pump is the case the app genuinely cannot answer. Both are
+# blank here, so the only reason to refuse is that it cannot tell them apart.
+add_pump_station("Pump 15")
+add_reactor("Twin A", 4000, asset_tag="M-415")
+add_reactor("Twin B", 4000, asset_tag="M-416")
+link_vessel_to_pump("Twin A", "Pump 15")
+link_vessel_to_pump("Twin B", "Pump 15")
+check("two blank tanks on one pump adopts nothing rather than guessing",
+      adopt_vessel_resin("Pump 15", "Op Set B V1", operator="Op", shift="Shift 1"), "")
+check("and neither of them picked it up",
+      reactor_for("Pump 15", "Op Set B V1"), None)
+check("a blank pump or a blank resin adopts nothing",
+      [adopt_vessel_resin("", "Op Set A V1"), adopt_vessel_resin("Pump 15", "")], ["", ""])
+print("  operator-led setup needs no manager OK")
 
 # --- the form opens where they left it -------------------------------------
 check("an operator who has never logged has nothing remembered",

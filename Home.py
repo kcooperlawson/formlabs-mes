@@ -44,6 +44,7 @@ from database import (
 )
 from database import esc
 from resin_palette import resin_chip, stored_color_map, style_resin_column
+import pace
 
 # Pull our external theme dictionary
 try:
@@ -123,7 +124,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.41"
+APP_VERSION = "PT-V3.45"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -828,6 +829,13 @@ operating_hours = elapsed_net if (time_horizon == "⚡ Live Today (Active Shift)
 
 run_velocity_lh = (liters_output / operating_hours) if operating_hours > 0 else 0.0
 pack_velocity_uh = (total_packed / operating_hours) if operating_hours > 0 else 0.0
+# The expected rate is the pumps that were certified for this shift added up,
+# not one figure for the whole plant. See pace.py.
+_pace = pace.expected_for_shift(settings, active_shift_name,
+                                shift_status.get("started_at")) \
+    if is_shift_active else {"expected_l": 0.0, "rate_lph": target_rate_lh,
+                             "shift_target_l": 0.0, "stations": [], "derived": False}
+target_rate_lh = float(_pace["rate_lph"] or target_rate_lh)
 oee_pct = (run_velocity_lh / target_rate_lh) * 100.0 if target_rate_lh > 0 else 0.0
 yield_pct = (total_poured / (total_poured + total_scrap) * 100.0) if (total_poured + total_scrap) > 0 else 100.0
 
@@ -835,7 +843,8 @@ yield_pct = (total_poured / (total_poured + total_scrap) * 100.0) if (total_pour
 # mode. The trajectory card itself is now hidden outside that mode (see
 # row2_col1 below) instead of showing stale placeholder text.
 if is_shift_active and time_horizon == "⚡ Live Today (Active Shift)":
-    expected_now = target_rate_lh * max(0.1, operating_hours)
+    expected_now = (_pace["expected_l"] if _pace["derived"]
+                    else target_rate_lh * max(0.1, operating_hours))
     pace_variance_l = liters_output - expected_now
     expected_display = f"{expected_now:,.0f} L"
     variance_display = f"{pace_variance_l:+,.0f} L"

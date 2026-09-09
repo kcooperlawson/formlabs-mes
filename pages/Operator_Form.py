@@ -17,6 +17,18 @@ from datetime import datetime, date, timedelta
 from streamlit_lottie import st_lottie
 import requests
 
+
+def _vessel_label(v: dict) -> str:
+    """How a vessel reads in a picker, including where it is now.
+
+    A tank already sitting on another pump is offered rather than hidden, so
+    the label has to say so. Hiding it is what forced a manager to move it.
+    """
+    tag = str(v.get("asset_tag") or "").strip()
+    name = f"{v['reactor_name']} ({tag})" if tag else str(v["reactor_name"])
+    on = str(v.get("current_pump") or "").strip()
+    return f"{name} · currently on {on}" if on else name
+
 from database import (
     add_hourly_log,
     add_lot_verification,
@@ -424,21 +436,21 @@ if current_role in ["operator", "packer"]:
             # side of the vessel - and only when that pump has no tank on it
             # yet. Answered once, it never appears again, and no manager ever
             # has to open a settings page to link a reactor to a station.
-            _vessels_here = crud.vessels_on_pump(st.session_state.get("h_pump", ""))
+            _chk_pump = st.session_state.get("h_pump", "")
+            _vessels_here = crud.vessels_on_pump(_chk_pump)
             if not _vessels_here:
-                _all_vessels = crud.get_all_reactors_df()
-                _free = ([] if _all_vessels.empty else
-                         [str(r["reactor_name"]) for _, r in _all_vessels.iterrows()
-                          if not str(r.get("assigned_pump") or "").strip()
-                          or str(r.get("assigned_pump")) == "None"])
-                if _free:
+                _chk_opts = crud.vessels_for_pump_picker(_chk_pump)
+                if _chk_opts:
+                    _chk_map = {_vessel_label(v): v["reactor_name"] for v in _chk_opts}
+                    st.session_state["_chk_vessel_map"] = _chk_map
                     st.selectbox(
                         "🛢️ Which vessel does this pump draw from?",
-                        ["— I don't know —"] + _free, key="chk_vessel",
+                        ["— I don't know —"] + list(_chk_map.keys()), key="chk_vessel",
                         help="Asked once per pump. It is how the tank level knows a pour "
                              "came out of this vessel and not the one beside it. If you are "
                              "not sure, leave it and tell your lead — your logs still record.")
-                    st.caption("Read the tag off the side of the tank if there is one.")
+                    st.caption("Read the tag off the side of the tank if there is one. "
+                               "A tank shown as being on another pump can be moved here.")
 
         # --- Cookie check to survive page refreshes ---
         # Keyed by station as well as operator: moving to a new pump means a
@@ -544,7 +556,9 @@ if current_role in ["operator", "packer"]:
                         # Link the vessel on the way through, if they answered.
                         _picked = st.session_state.get("chk_vessel", "")
                         if _picked and not _picked.startswith("—"):
-                            crud.link_vessel_to_pump(_picked, checklist_station)
+                            _target = st.session_state.get(
+                                "_chk_vessel_map", {}).get(_picked, _picked)
+                            crud.link_vessel_to_pump(_target, checklist_station)
                         flash("Startup checklist recorded. Terminal unlocked.", "🔓")
                         # The station is certified and the screen opens up.
                         # That is a real event, once a shift, so the laser
@@ -1207,25 +1221,61 @@ if tab1 is not None:
                     _v = _on_pump[0]
                     _was = str(_v.get("current_resin") or "").strip()
                     _tag = str(_v.get("asset_tag") or "").strip() or _v["reactor_name"]
-                    st.warning(
-                        f"**{_tag} is recorded as holding "
-                        f"{_was or 'nothing yet'}, and you have picked {resin}.**")
-                    if st.button(f"✅ Yes — {_tag} was changed over to {resin}",
-                                 key="confirm_changeover", use_container_width=True):
-                        crud.record_changeover(_v["reactor_name"], resin,
-                                               operator=current_user,
-                                               shift=current_shift,
-                                               pump_station=station)
-                        flash(f"{_tag} is now on {resin}.", "🛢️")
-                        st.rerun()
-                    st.caption("If that is not right, check the resin above. Your log "
-                               "records either way — this only decides which tank the "
-                               "litres come off.")
+                    if not _was:
+                        # Nothing recorded is a blank, not a changeover. There
+                        # is no previous material to disagree with, so there is
+                        # nothing to confirm. Submitting the log fills it in.
+                        st.caption(f"🛢️ {_tag} has no resin recorded yet. Logging "
+                                   f"this will record it as holding {resin}.")
+                    else:
+                        st.warning(
+                            f"**{_tag} is recorded as holding "
+                            f"{_was}, and you have picked {resin}.**")
+                        if st.button(f"✅ Yes — {_tag} was changed over to {resin}",
+                                     key="confirm_changeover", use_container_width=True):
+                            crud.record_changeover(_v["reactor_name"], resin,
+                                                   operator=current_user,
+                                                   shift=current_shift,
+                                                   pump_station=station)
+                            flash(f"{_tag} is now on {resin}.", "🛢️")
+                            st.rerun()
+                        st.caption("If that is not right, check the resin above. Your log "
+                                   "records either way — this only decides which tank the "
+                                   "litres come off.")
                 else:
+                    # The checklist asks this once a day per station, so a tank
+                    # created after that morning's checklist could not be linked
+                    # until the next one, and the operator standing at the pump
+                    # was told to go and find a question that had already gone.
+                    # It is the same question, answerable here, any time this
+                    # station has no vessel on it.
                     st.warning(
                         "**No vessel is linked to this station.** Your log still records "
-                        "and still counts — it only means the tank level will not move. "
-                        "The startup checklist asks which vessel this pump draws from.")
+                        "and still counts. It only means the tank level will not move "
+                        "until this is answered.")
+                    _opts = crud.vessels_for_pump_picker(station)
+                    if _opts:
+                        _map = {_vessel_label(v): v["reactor_name"] for v in _opts}
+                        _pick = st.selectbox(
+                            "🛢️ Which vessel does this pump draw from?",
+                            ["— pick one —"] + list(_map.keys()),
+                            key="form_vessel_pick")
+                        if _pick and not _pick.startswith("—"):
+                            _target = _map[_pick]
+                            if st.button(f"🔗 Link {_target} to {station}",
+                                         key="form_vessel_link",
+                                         use_container_width=True):
+                                if crud.link_vessel_to_pump(_target, station):
+                                    flash(f"{_target} is now on {station}.", "🛢️")
+                                    st.rerun()
+                                else:
+                                    st.error("That vessel could not be linked. "
+                                             "Tell your lead.")
+                        st.caption("Read the tag off the side of the tank. A tank shown "
+                                   "as being on another pump can be moved here.")
+                    else:
+                        st.caption("No vessels are registered yet. A manager adds them "
+                                   "in IT Admin.")
             elif _vessel.get("ambiguous"):
                 st.warning("More than one vessel is set to this station and resin ("
                            + ", ".join(_vessel["ambiguous"]) + "), so the level cannot "
@@ -1695,6 +1745,22 @@ if tab1 is not None:
             if not _save_ok:
                 save_state("failed", _save_err)
                 st.stop()
+
+            # A tank with nothing recorded on it is a blank, not a changeover,
+            # so the log that was just written fills it in and the level starts
+            # working without a manager opening a settings page. After the
+            # write rather than before it: a resin picked and then corrected
+            # would otherwise be adopted on the way past. Skipped on an
+            # off-tank pour, which by definition did not come out of a vessel
+            # on this station.
+            if not bulk_off_tank:
+                try:
+                    _adopted = crud.adopt_vessel_resin(
+                        station, resin, operator=current_user, shift=current_shift)
+                    if _adopted:
+                        flash(f"{_adopted} is now recorded as holding {resin}.", "🛢️")
+                except Exception:
+                    pass
 
             # Arm the fast path only after a clean check. A mismatch or an
             # expired lot clears it, so the next log at this station starts
