@@ -8,6 +8,36 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.38 — Wednesday, September 9, 2026
+**Going over the documents before test day**
+
+My lead told me tomorrow is test day, so I read the handbook, the operator guide and the one-pager against what the app actually does now. Some of it was out of date and some of it was wrong.
+
+**The documents**
+
+- **The operator guide covers the measured pour properly.** It still called it Drum / Tote, and it did not mention the question about where the resin came from.
+- **What happens after you submit** was written before the five-second block and before the confirmation moved to the bottom of the phone screen. Both are described now.
+- **The guide says the form remembers your station, format and resin**, and that the question mark on the form opens the guide itself.
+- **The checklist step mentions the vessel question** — which supply vessel the pump draws from, asked once per pump.
+- **The handbook said the Device Gateway screen was unlinked and unreachable.** That has not been true since the switch went in.
+- **The handbook role table said operators get the SCADA page.** They have not since Monday.
+- **The plant settings section lists the switches** an administrator actually has, including measured pours and the gateway.
+- **The test figures were from ten migrations ago.** Eighteen migrations, twenty suites, 1,543 assertions.
+- **Rate is in the one-pager now.** Litres an hour against target, next to units and scrap, because pace is part of what the record is for.
+
+**Pages that were quietly cutting themselves off**
+
+Every page in those documents is a fixed sheet with the overflow hidden, so anything that does not fit is painted over the footer and cut. Six pages were doing it, and two of them were doing it before I touched anything — one had been cutting the end off its own note in the copy I was going to hand over.
+
+- Six pages fixed, and all three documents rebuilt.
+- **A checker that measures it.** `dev/check_page_fit.py` opens each document and asks every page whether its content is taller than the page. Run it before rebuilding the PDFs. It is how the two I did not cause were found.
+
+**One thing in the app**
+
+- **The operator nav had a Live SCADA link that bounces.** The page is manager and admin only now and sends an operator straight back to the form, so the link went. The sidebar was narrowed when that changed and this bar was missed.
+
+---
+
 ## 3.37 — Tuesday, September 8, 2026
 **The submit button goes away for five seconds after a log lands**
 
@@ -74,7 +104,7 @@ That was the wrong way to say "not yet". A plant that did want to wire something
 ## 3.34 — Tuesday, September 8, 2026
 **Operators get one screen, and both documents are one tap away**
 
-Operators had the full SCADA page. Not the plant figures that bothered me — their own numbers are on their own form and the guide promises those are the same ones management sees. It was the leaderboard. It ranks people by name against litres an hour, and a visible ranking pushes toward speed, which is exactly what the lot check exists to slow down. A system whose best feature asks somebody to stop and turn a cartridge over should not put a scoreboard on the next screen.
+Operators had the full SCADA page. Not the plant figures that bothered me — their own numbers are on their own form and the guide promises those are the same ones management sees. It is that the whole page is a management view: every station at once, every operator ranked by name, the plant's pace against target. That is the right screen for whoever is running the shift and the wrong one to have open at a pump, where the job in front of you is one station and one cartridge. Rate still matters, and the people who act on it still see it.
 
 - The SCADA page is manager and admin only. An operator who lands on it is sent to their workstation.
 - Their nav is two links instead of three.

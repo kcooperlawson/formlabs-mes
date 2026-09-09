@@ -121,7 +121,7 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
 active_theme = st.session_state.get("preferred_theme", "Default Dark")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.37"
+APP_VERSION = "PT-V3.38"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -422,11 +422,13 @@ current_role = st.session_state.get("user_role", "operator")
 
 # Operators do not come here. Not because plant figures are secret - their own
 # numbers are on their own form and update as they log, and the operator guide
-# promises those are the same figures management sees. It is the leaderboard.
-# It ranks people by name against litres an hour, and a visible ranking pushes
-# toward speed - which is exactly what the lot check exists to slow down. A
-# system whose most valuable feature asks somebody to stop and turn a cartridge
-# over should not put a scoreboard on the next screen.
+# promises those are the same figures management sees. This screen is a
+# management view: the whole plant at once, every station and every operator
+# ranked by name. That is the right screen for the person running the shift and
+# the wrong one to have open at a pump, where the job in front of you is one
+# station and one cartridge. Rate matters here and nobody pretends otherwise -
+# it is what the pace line and the leaderboard are for - it is just read by the
+# people who act on it.
 if current_role in ("operator", "packer"):
     st.switch_page("pages/Operator_Form.py")
 

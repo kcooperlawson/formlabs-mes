@@ -211,9 +211,8 @@ td.k{font-weight:600; color:var(--ink);}
     the pump.</p>
     <p style="margin-top:7pt;">It covers more ground than the plant needs today, and the marker on
     each section says which is which: <b>In service</b> runs now; <b>Optional</b> is finished and
-    switched off until somebody wants it; <b>Not in service</b> was built to find out whether an
-    approach works, with nothing depending on it. <b>Part One is what is being proposed</b> &mdash;
-    the rest is here so the capability is known, not because it is being asked for.</p>
+    switched off; <b>Not in service</b> was built to find out whether an approach works.
+    <b>Part One is what is being proposed</b> &mdash; the rest is here so the capability is known.</p>
   </div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>2</span></div>
 </section>
@@ -260,8 +259,7 @@ td.k{font-weight:600; color:var(--ink);}
   <div class="note" style="margin-top:12pt;">
     <span class="eyebrow">Scope</span>
     <p>The system is in service for resin pouring. Pack-out logging and machine integration are built
-    but not in use; both are described in Appendix D rather than here, because neither has been
-    committed to.</p>
+    but not in use, and are described in Appendix D rather than here.</p>
   </div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>3</span></div>
 </section>
@@ -371,6 +369,11 @@ td.k{font-weight:600; color:var(--ink);}
     <div class="step"><span class="n">4</span><div><h4>Everything else follows</h4><p>Display, analytics
       and exports all read those same rows.</p></div></div>
   </div>
+  <div class="note" style="margin-top:12pt;"><span class="eyebrow">Sent twice</span>
+    <p>For five seconds after a log lands the submit button is not on the screen, and a block naming
+    what was recorded stands in its place. That exists because a shift where the confirmation was not
+    drawing produced several identical entries: every one of them was a correct write as far as the
+    application was concerned, which is exactly why nothing stopped them.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>5</span></div>
 </section>
 
@@ -526,7 +529,7 @@ td.k{font-weight:600; color:var(--ink);}
   <table class="tight-rows">
     <thead><tr><th style="width:40%">Capability</th><th>Operator</th><th>Manager</th><th>Admin</th></tr></thead>
     <tbody>
-      <tr><td class="k">Live SCADA dashboard</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+      <tr><td class="k">Live SCADA dashboard</td><td class="no">&mdash;</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
       <tr><td class="k">Startup checklist &amp; terminal unlock</td><td class="yes">Required</td><td class="no">n/a</td><td class="no">n/a</td></tr>
       <tr><td class="k">Log hourly pouring &amp; lot verification</td><td class="yes">Yes</td><td class="part">Test mode</td><td class="part">Test mode</td></tr>
       <tr><td class="k">Log downtime &amp; cleanliness audits</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
@@ -548,6 +551,9 @@ td.k{font-weight:600; color:var(--ink);}
       <tr><td class="k">Choose how the plant runs this system</td><td class="no">&mdash;</td><td class="part">Logging mode</td><td class="yes">Yes</td></tr>
     </tbody>
   </table>
+  <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;">The SCADA dashboard is not on that
+  list for operators: it is a management view of the whole plant, and their own figures are on their own
+  screen. Rate is on it because rate matters, read by the people who act on it.</p>
   <p style="font-size:8.4pt;color:var(--faint);margin-top:8pt;"><em>Logging mode</em> marks the rows a
   manager holds only while the plant runs as a log. <em>Test mode</em> lets a manager or administrator
   log on behalf of an operator for training and troubleshooting; the entry is attributed to the operator
@@ -570,8 +576,10 @@ td.k{font-weight:600; color:var(--ink);}
       accounts. Managers can provision floor personnel without full IT access.</p></div>
     <div class="card"><span class="tag">Plant</span><h4>Global parameters</h4>
       <p><strong>How many shifts the plant runs</strong> &mdash; this one runs two &mdash; with start
-      times, lengths and breaks; rate and yield targets; and the address of
-      the pump form the operator terminal links out to.</p></div>
+      times, lengths and breaks; rate and yield targets; the address of the pump form the operator
+      terminal links out to; and the switches for what the floor sees at all &mdash; work
+      orders, pack-out logging, measured pours and the machine gateway &mdash; each off until it is
+      turned on.</p></div>
     <div class="card"><span class="tag">Equipment</span><h4>Stations, reactors, reasons</h4>
       <p>Pump stations, the reactor fleet and capacities, and the downtime reason list, so the vocabulary
       stays the plant's own.</p></div>
@@ -617,8 +625,7 @@ td.k{font-weight:600; color:var(--ink);}
     because every figure is computed from the log and the last good hour is still the last good
     hour. So the system watches its own intake: after roughly three hours with nothing logged
     <em>during a running shift</em>, the main screen and the floor display both say so. Quiet
-    outside a shift is not a fault, and nor is a day the plant does not run &mdash; the working
-    days are set in the admin console, and a shift counts by the day it starts.</p></div>
+    outside a shift is not a fault, and nor is a day the plant does not run.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>14</span></div>
 </section>
 
@@ -634,31 +641,29 @@ td.k{font-weight:600; color:var(--ink);}
   vessel having been refilled; and each log carries the container format it was poured in, so a
   bulk jug and a cartridge are counted at their own volumes rather than one assumed for all.
   Nothing has to be entered anywhere else for the levels to be right.</p>
-  <p>Not everything leaving a vessel is a counted container. An amount decanted into a drum or a
-  tote is entered as the amount &mdash; in litres or in kilograms &mdash; and converted using the
+  <p>Not everything leaving a vessel is a counted container, and not every container is one the system
+  has a size for. An amount poured into anything of that kind is entered as the amount &mdash; in litres or in kilograms &mdash; and converted using the
   density already implied by the resin&rsquo;s own fill-weight spec, so no new figure has to be
-  looked after. An amount larger than the vessel could have given out is refused at the keyboard,
-  because a typed volume is not self-checking the way a container count is: nobody types 2,500
-  cartridges and believes it, but 1800 litres instead of 180 looks perfectly ordinary and only
-  shows up an hour later as an empty vessel on the wall.</p>
-  <p>The consequence worth stating plainly: the level does not depend on work orders. It reads
-  identically whether or not the plant is dispatching runs.</p>
+  looked after. More than the vessel could have given out is refused at the keyboard: a typed
+  volume is not self-checking the way a container count is, and 1800 litres instead of 180 looks
+  perfectly ordinary until it turns up an hour later as an empty vessel on the wall.</p>
+  <p>Nor did all of it come out of the tank. Resin decanted from a drum left the vessel when that drum was filled, so a measured pour asks which it was: one off a drum counts as production and leaves the level alone.</p>
+
+  <p>The consequence worth stating plainly: the level does not depend on work orders. It reads identically whether or not the plant is dispatching runs.</p>
   <p>When a gauge disagrees with the calculated figure &mdash; a transfer nobody logged, a partial
   fill &mdash; anyone at the vessel can correct it from the operator terminal, either by the
   percentage on the sight glass or by the exact litres. The correction is written into the record
   as a dated, attributed adjustment rather than quietly replacing what was there, so the
   disagreement stays visible and the level goes on being derived from the record afterwards.</p>
-  <figure><img class="med" src="figs_print/07_reactors.png" alt="Live reactors">
+  <figure><img class="med" src="figs_print/07_reactors.png" alt="Live reactors" style="max-height:1.15in;">
     <figcaption><b>Live Reactor Fleet.</b> Each vessel drawn as its own kind, with its asset tag,
     bay marker, resin, station, lot and remaining volume in litres and in kilograms.</figcaption></figure>
   <div class="note" style="margin-top:13pt;"><span class="eyebrow">When a vessel sits at empty</span>
-    <p>A vessel that reads empty while pouring continues from it is telling you something specific:
-    more has been drawn on the current lot than the vessel holds, which means it was refilled and
-    the lot on the log did not change with it &mdash; the same drum number read off a second
-    container, or a top-up nobody recorded. The figure is not lost, and nothing needs unpicking:
-    the next lot that does change resets the vessel, and a level calibration corrects it in the
-    meantime. It is worth knowing because it is the one condition where the screen and the vessel
-    can disagree without anybody having made a mistake at the pump.</p></div>
+    <p>A vessel that reads empty while pouring continues from it means more has been drawn on the
+    current lot than the vessel holds: it was refilled and the lot on the log did not change with
+    it. Nothing needs unpicking. The next lot that does change resets the vessel, and a level
+    calibration corrects it in the meantime. It is the one case where screen and vessel disagree
+    with nobody at fault.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>15</span></div>
 </section>
 
@@ -952,59 +957,47 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">1,394</span><span class="l">assertions across eighteen suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels, vessel drawings, backups and the stopped record, machine readiness, the shift build, measured pours, export destinations and their round trip, crash reporting, links, boot paths</span></div>
+    <div class="stat"><span class="n">1,543</span><span class="l">assertions across twenty suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels and drawings, backups and the stopped record, the shift build, measured pours, export destinations and their round trip, crash reporting, links, boot paths, plant switches</span></div>
     <div class="stat"><span class="n">58</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
   <h3>What the simulation covers</h3>
-  <p>All ten migrations are applied to an empty database and the result compared table by table against
-  the application's own model definitions. A manager then creates three work orders; operators clear per-station
-  checklists and pour &mdash; clean logs, a fast-path log, a mismatched cartridge, a cartridge pulled before
-  pouring, a log with no run behind it, and a gated RPS jug &mdash; alongside downtime. Every
-  figure the interface displays is then recomputed from the raw rows and compared against hand-figured
-  expectations: poured, scrap, yield, per-operator totals, run progress, flag rate and variance.</p>
+  <p>All eighteen migrations are applied to an empty database and the result compared table by table
+  against the application's own model definitions. A manager then creates work orders; operators clear
+  per-station checklists and pour &mdash; clean logs, a fast-path log, a mismatched cartridge, one pulled
+  before pouring, a log with no run behind it, a gated RPS jug &mdash; alongside downtime. Every figure
+  the interface displays is recomputed from the raw rows and compared against hand-figured expectations:
+  poured, scrap, yield, per-operator totals, run progress, flag rate and variance.</p>
   <h3 style="margin-top:12pt;">What that has caught</h3>
   <ul class="tight">
-    <li><strong>The run card was printing the lot the check was hiding.</strong> An operator could have read
-    the expected lot off the screen instead of the cartridge, which would have made the whole check
-    decorative. Found because the interface test asserts the lot appears nowhere on the page.</li>
-    <li><strong>Plant settings could never be saved.</strong> The Admin Panel's save button passed a
-    dictionary to a function expecting fifteen positional arguments, so shift times, rate targets and yield
-    targets had never been changeable from the interface.</li>
-    <li><strong>A content-delivery fetch could take the terminal down.</strong> An unguarded network call for a
-    decorative animation ran on every interaction; a floor PC that lost its internet would have hung the
-    terminal before a control rendered.</li>
-    <li><strong>Eight pages failed on a theme change</strong>, and log cleanup crashed whenever a filter
+    <li><strong>The run card was printing the lot the check was hiding.</strong> An operator could have
+    read the expected lot off the screen instead of the cartridge, which would have made the check
+    decorative. Caught by a test asserting the lot appears nowhere on the page.</li>
+    <li><strong>Plant settings could never be saved.</strong> The save button passed a dictionary to a
+    function expecting fifteen positional arguments, so shift times and targets had never been
+    changeable from the interface.</li>
+        <li><strong>Eight pages failed on a theme change</strong>, and log cleanup crashed whenever a filter
     matched fewer than ten records &mdash; both long-standing.</li>
   </ul>
   <ul class="tight" style="margin-top:10pt;">
-    <li><strong>A setting that saved and was never read back.</strong> The number of shifts had a column, a
-    migration, an admin field and a working save path &mdash; and the function every screen reads settings
-    through never returned it, so all of them silently used the default. It happened to be the right
-    answer for this plant, which is why nobody noticed.</li>
-    <li><strong>Every light theme rendered its stylesheet as visible text.</strong> Found in a browser
-    after the tests had passed: an indented style block appended after other content is treated as a code
-    listing and displayed rather than applied. The twenty-four older themes were never bitten because
-    theirs comes first.</li>
-    <li><strong>Every vessel on the wall would have drawn the first vessel's colour.</strong> A
-    gradient is referenced by an identifier, four vessels share one page, and duplicate
-    identifiers all resolve to the first &mdash; so the second tank onwards would have shown the
-    right level in the wrong resin's colour, on a screen whose whole point is being recognised by
-    colour from a distance. Nothing would have looked broken.</li>
-    <li><strong>Vessel levels only worked because work orders were switched on.</strong> The level looked
-    like a vessel feature and was not one: the work order was quietly supplying both the point the vessel
-    was last filled and the size of the containers coming out of it. With work orders off &mdash; which is
-    how the system is proposed to run &mdash; every vessel summed every log ever taken at its station,
-    emptied on the first day and stayed there, and counted a five-litre jug as one litre. Both answers were
-    already in the hourly log; the level is now taken from there, and a suite of its own asserts that a
-    vessel reads the same figure with work orders on and off.</li>
+    <li><strong>A setting that saved and was never read back.</strong> The number of shifts had a column,
+    a migration, an admin field and a working save path, and the function every screen reads settings
+    through never returned it. The default happened to be right for this plant, which is why nobody
+    noticed.</li>
+    <li><strong>Every light theme rendered its stylesheet as visible text.</strong> An indented style
+    block appended after other content is treated as a code listing and displayed rather than applied.
+    Found in a browser after the tests had passed.</li>
+    <li><strong>Every vessel on the wall would have drawn the first vessel's colour.</strong>
+    Duplicate identifiers all resolve to the first, so the second tank onwards showed the right
+    level in the wrong resin's colour, on a screen whose whole point is being recognised by colour
+    from across the room. Nothing would have looked broken.</li>
+    <li><strong>Vessel levels only worked because work orders were switched on.</strong> The work order
+    was quietly supplying both the point the vessel was last filled and the size of the containers coming
+    out of it. With work orders off &mdash; how the system is proposed to run &mdash; every vessel summed
+    every log ever taken at its station and counted a five-litre jug as one litre. Both answers were
+    already in the hourly log, so the level is taken from there now, and a suite asserts a vessel reads
+    the same with work orders on and off.</li>
   </ul>
-  <div class="note" style="margin-top:11pt;"><span class="eyebrow">Closed since the last issue</span>
-    <p>The page sweep renders every screen but did not submit forms, which is how the settings save stayed
-    broken. The interface suite now drives the real pouring form through submission &mdash; including the
-    two rules that matter most about the check weight, that it never blocks a log and is never pre-filled
-    &mdash; and a screenshot comparison catches a card that lost its border or a chart that came back
-    empty, neither of which raises an error.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>24</span></div>
 </section>
 
@@ -1030,16 +1023,16 @@ td.k{font-weight:600; color:var(--ink);}
       and weights would not have to be typed. Each machine is a row in a registry and the polling logic sits
       behind one shared interface, with adapters written for Modbus TCP, Modbus RTU, OPC-UA, MQTT, Serial
       ASCII and HTTP. Readings would write through the same logging path the operator screen uses, so analytics and
-run tracking would need no changes. A registry screen for it is written &mdash; add a machine, point it at the pump station it sits on, map its raw tags &mdash; and is deliberately not linked from anywhere in the application, so it cannot be reached by an administrator who has not been told it is there.</p>
-      <p style="font-size:9.2pt;"><strong>None of it has been tested against real equipment.</strong> The adapters were written to cover whatever the scales or pump controllers turn out to speak; which of them is correct is unknown until someone connects one. Until then the screen stays unlinked rather than deleted, so nothing is lost if the plant ever wants it.</p>
+run tracking would need no changes. A registry screen for it is written &mdash; add a machine, point it at the pump station it sits on, map its raw tags &mdash; and it sits behind a plant setting that is off unless somebody turns it on, so it appears in the manager&rsquo;s console only for a plant that has asked for it.</p>
+      <p style="font-size:9.2pt;"><strong>None of it has been tested against real equipment.</strong> The adapters were written to cover whatever the scales or pump controllers turn out to speak; which of them is correct is unknown until someone connects one. The switch is how that is said: nothing shows for a plant that has not decided, and nobody has to be told a hidden address.</p>
     </div>
   </div>
-  <figure><img class="sml" src="figs_print/22_packing.png" alt="Pack-out logging">
+  <figure><img class="sml" src="figs_print/22_packing.png" alt="Pack-out logging" style="max-height:1.6in;">
     <figcaption><b>Pack-out logging, currently disabled.</b> Container format, resin, lot and units packed,
     with the skid equivalent calculated as the count is typed.</figcaption></figure>
   <div class="note warn" style="margin-top:11pt;"><span class="eyebrow">Read this as</span>
-    <p>Neither of these is a roadmap item or a commitment of dates. They are experiments that happen to be
-    finished enough to demonstrate, and either could be abandoned without affecting anything in service.</p></div>
+    <p>Neither is a roadmap item or a commitment of dates. Both are experiments finished enough to
+    demonstrate, and either could be abandoned without affecting anything in service.</p></div>
   <div class="folio"><span>Resin Pouring Production Logging &middot; Operations Handbook</span><span>25</span></div>
 </section>
 

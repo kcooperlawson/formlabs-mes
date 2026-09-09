@@ -195,13 +195,14 @@ elif current_role == "manager":
     with nav_5:
         st.page_link("pages/Analytics_Hub.py", label="Analytics", icon="🌌", use_container_width=True)
 else:
-    # Operator View (Stays 3 Columns)
-    nav_1, nav_2, nav_3 = st.columns(3, gap="small")
+    # Two links, not three. The SCADA page is manager and admin only now, and
+    # an operator who opens it is sent straight back here - so a Live SCADA
+    # link on this bar was an invitation to tap something that bounces. The
+    # sidebar menu was narrowed when that changed and this bar was missed.
+    nav_1, nav_2 = st.columns(2, gap="small")
     with nav_1:
-        st.page_link("Home.py", label="Live SCADA", icon="⚡", use_container_width=True)
-    with nav_2:
         st.page_link("pages/Operator_Form.py", label="Workstation", icon="📝", use_container_width=True)
-    with nav_3:
+    with nav_2:
         st.page_link("pages/Live_Reactors.py", label="Reactors", icon="🛢️", use_container_width=True)
 
 st.markdown("---")
