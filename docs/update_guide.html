@@ -1,0 +1,481 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Formlabs MES &mdash; Update Process</title>
+<style>
+@page { size: Letter; margin: 0; }
+:root{
+  /* Light print palette. This document is printed and read on paper, so the
+     page is white: a dark ground looks right on screen and comes out of a
+     printer as a solid block of toner that bleeds through the sheet. */
+  --ground:#FFFFFF; --surface:#F1F5F9; --surface-2:#F8FAFC; --raised:#E2E8F0;
+  --line:#CBD5E1; --line-soft:#E2E8F0;
+  --ink:#0F172A; --body:#334155; --muted:#475569; --faint:#64748B;
+  --accent:#C2410C; --accent-2:#EA580C; --accent-dim:#FED7AA;
+  --good:#15803D; --warn:#B45309; --bad:#B91C1C;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --disp:"Inter Display","Inter",Arial,sans-serif;
+  --mono:"DejaVu Sans Mono",monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:var(--sans); color:var(--body); font-size:10pt; line-height:1.55;
+     background:var(--ground); -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+.page{width:8.5in; height:11in; padding:0.7in 0.78in 0.55in; position:relative;
+      page-break-after:always; overflow:hidden; background:var(--ground);}
+.page:last-child{page-break-after:auto;}
+
+h1,h2,h3,h4{font-family:var(--disp); color:var(--ink); margin:0; font-weight:700; letter-spacing:-.018em;}
+h2{font-size:19pt; line-height:1.12; letter-spacing:-.025em;}
+h3{font-size:11.5pt; margin-bottom:4pt;}
+h4{font-size:9.4pt;}
+p{margin:0 0 7pt;}
+strong{color:var(--ink); font-weight:600;}
+code,.mono{font-family:var(--mono); font-size:8.2pt; background:var(--surface);
+           padding:.5pt 3pt; border-radius:2pt; color:#9A3412;
+           border:.4pt solid var(--line-soft);}
+
+.eyebrow{font-family:var(--mono); font-size:7pt; letter-spacing:.15em;
+         text-transform:uppercase; color:var(--accent);}
+.sec-head{border-bottom:1pt solid var(--line); padding-bottom:7pt; margin-bottom:14pt;}
+.sec-head .eyebrow{display:block; margin-bottom:5pt;}
+.lead{font-size:10.6pt; color:var(--body);}
+.lead strong{color:var(--ink);}
+
+.folio{position:absolute; left:0.78in; right:0.78in; bottom:0.32in; display:flex;
+       justify-content:space-between; font-family:var(--mono); font-size:6.8pt;
+       color:var(--faint); letter-spacing:.08em; text-transform:uppercase;
+       border-top:.5pt solid var(--line-soft); padding-top:6pt;}
+
+/* cover */
+.cover{padding:0.85in 0.8in; background:var(--ground);}
+.cover::before{content:""; position:absolute; left:0; top:0; bottom:0; width:.16in; background:var(--accent);}
+.cover .logo{height:.4in; margin-bottom:.8in;}
+.cover h1{color:var(--ink); font-size:39pt; line-height:1.0; letter-spacing:-.03em; max-width:6in;}
+.cover .sub{font-size:11.5pt; color:var(--accent-2); margin-top:15pt;}
+.cover .rule{height:1pt; background:var(--line); margin:30pt 0 20pt; width:2.2in;}
+.cover .blurb{font-size:10.8pt; line-height:1.55; color:var(--muted); max-width:4.8in;}
+.cover .meta{position:absolute; left:0.8in; right:0.8in; bottom:0.7in; display:flex; gap:0.42in;
+             font-family:var(--mono); font-size:7pt; color:var(--faint); text-transform:uppercase; letter-spacing:.08em;}
+.cover .meta b{display:block; font-family:var(--sans); color:var(--ink); font-size:9pt;
+               font-weight:600; letter-spacing:-.01em; margin-top:3pt; text-transform:none;}
+
+/* figures */
+figure{margin:0 0 10pt;}
+figure img{width:100%; display:block; border:.6pt solid var(--line); border-radius:3pt;
+           max-height:2.85in; object-fit:cover; object-position:top center;}
+figure img.med{max-height:3.35in;} figure img.big{max-height:4.15in;} figure img.sml{max-height:1.95in;}
+figcaption{font-size:7.6pt; color:var(--muted); margin-top:5pt; line-height:1.42;}
+figcaption b{color:var(--ink); font-weight:600;}
+
+/* blocks */
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12pt 16pt;}
+.grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10pt 13pt;}
+.card{border:.6pt solid var(--line); border-radius:3pt; padding:10pt 11pt; background:var(--surface);}
+.card h4{margin-bottom:3pt;}
+.card p{font-size:8.8pt; line-height:1.45; color:var(--muted); margin:0;}
+.card .tag{font-family:var(--mono); font-size:6.6pt; letter-spacing:.1em; text-transform:uppercase;
+           color:var(--accent); display:block; margin-bottom:5pt;}
+.stat{border-left:2pt solid var(--accent); padding-left:9pt;}
+.stat .n{font-family:var(--disp); font-size:22pt; font-weight:800; color:var(--ink);
+         letter-spacing:-.03em; line-height:1; display:block;}
+.stat .l{font-size:7.6pt; color:var(--muted); line-height:1.35; display:block; margin-top:4pt;}
+.note{background:var(--surface-2); border-left:2pt solid var(--line); padding:10pt 12pt; margin:0 0 11pt;}
+.note p{margin:0; font-size:9.2pt;}
+.note .eyebrow{display:block; margin-bottom:4pt; color:var(--muted);}
+.note.warn{border-left-color:var(--warn);} .note.warn .eyebrow{color:var(--warn);}
+
+ul.tight{margin:0 0 8pt; padding-left:13pt;}
+ul.tight li{margin-bottom:4pt; font-size:9.3pt; line-height:1.45; color:var(--muted);}
+ul.tight li::marker{color:var(--accent);}
+ul.tight li strong{color:var(--ink);}
+
+table{width:100%; border-collapse:collapse; font-size:8pt;}
+th{text-align:left; font-weight:600; color:var(--ink); border-bottom:1pt solid var(--line);
+   padding:5pt 6pt; font-size:7.2pt; letter-spacing:.07em; text-transform:uppercase;}
+td{padding:5pt 6pt; border-bottom:.5pt solid var(--line-soft); vertical-align:top; line-height:1.4; color:var(--muted);}
+/* The capability table grew four rows when the manager column stopped being
+   fixed. Rows give up a point of padding rather than the page giving up a
+   capability, because the whole value of that table is that it is complete. */
+table.tight-rows td{padding:3.6pt 6pt;}
+table.tight-rows th{padding:4pt 6pt;}
+td.k{font-weight:600; color:var(--ink);}
+.yes{color:var(--good); font-weight:600;} .no{color:var(--faint);} .part{color:var(--warn); font-weight:600;}
+
+.step{display:grid; grid-template-columns:20pt 1fr; gap:0 9pt; margin-bottom:9pt;}
+.step .n{font-family:var(--disp); font-size:8.5pt; font-weight:800; color:var(--ground);
+         background:var(--accent); width:16pt; height:16pt; border-radius:50%;
+         display:flex; align-items:center; justify-content:center; margin-top:1pt;}
+.step h4{margin-bottom:2pt;}
+.step p{font-size:9pt; margin:0; color:var(--muted); line-height:1.45;}
+
+.toc{font-size:9.2pt;}
+.toc .row{display:flex; align-items:baseline; gap:7pt; padding:5.5pt 0; border-bottom:.5pt solid var(--line-soft);}
+.toc .row .num{font-family:var(--mono); font-size:7.6pt; color:var(--accent); width:18pt; flex:none;}
+.toc .row .t{color:var(--ink); font-weight:600;}
+.toc .row .d{color:var(--muted); flex:1; font-size:8.6pt;}
+.toc .row .pg{font-family:var(--mono); font-size:7.6pt; color:var(--faint);}
+
+.role-band{display:flex; margin-bottom:12pt; border:.6pt solid var(--line); border-radius:3pt; overflow:hidden;}
+.role-band div{flex:1; padding:7pt 9pt; font-size:7.8pt; color:var(--muted); border-right:.6pt solid var(--line);}
+.role-band div:last-child{border-right:none;}
+.role-band b{display:block; color:var(--ink); font-size:8.8pt; font-weight:600; margin-bottom:2pt;}
+.role-band div.me{background:var(--surface); border-top:2pt solid var(--accent);}
+.role-band div.me b{color:var(--accent-2);}
+
+/* theme gallery */
+.themes{display:grid; grid-template-columns:1fr 1fr; gap:11pt 13pt;}
+/* Three across for the light set: two rows of thumbnails would push the rest
+   of that page over the fold, and these three are being compared with each
+   other rather than read in detail. */
+.themes.three{grid-template-columns:1fr 1fr 1fr; gap:9pt 10pt;}
+.themes.three .nm{font-size:7.6pt;} .themes.three .sw{font-size:6pt;}
+.theme img{width:100%; display:block; border:.5pt solid var(--line); border-radius:3pt;}
+.theme .cap{display:flex; justify-content:space-between; align-items:baseline; margin-top:4pt;}
+.theme .nm{font-size:8.4pt; font-weight:600; color:var(--ink);}
+.theme .sw{font-family:var(--mono); font-size:6.8pt; color:var(--faint);}
+.chip{display:inline-block; width:7pt; height:7pt; border-radius:1.5pt; margin-left:3pt; vertical-align:-.5pt;}
+
+/* Part banding and section status. The distinction between what runs and what
+   is merely available has to survive somebody opening the document in the
+   middle, so it lives on every section header rather than only in the
+   contents. */
+.partband{font-family:var(--mono); font-size:6.4pt; letter-spacing:.18em;
+          text-transform:uppercase; color:var(--ground); background:var(--ink);
+          display:inline-block; padding:2.5pt 7pt; border-radius:2pt; margin-bottom:7pt;}
+.sec-head .hrow{display:flex; justify-content:space-between; align-items:baseline;
+                gap:10pt; margin-bottom:5pt;}
+.sec-head .hrow .eyebrow{display:inline; margin-bottom:0;}
+.status{font-family:var(--mono); font-size:6.4pt; letter-spacing:.13em; text-transform:uppercase;
+        padding:2pt 6pt; border-radius:2pt; border:.5pt solid var(--line);
+        color:var(--muted); background:var(--surface-2); white-space:nowrap; flex:none;}
+.status.in{color:#166534; border-color:#BBF7D0; background:#F0FDF4;}
+.status.opt{color:#92400E; border-color:var(--accent-dim); background:#FFFBEB;}
+.status.no{color:var(--faint); border-color:var(--line); background:var(--surface-2);}
+/* The contents now carries three part bands and a scope note as well as its
+   rows, so the rows themselves give up a point of leading each. */
+.toc .row{padding:4.2pt 0;}
+
+/* contents banding */
+.toc-band{font-family:var(--mono); font-size:6.8pt; letter-spacing:.16em;
+          text-transform:uppercase; color:var(--accent); margin:11pt 0 3pt;}
+.toc .row:first-of-type{border-top:none;}
+</style>
+<style>
+  body{font-size:11pt; line-height:1.6;}
+  .page{padding:0.62in 0.72in 0.5in;}
+  h1,h2,h3,h4{color:var(--ink);}
+  .cover-op{display:flex; flex-direction:column; justify-content:center; height:11in;
+            padding:0 1.05in; text-align:left;}
+  /* align-self, not width. The cover is a column flexbox, whose align-items
+     defaults to `stretch` - which pulls the logo out to the full column
+     width and flattens the mark. Nothing was setting a width at all. */
+  .cover-op .logo{height:34pt; width:auto; align-self:flex-start;
+                  margin-bottom:30pt;}
+  .cover-op h1{font-family:var(--disp); font-size:34pt; font-weight:800; line-height:1.06;
+               letter-spacing:-0.02em; margin:0;}
+  .cover-op .sub{font-size:13.5pt; color:var(--muted); margin-top:12pt; max-width:5.1in;
+                 line-height:1.5;}
+  .cover-op .rule{height:2.5pt; width:1.5in; background:var(--accent); margin:22pt 0 20pt;}
+  .cover-op .who{font-family:var(--mono); font-size:8.4pt; letter-spacing:.13em;
+                 text-transform:uppercase; color:var(--faint); line-height:2;}
+
+  .sec{border-bottom:1.4pt solid var(--ink); padding-bottom:7pt; margin-bottom:15pt;}
+  .sec .num{font-family:var(--mono); font-size:8pt; letter-spacing:.16em; color:var(--accent);
+            text-transform:uppercase; display:block; margin-bottom:3pt;}
+  .sec h2{font-family:var(--disp); font-size:20pt; font-weight:800; margin:0;
+          letter-spacing:-0.015em;}
+
+  .row{display:grid; grid-template-columns:1fr 1.72in; gap:20pt; align-items:start;
+       margin-bottom:15pt;}
+  .row.wide{grid-template-columns:1fr 2.05in;}
+  .row .shot img{width:100%; border:.7pt solid var(--line); border-radius:6pt;}
+  .row .shot.tall img{max-height:2.55in; object-fit:cover; object-position:top center;}
+  .row .shot .cap{font-size:8pt; color:var(--faint); text-align:center; margin-top:4pt;
+                  line-height:1.35;}
+
+  .stepbig{display:flex; gap:11pt; margin-bottom:12pt; align-items:flex-start;}
+  .stepbig .n{flex:0 0 auto; width:23pt; height:23pt; border-radius:50%;
+              background:var(--accent); color:#fff; font-family:var(--disp);
+              font-weight:800; font-size:12pt; display:flex; align-items:center;
+              justify-content:center; margin-top:1pt;}
+  .stepbig h4{font-size:12pt; font-weight:800; margin:1pt 0 3pt;}
+  .stepbig p{margin:0; font-size:10.6pt; line-height:1.55; color:var(--body);}
+  .stepbig p + p{margin-top:5pt;}
+
+  /* The bottom margin is spacing between a callout and whatever follows it.
+     On a fixed-height page the last element on the sheet has nothing following
+     it, and that margin is the difference between a page that fits and one
+     that silently clips its last line - which is how page 7 lost the end of
+     its own callout. */
+  .callout{border-left:3.5pt solid var(--accent); background:var(--surface-2);
+           padding:10pt 14pt; margin:0 0 13pt;}
+  /* :last-of-type would match the last DIV on the page, and the folio is a
+     div too, so it never matched the callout. nth-last-child(2) is the
+     element with only the folio after it, which is what "last on the
+     sheet" actually means here. */
+  .page > .callout:nth-last-child(2){margin-bottom:0;}
+  /* Same for a fix block, for the same reason: the troubleshooting page
+     is eight of them stacked, and the last one's bottom margin was the
+     five pixels that put its final line under the footer. */
+  .page > .fix:nth-last-child(2){margin-bottom:0;}
+  .callout .lab{font-family:var(--mono); font-size:7.6pt; letter-spacing:.13em;
+                text-transform:uppercase; color:var(--accent); display:block; margin-bottom:4pt;}
+  .callout p{margin:0; font-size:10.4pt; line-height:1.55;}
+  .callout.stop{border-left-color:var(--bad);} .callout.stop .lab{color:var(--bad);}
+  .callout.ok{border-left-color:var(--good);} .callout.ok .lab{color:var(--good);}
+
+  .fix{border-top:.7pt solid var(--line-soft); padding:9pt 0 0; margin-bottom:9pt;}
+  .fix h4{font-size:11pt; font-weight:800; margin:0 0 3pt;}
+  .fix p{margin:0; font-size:10.2pt; line-height:1.55; color:var(--body);}
+
+  .rule-list{margin:0; padding-left:0; list-style:none;}
+  .rule-list li{font-size:11pt; line-height:1.5; margin-bottom:9pt; padding-left:18pt;
+                position:relative; color:var(--ink);}
+  .rule-list li::before{content:"—"; position:absolute; left:0; color:var(--accent);
+                        font-weight:700;}
+  .rule-list li span{color:var(--muted); font-size:10.2pt;}
+
+  .later{display:grid; grid-template-columns:1fr 1fr; gap:9pt 16pt; margin-top:4pt;}
+  .later div{font-size:10pt; line-height:1.5; color:var(--muted);}
+  .later b{color:var(--ink); display:block; font-size:10.4pt;}
+</style>
+</head><body>
+
+<section class="page cover-op">
+  <img class="logo" src="assets/formlabs_logo.png" alt="">
+  <h1>Updating the plant PC</h1>
+  <div class="rule"></div>
+  <div class="sub">How a change made away from the floor gets onto the machine
+  that runs the pouring log, without anybody guessing at which files to copy.</div>
+  <div class="who" style="margin-top:34pt;">For &mdash; whoever looks after the plant PC<br>
+  Keep with the handbook &middot; September 2026</div>
+</section>
+
+<section class="page">
+  <div class="sec"><span class="num">The short version</span>
+    <h2>One file, one menu option</h2></div>
+
+  <p class="lead" style="margin-bottom:14pt;">An update arrives as a single zip
+  file with a version in its name, like <code>mes_update_PT-V3.42.zip</code>.
+  Everything in this guide is what happens around those five steps, so if you
+  have done this before, the five steps are the whole job.</p>
+
+  <ul class="rule-list">
+    <li>Copy the zip into the <b>updates</b> folder on the plant PC.
+      <span>Same folder every time. Nothing else goes in there.</span></li>
+    <li>Run <b>START_HERE.bat</b> from the project folder.</li>
+    <li>Choose <b>7 &mdash; Apply an update</b>.</li>
+    <li>Read what it says it is about to do, then type <b>YES</b>.
+      <span>Anything other than YES stops it, and nothing is changed.</span></li>
+    <li>When it finishes, choose <b>3</b> to start the app again.
+      <span>Operators pick up the new version the next time their page loads.</span></li>
+  </ul>
+
+  <div class="callout ok">
+    <span class="lab">If it goes wrong, it undoes itself</span>
+    <p>Every step that can fail is checked, and a failure after the files have
+    moved puts the old version back before it tells you anything. You do not
+    have to undo it by hand, and the worst case is that nothing changed.</p>
+  </div>
+
+  <div class="callout">
+    <span class="lab">What it never touches</span>
+    <p>Your database connection, the backups folder, the logs, uploaded photos
+    and the Python environment all belong to that machine rather than to a
+    release. An update never writes to any of them, and a package that tries is
+    refused before anything else happens.</p>
+  </div>
+
+  <div class="callout">
+    <span class="lab">Who can do this</span>
+    <p>Anybody who can sign into the plant PC and copy a file. There is nothing
+    to know about Python, databases or version control, and nothing to decide.
+    If the machine cannot take the update it says so and changes nothing.</p>
+  </div>
+
+  <div class="folio"><span>Formlabs MES &middot; Update Process</span><span>2</span></div>
+</section>
+
+<section class="page">
+  <div class="sec"><span class="num">Step by step</span>
+    <h2>Doing it, and what you see</h2></div>
+
+  <div class="stepbig"><div class="n">1</div><div>
+    <h4>Pick a quiet moment</h4>
+    <p>The app is unavailable for a minute or two while this runs, and an
+    operator who is halfway through typing a log will lose what they typed.
+    Between shifts is ideal. Mid-pour is not.</p></div></div>
+
+  <div class="stepbig"><div class="n">2</div><div>
+    <h4>Copy the zip into <code>updates\</code></h4>
+    <p>Straight from the USB stick into that folder. Do not unzip it. If the
+    folder already holds an older package, the newest one is the one it picks
+    up, but it is tidier to keep only the one you are applying.</p></div></div>
+
+  <div class="stepbig"><div class="n">3</div><div>
+    <h4>Run START_HERE.bat and choose 7</h4>
+    <p>The same menu you use to start the app. Option 7 is <em>Apply an
+    update</em>, under the UPDATE heading at the bottom.</p></div></div>
+
+  <div class="stepbig"><div class="n">4</div><div>
+    <h4>Check the two lines at the top</h4>
+    <p>It prints the version this PC is running and the name of the package it
+    found, then what the package changes. If either version is not what you
+    expected, type anything other than YES and nothing happens.</p></div></div>
+
+  <div class="stepbig"><div class="n">5</div><div>
+    <h4>Type YES and wait</h4>
+    <p>It works through six numbered steps and says what it is doing. A minute
+    is normal. Longer than five means something is stuck, and the safe thing is
+    to leave it rather than close the window.</p></div></div>
+
+  <div class="stepbig"><div class="n">6</div><div>
+    <h4>Start the app again</h4>
+    <p>It finishes by printing the version now running. Choose 3 from the menu
+    to start the app, then open it once yourself and sign in before you walk
+    away.</p></div></div>
+
+  <div class="folio"><span>Formlabs MES &middot; Update Process</span><span>3</span></div>
+</section>
+
+<section class="page">
+  <div class="sec"><span class="num">While you wait</span>
+    <h2>What it is actually doing</h2></div>
+
+  <p class="lead" style="margin-bottom:13pt;">Six steps, in this order on
+  purpose. Each one is a thing that used to be a decision somebody made
+  differently every time.</p>
+
+  <div class="step"><span class="n">1</span><div>
+    <h4>Reads the package and checks every file</h4>
+    <p>Each file carries a checksum. A stick that copied half a file looks
+    exactly like a good one until those are read, and that is the failure most
+    likely to actually happen. A bad one stops here, before anything is
+    written.</p></div></div>
+
+  <div class="step"><span class="n">2</span><div>
+    <h4>Checks the version</h4>
+    <p>A package built for a different version, one this PC has already had, or
+    an older one going backwards are all refused. Nothing is changed by any of
+    them.</p></div></div>
+
+  <div class="step"><span class="n">3</span><div>
+    <h4>Takes a database backup</h4>
+    <p>Into <code>backups\</code>, the same as the daily one. If the backup
+    fails it stops there, because an update with no backup behind it is the one
+    that cannot be undone.</p></div></div>
+
+  <div class="step"><span class="n">4</span><div>
+    <h4>Copies the whole project aside</h4>
+    <p>Into <code>rollback\</code>, in a folder named for the version and the
+    date. That copy is what gets put back if anything later fails, and it is
+    also what you copy back by hand a week later if you need to.</p></div></div>
+
+  <div class="step"><span class="n">5</span><div>
+    <h4>Writes the files</h4>
+    <p>Only the files in the package, into the folders they belong in. Files a
+    release removes are removed. Anything that belongs to this machine is left
+    alone.</p></div></div>
+
+  <div class="step"><span class="n">6</span><div>
+    <h4>Proves it runs</h4>
+    <p>It compiles every file it copied and then starts the application, which
+    is what applies any database change the release brought with it. If that
+    fails, the old version goes back automatically.</p></div></div>
+
+  <div class="note"><span class="eyebrow">Where things end up</span>
+    <p><code>rollback\</code> a dated copy of the version you were on &middot;
+    <code>updates\applied\</code> packages already used, so one cannot run
+    twice &middot; <code>logs\updates.log</code> one line per attempt &middot;
+    <code>backups\</code> the database backup from step 3.</p></div>
+
+  <div class="folio"><span>Formlabs MES &middot; Update Process</span><span>4</span></div>
+</section>
+
+<section class="page">
+  <div class="sec"><span class="num">Reference</span>
+    <h2>When it says something is wrong</h2></div>
+
+  <div class="fix"><h4>No update package found</h4>
+  <p>The zip is not in the <code>updates</code> folder, or it is still in a
+  subfolder from unzipping something. Put the zip itself in there.</p></div>
+
+  <div class="fix"><h4>does not match its checksum</h4>
+  <p>The file did not copy properly. Copy it onto the stick again and copy it
+  across again. Nothing was changed on the PC.</p></div>
+
+  <div class="fix"><h4>This package updates PT-V3.40, and this PC is on PT-V3.38</h4>
+  <p>You are missing a release in between, or this package was built for a
+  different machine. Apply them in order, or ask for one built against the
+  version this PC is actually on. The version it is on is printed at the top of
+  the screen.</p></div>
+
+  <div class="fix"><h4>This PC is already on that version</h4>
+  <p>The package has already been applied here. There is a copy of every
+  package that has been used in <code>updates\applied\</code>.</p></div>
+
+  <div class="fix"><h4>the backup failed</h4>
+  <p>The database is not reachable, or PostgreSQL is not running. Choose 5 from
+  the menu to diagnose the PC. Nothing was changed, and the update is worth
+  fixing this first rather than skipping it.</p></div>
+
+  <div class="fix"><h4>the application did not start</h4>
+  <p>The update did not take, and the old version has already been put back.
+  The PC is running exactly what it was running before. Send me the last twenty
+  lines of what it printed, and the backup from that run is in
+  <code>backups\</code> if it is ever needed.</p></div>
+
+  <div class="fix"><h4>a package could not be installed</h4>
+  <p>The release needed something new from the internet and this PC could not
+  reach it. The update rolled itself back. It needs a package bundle built for
+  it, which is my end, not yours.</p></div>
+
+  <div class="folio"><span>Formlabs MES &middot; Update Process</span><span>5</span></div>
+</section>
+
+<section class="page">
+  <div class="sec"><span class="num">Reference</span>
+    <h2>Going back, and building one</h2></div>
+
+  <h3 style="margin-bottom:6pt;">Putting the old version back by hand</h3>
+  <p style="font-size:10.4pt;">You should not need this. The applier undoes
+  itself when a step fails, and this is for the other case: it applied cleanly
+  and something looks wrong an hour later.</p>
+
+  <div class="stepbig"><div class="n">1</div><div>
+    <h4>Close the app</h4>
+    <p>Close the window that is running it, so nothing is reading the files you
+    are about to replace.</p></div></div>
+
+  <div class="stepbig"><div class="n">2</div><div>
+    <h4>Copy the dated folder back over the top</h4>
+    <p>Open <code>rollback\</code>, find the folder named for the version you
+    want and the time it was taken, and copy everything inside it into the
+    project folder, replacing what is there.</p></div></div>
+
+  <div class="stepbig"><div class="n">3</div><div>
+    <h4>Start it again and check the version</h4>
+    <p>The version is printed at the bottom of the sidebar in the app, and by
+    option 5 on the menu.</p></div></div>
+
+  <div class="callout stop">
+    <span class="lab">The one case that needs more than files</span>
+    <p>If the release you are undoing changed the database, putting the old
+    files back leaves older code in front of a newer database. Usually that is
+    fine. If the app misbehaves after a rollback, restore the backup that was
+    taken at the start of that update, which is the newest file in
+    <code>backups\</code>. Tell me before you do it, because restoring the
+    database also gives back any logs entered since.</p></div>
+
+  <h3 style="margin:14pt 0 6pt;">Building a package</h3>
+  <p style="font-size:10.4pt;">My end, written down so it is not only in my
+  head. From the project folder on the machine where the change was made:</p>
+  <p><code>python dev/make_update.py --from PT-V3.41 --notes "what is in it"</code></p>
+  <p style="font-size:10.4pt;">It reads what changed since that version and
+  writes one zip into <code>dist\</code>, listing what went in it. The version
+  after <code>--from</code> is the version the plant PC is running, and getting
+  it wrong is safe: the applier refuses a package that does not match the
+  machine.</p>
+
+  <div class="folio"><span>Formlabs MES &middot; Update Process</span><span>6</span></div>
+</section>
+
+</body></html>
