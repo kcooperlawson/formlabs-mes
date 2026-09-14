@@ -21,6 +21,16 @@ Thumbs.db
 *.env
 !.env.example
 
+# Per-PC HTTPS certificate and private key (setup/generate_tls_cert.py).
+# Every machine gets its own — never commit the key.
+certs/
+
+# Update-signing private key (setup/update_signing.py / dev/make_update.py
+# --init-keys). Lives only on the machine that builds releases — never here,
+# never on a plant PC. The matching public key IS committed: it's
+# setup/update_signing_public.pem, not this file.
+dev/update_signing_private.pem
+
 # Local database files and dumps
 *.db
 *.sql

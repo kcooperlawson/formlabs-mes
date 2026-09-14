@@ -103,7 +103,19 @@ def _get_pg_bin(binary_name: str) -> str:
     exe_name = f"{binary_name}.exe" if os.name == "nt" else binary_name
     bin_dir = os.getenv("PG_BIN_DIR", "").strip()
     if bin_dir:
-        return os.path.join(bin_dir, exe_name)
+        candidate = os.path.join(bin_dir, exe_name)
+        if os.path.isfile(candidate):
+            return candidate
+        # A stale or malformed PG_BIN_DIR (a doubled backslash pasted in by
+        # hand, a version that got uninstalled, ...) used to be trusted
+        # forever and break every backup/restore with a bare WinError 2 and
+        # no hint why. Falling through to re-detect instead means a bad
+        # value heals itself the next time this runs, rather than staying
+        # broken until somebody finds this exact line of code.
+        logger.warning(
+            f"_get_pg_bin() PG_BIN_DIR={bin_dir!r} in .env does not contain "
+            f"{exe_name} - ignoring it and re-detecting PostgreSQL"
+        )
 
     resolved = shutil.which(exe_name)
     if resolved:
@@ -116,7 +128,14 @@ def _get_pg_bin(binary_name: str) -> str:
         )
         if candidates:
             found_path = candidates[0]
-            found_dir = os.path.dirname(found_path)
+            # Forward slashes rather than os.path.dirname()'s native
+            # backslashes: Windows file APIs accept '/' fine, and it sidesteps
+            # python-dotenv's own quoting/escaping of '\\' on write - which is
+            # exactly what corrupted this value once already (a persisted
+            # "C:\Program Files\..." came back out with doubled backslashes
+            # and stray quotes, and broke pg_dump for good until someone
+            # noticed this comment).
+            found_dir = os.path.dirname(found_path).replace("\\", "/")
             try:
                 env_path = os.path.join(BASE_DIR, ".env")
                 if os.path.exists(env_path):
@@ -479,7 +498,7 @@ def do_logout(cookie_manager):
     """
     from crud import delete_session  # local import avoids a circular import with crud.py
 
-    saved_theme = st.session_state.get("preferred_theme", "Default Dark")
+    saved_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
 
     # Read the token before the state goes, and revoke it server-side: this is
     # the part that must happen whatever else does, because it is what stops
@@ -526,7 +545,7 @@ def check_authentication(cookie_manager):
             "user_role": user_data["role"],
             "user_name": user_data["full_name"],
             "user_shift": user_data.get("shift", "Shift 1"),
-            "preferred_theme": user_data.get("preferred_theme", "Default Dark"),
+            "preferred_theme": user_data.get("preferred_theme", "Formlabs Forge"),
             "avatar_filename": user_data.get("avatar_filename"),
         })
         st.rerun()

@@ -39,10 +39,10 @@ from database import (
     seed_initial_data,
     backfill_foreign_keys,
     update_user_theme,
-    add_suggestion,
     do_logout,
 )
 from database import esc
+from components import render_feedback_box
 from resin_palette import resin_chip, stored_color_map, style_resin_column
 import pace
 
@@ -51,7 +51,7 @@ try:
     from themes import THEMES
 except ImportError:
     THEMES = {
-        "Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+        "Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
 
 @st.fragment(run_every="10s")
@@ -103,7 +103,7 @@ if "authenticated" not in st.session_state:
     st.session_state["user_role"] = None
     st.session_state["user_name"] = None
     st.session_state["user_id"] = None
-    st.session_state["preferred_theme"] = "Default Dark"
+    st.session_state["preferred_theme"] = "Formlabs Forge"
 
 # We add a lock so we ONLY check the browser cookie once!
 if "theme_loaded_from_cookie" not in st.session_state:
@@ -121,10 +121,10 @@ if cached_theme and cached_theme in THEMES and not st.session_state["theme_loade
     st.session_state["theme_loaded_from_cookie"] = True
 
 # Always trust the fast internal memory from here on out
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
 
 # Change this variable to easily update the version across the app!
-APP_VERSION = "PT-V3.46"
+APP_VERSION = "PT-V3.47"
 
 _signed_in = bool(st.session_state.get("authenticated", False))
 
@@ -248,7 +248,7 @@ if not st.session_state["authenticated"] and cached_token is not None:
         st.session_state["user_role"] = user_data["role"]
         st.session_state["user_name"] = user_data["full_name"]
         st.session_state["user_shift"] = user_data.get("shift", "Shift 1")
-        st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Default Dark")
+        st.session_state["preferred_theme"] = user_data.get("preferred_theme", "Formlabs Forge")
         st.session_state["avatar_filename"] = user_data.get("avatar_filename")
         if user_data["role"] in ["operator", "packer"]:
             st.switch_page("pages/Operator_Form.py")
@@ -336,7 +336,7 @@ if not st.session_state["authenticated"]:
                         user, auth_error = authenticate_user(log_user, log_pin)
                         if user:
                             # Capture theme from user profile and set theme cookie
-                            user_theme = user.get("preferred_theme", "Default Dark")
+                            user_theme = user.get("preferred_theme", "Formlabs Forge")
                             set_cookie(cookie_manager, "formlabs_mes_theme", user_theme,
                                                expires_at=datetime.now() + timedelta(days=30), key="set_theme_cookie")
 
@@ -386,7 +386,7 @@ if not st.session_state["authenticated"]:
                             success = create_user(
                                 username=reg_user, email=reg_email, pin=reg_pin, full_name=reg_name,
                                 role="operator",  # self-registration can never grant anything above operator
-                                target_lph=400.0, shift=reg_shift, theme="Default Dark"
+                                target_lph=400.0, shift=reg_shift, theme="Formlabs Forge"
                             )
                             if success:
                                 st.success("✅ Credentials logged! You may now sign in.")
@@ -492,7 +492,7 @@ with st.sidebar:
 
         with set_tab2:
             st.markdown("#### Interface Preferences")
-            current_t = st.session_state.get("preferred_theme", "Default Dark")
+            current_t = st.session_state.get("preferred_theme", "Formlabs Forge")
             chosen_t = st.selectbox("System Theme", list(THEMES.keys()), index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
 
             if chosen_t != current_t:
@@ -516,15 +516,7 @@ with st.sidebar:
                     st.rerun()
 
         with set_tab3:
-            st.markdown("#### Universal Feedback Box")
-            with st.form("settings_sug_form", clear_on_submit=True):
-                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue"))
-                s_txt = st.text_area("Observation / Description")
-                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                    if s_txt.strip():
-                        from database import add_suggestion
-                        add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat, s_txt)
-                        st.success("✅ Submitted to IT Admin!")
+            render_feedback_box(st.session_state.get("user_name"), st.session_state.get("user_role"))
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -773,18 +765,22 @@ total_scrap = (
 )
 liters_output = 0.0
 resin_mass_kg = 0.0
-v2_cart_count = 0
-rps_jug_count = 0
+# Every cartridge type actually poured today, not just the two this card used
+# to know about. It used to keep one counter for RPS and one for "everything
+# else, unless it says Pigment" - so a V1 pour (or a bulk drum) was silently
+# added to the V2 total, and Pigment was dropped from the subtext entirely
+# even though it was still in the liters above it. A day that ran all V1, like
+# today, read as a day of V2. Counting by whatever cartridge_type the row
+# actually carries means a new format added in Mgr_Resin_Canvas shows up here
+# with no further change needed.
+cart_type_counts = {}
 
 if not pour_df.empty:
     for _, r in pour_df.iterrows():
         b_count = float(r.get("bottles_filled", 0) or 0)
-        c_type = str(r.get("cartridge_type", "V2")).strip()
+        c_type = str(r.get("cartridge_type", "V2")).strip() or "V2"
         r_name = str(r.get("resin_type", "")).strip()
-        if "RPS" in c_type.upper():
-            rps_jug_count += int(b_count)
-        elif "PIGMENT" not in c_type.upper():
-            v2_cart_count += int(b_count)
+        cart_type_counts[c_type] = cart_type_counts.get(c_type, 0) + int(b_count)
 
         # One definition of how much a row is worth, in crud.log_litres, so the
         # tanks and the totals can never disagree about it - including on a
@@ -911,11 +907,21 @@ if show_pouring:
             unsafe_allow_html=True,
         )
 
+    # Busiest type first, so the card reads the same way the plant floor
+    # would say it out loud - "mostly V1 today, a bit of RPS" - rather than
+    # alphabetically. Whatever ran today shows up; nothing here is hardcoded
+    # to a fixed pair of formats any more.
+    _cart_subtext = (
+        " | ".join(f"{n} {t}" for t, n in
+                   sorted(cart_type_counts.items(), key=lambda kv: -kv[1]))
+        if cart_type_counts else "No cartridges logged"
+    )
+
     c1, c2, c3, c4 = st.columns(4)
     c1.markdown(
         f"""<div class="telemetry-grid-card"><div class="telemetry-label">VOLUME OUTPUT</div>
             <div class="telemetry-val-large">{liters_output:,.0f} <span style="font-size:0.9rem; color:#94A3B8;">L</span></div>
-            <div class="telemetry-subtext">{v2_cart_count} V2 | {rps_jug_count} RPS</div></div>""",
+            <div class="telemetry-subtext">{esc(_cart_subtext)}</div></div>""",
         unsafe_allow_html=True,
     )
     c2.markdown(

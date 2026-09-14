@@ -56,6 +56,20 @@ def start_announcing():
     if _zeroconf is not None:
         return  # already announcing in this process
 
+    # Only announce when the device gateway is enabled. Broadcasting the
+    # database location is only useful when a gateway poller somewhere on the
+    # LAN might need it; otherwise it is unnecessary reconnaissance.
+    try:
+        from database import get_plant_settings
+        if not get_plant_settings().get("enable_device_gateway", False):
+            logger.info("[service_announcer] device gateway is off - not announcing database")
+            return
+    except Exception:
+        # If settings cannot be read at startup, stay silent rather than
+        # broadcasting blindly.
+        logger.warning("[service_announcer] could not read plant settings - not announcing database")
+        return
+
     db_url = os.getenv("DB_URL")
     if not db_url:
         logger.warning("[service_announcer] DB_URL not set - nothing to announce")

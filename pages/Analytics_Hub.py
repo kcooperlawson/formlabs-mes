@@ -25,6 +25,7 @@ from database import (
     get_all_users_df, get_all_resin_specs_df,
 )
 from resin_palette import resin_color_map, stored_color_map
+from components import render_feedback_box
 import fill_weight
 import pace
 
@@ -68,11 +69,11 @@ try:
     from themes import THEMES
 except ImportError:
     THEMES = {
-        "Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+        "Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
 if active_theme not in THEMES:
-    active_theme = "Default Dark"
+    active_theme = "Formlabs Forge"
 
 st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 try:
@@ -140,7 +141,7 @@ with st.sidebar:
         # TAB 2: THEME & AVATAR
         with set_tab2:
             st.markdown("#### Interface Preferences")
-            current_t = st.session_state.get("preferred_theme", "Default Dark")
+            current_t = st.session_state.get("preferred_theme", "Formlabs Forge")
             chosen_t = st.selectbox("System Theme", list(THEMES.keys()),
                                     index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
 
@@ -168,17 +169,7 @@ with st.sidebar:
 
         # TAB 3: FEEDBACK & CHANGELOG
         with set_tab3:
-            st.markdown("#### Universal Feedback Box")
-            with st.form("settings_sug_form", clear_on_submit=True):
-                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue"))
-                s_txt = st.text_area("Observation / Description")
-                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                    if s_txt.strip():
-                        from database import add_suggestion
-
-                        add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat,
-                                       s_txt)
-                        st.success("✅ Submitted to IT Admin!")
+            render_feedback_box(st.session_state.get("user_name"), st.session_state.get("user_role"))
 
     st.markdown("<br>", unsafe_allow_html=True)
 

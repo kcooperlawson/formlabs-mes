@@ -19,11 +19,12 @@ from datetime import datetime, timedelta
 from database import (do_logout, get_avatar_path, role_can_administer,
                       role_can_view_scada, can, get_plant_settings,
                       set_cookie, flash, draw_flashes)
+from components import render_feedback_box
 
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; }</style>"}
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; }</style>"}
 
 
 # What a phone needs to save this to a home screen and have it look like an
@@ -287,7 +288,7 @@ def render_shell(show_settings: bool = True):
 
                 with set_tab2:
                     st.markdown("#### Interface Preferences")
-                    current_t = st.session_state.get("preferred_theme", "Default Dark")
+                    current_t = st.session_state.get("preferred_theme", "Formlabs Forge")
                     chosen_t = st.selectbox("System Theme", list(THEMES.keys()), index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
 
                     if chosen_t != current_t:
@@ -344,15 +345,7 @@ def render_shell(show_settings: bool = True):
                             st.rerun()
 
                 with set_tab3:
-                    st.markdown("#### Universal Feedback Box")
-                    with st.form("settings_sug_form", clear_on_submit=True):
-                        s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue"))
-                        s_txt = st.text_area("Observation / Description")
-                        if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                            if s_txt.strip():
-                                from database import add_suggestion
-                                add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat, s_txt)
-                                st.success("✅ Submitted to IT Admin!")
+                    render_feedback_box(st.session_state.get("user_name"), st.session_state.get("user_role"))
 
             # spacing that belongs to the popover above, not to pages without it
             st.markdown("<br>", unsafe_allow_html=True)

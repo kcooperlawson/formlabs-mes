@@ -17,8 +17,8 @@ import bulk_pour as _bulk
 from db_core import engine, ScopedSession, Base
 from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor, SheetTarget,
                     ErrorReport,
-                    ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
-                    CleanlinessAudit, FloorMessage, PlantSettings, Suggestion, UserSession,
+                    ResinSpec, ResinSpecHistory, PumpStation, DowntimeReason, DailyChecklist,
+                    CleanlinessAudit, CleanlinessAuditPhoto, FloorMessage, PlantSettings, Suggestion, UserSession,
                     LotVerification, UserAbility, ReactorBatch)
 from reactor_vessel import resolve_vessel_type
 from app_logger import logger
@@ -230,9 +230,16 @@ def seed_initial_data():
     session = ScopedSession()
     try:
         if session.query(User).count() == 0:
-            # Generate properly salted bcrypt hashes for the default accounts
+            # Generate properly salted bcrypt hashes for the default accounts.
+            # admin_pin is 8 characters, not 4 - see PIN_MIN_LENGTH /
+            # pin_policy_error above: this seeded account is role 'admin',
+            # which every other path that creates or resets an admin PIN
+            # already holds to a 6-character minimum. This is the one write
+            # that happens outside those paths (a raw INSERT on first boot),
+            # so it needs its own compliant default rather than inheriting
+            # the operator PIN's convention by accident.
             op_pin = bcrypt.hashpw("1234".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            admin_pin = bcrypt.hashpw("admin".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            admin_pin = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
             users = [
                 User(username="operator", pin=op_pin, full_name="Demo Operator", role="operator"),
@@ -592,6 +599,20 @@ def complete_run_with_custom_total(run_id: int, final_units: int):
         session.close()
 
 
+def get_resin_spec_history(spec_id: int = None, limit: int = 200) -> pd.DataFrame:
+    """Return the resin specification audit trail, optionally filtered to one spec."""
+    session = ScopedSession()
+    try:
+        query = session.query(ResinSpecHistory)
+        if spec_id is not None:
+            query = query.filter(ResinSpecHistory.resin_spec_id == spec_id)
+        query = query.order_by(desc(ResinSpecHistory.changed_at))
+        df = pd.read_sql(query.limit(limit).statement, session.bind)
+        return df
+    finally:
+        session.close()
+
+
 def get_all_resin_specs_df(cartridge_filter: str = "ALL") -> pd.DataFrame:
     session = ScopedSession()
     try:
@@ -604,12 +625,13 @@ def get_all_resin_specs_df(cartridge_filter: str = "ALL") -> pd.DataFrame:
         session.close()
 
 
-def bulk_update_resin_specs(df_updated: pd.DataFrame):
+def bulk_update_resin_specs(df_updated: pd.DataFrame, changed_by: str = None):
     session = ScopedSession()
     try:
         for _, row in df_updated.iterrows():
             spec = session.query(ResinSpec).filter(ResinSpec.id == int(row["id"])).first()
             if spec:
+                old_values = _resin_spec_to_dict(spec)
                 spec.sku = str(row.get("sku", spec.sku))
                 spec.resin_code = str(row.get("resin_code", spec.resin_code))
                 spec.resin_name = str(row.get("resin_name", spec.resin_name))
@@ -625,6 +647,10 @@ def bulk_update_resin_specs(df_updated: pd.DataFrame):
                 # not blank out a colour somebody chose on another screen.
                 if "color_tag" in row and str(row.get("color_tag") or "").strip():
                     spec.color_tag = str(row["color_tag"]).strip()
+                _log_resin_spec_history(
+                    session, spec.id, "EDIT", old_values,
+                    _resin_spec_to_dict(spec), changed_by
+                )
         session.commit()
     finally:
         session.close()
@@ -910,7 +936,7 @@ def authenticate_user(username: str, pin: str) -> tuple[dict | None, str | None]
                 "full_name": user.full_name,
                 "role": user.role,
                 "shift": user.shift,
-                "preferred_theme": getattr(user, 'preferred_theme', "Default Dark"),
+                "preferred_theme": getattr(user, 'preferred_theme', "Formlabs Forge"),
                 "avatar_filename": user.avatar_filename,
             }, None
 
@@ -928,8 +954,24 @@ def authenticate_user(username: str, pin: str) -> tuple[dict | None, str | None]
         session.close()
 
 
+# Security posture doc, Finding 9: four-digit PINs are a deliberate trade for
+# gloved hands at a pump, but that same trade makes no sense for an account
+# that reaches Admin Panel, user roster and the database backup/restore
+# tools - reachable from anywhere on the network, not just a pump on the
+# floor. Longer here, unchanged everywhere else.
+PIN_MIN_LENGTH = {"admin": 6, "manager": 6}
+
+
+def pin_policy_error(role: str, pin: str) -> str | None:
+    """None if this PIN is long enough for this role, else the message to show."""
+    minimum = PIN_MIN_LENGTH.get(str(role or "").strip().lower(), 4)
+    if len((pin or "").strip()) < minimum:
+        return f"{str(role or 'This').strip().capitalize()} accounts need a PIN of at least {minimum} characters."
+    return None
+
+
 def create_user(username: str, email: str, pin: str, full_name: str, role: str, target_lph: float = 400.0,
-                shift: str = "Shift 1", theme: str = "Default Dark") -> bool:
+                shift: str = "Shift 1", theme: str = "Formlabs Forge") -> bool:
     session = ScopedSession()
     try:
         if session.query(User).filter(
@@ -1258,6 +1300,17 @@ ABILITIES = {
         "Target fill weights, tolerance bands, shelf life and the colour each "
         "resin is drawn in. Every check weight in the plant is judged against "
         "these."),
+    "view_resin_lookup": (
+        "See the resin quick-reference",
+        "Target fill weight and tolerance band for every formulation, on the "
+        "operator screen - what a pour is checked against. Deliberately not "
+        "the same door as 'Edit master resin specifications': this shows "
+        "target weights only, never the SKU or internal code for a "
+        "formulation that is not public yet, and there is no export button "
+        "on it. Granted to every floor role by default, because checking a "
+        "target weight mid-pour is the job - see Finding 11 in the security "
+        "posture doc for why this exists as its own ability rather than "
+        "being open to anyone signed in."),
     "manage_logs": (
         "Log management and bulk cleanup",
         "Filter and delete production and downtime records. The one ability "
@@ -1271,6 +1324,13 @@ ABILITIES = {
         "Enter when a sample went to QC and when the result came back, and "
         "whether it passed. The floor sees the answer on the pouring form; "
         "the times feed the turnaround figures management asked for."),
+    "mark_reactor_empty": (
+        "Mark a reactor empty",
+        "Close out the current filling on a tank the moment it actually runs "
+        "dry, from the pouring form. Granted to every operator by default: "
+        "without it, a filling's end is only ever inferred from the next "
+        "changeover, which overstates how long the resin actually sat there "
+        "whenever a tank sits empty for a while before it is refilled."),
     "export_data": (
         "Export and sync",
         "CSV export of any filtered view, and the Google Sheets sync."),
@@ -1283,8 +1343,8 @@ ABILITIES = {
 ROLE_ABILITIES = {
     "admin": set(ABILITIES),
     "manager": set(ABILITIES),
-    "packer": set(),
-    "operator": set(),
+    "packer": {"view_resin_lookup"},
+    "operator": {"view_resin_lookup", "mark_reactor_empty"},
 }
 
 
@@ -1885,26 +1945,88 @@ def add_downtime_log(operator_name: str, pump_station: str, shift: str, reason: 
         session.close()
 
 
-def add_cleanliness_audit(audit_type: str, operator_name: str, pump_station: str, shift: str, resin_type: str,
-                          notes: str, is_spill: bool, uploaded_file=None) -> bool:
-    session = ScopedSession()
+# How many photos a single audit can carry. One is enough to prove the
+# station was checked; a handful covers a spill or a changeover without the
+# upload time ballooning on the shop floor, where each photo takes 20-30
+# seconds to cross the network segment. More than this is a photoshoot,
+# not a check. The UI shows the same number to the operator, so the two
+# never disagree about what gets kept.
+MAX_AUDIT_PHOTOS = 4
+
+
+def _audit_photo_name(uploaded_file) -> str:
+    """Filename for one uploaded audit photo.
+
+    The audit_ prefix keeps these identifiable inside uploads/cleanliness;
+    the uuid tail means two photos submitted in the same second (possible
+    with a burst upload) cannot collide.
+    """
+    ext = uploaded_file.name.split('.')[-1] if hasattr(uploaded_file, 'name') else 'jpg'
+    return f"audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{ext}"
+
+
+def _remove_audit_photo(filename: str) -> None:
+    """Delete an audit photo from disk, best effort.
+
+    The database row is the record; a file that refuses to die is a
+    janitor's job, not a reason to crash the deletion of the audit it
+    belongs to.
+    """
     try:
-        saved_filename = None
-        if uploaded_file is not None:
-            saved_filename = f"audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{uploaded_file.name.split('.')[-1] if hasattr(uploaded_file, 'name') else 'jpg'}"
-            with open(os.path.join(UPLOAD_DIR, saved_filename), "wb") as f: f.write(uploaded_file.getbuffer())
-        session.add(
-            CleanlinessAudit(audit_type=audit_type, operator_name=operator_name, pump_station=pump_station, shift=shift,
-                             resin_type=resin_type if resin_type else None, image_filename=saved_filename,
-                             is_spill="Yes" if is_spill else "No", notes=notes,
-                             operator_id=_resolve_user_id(session, operator_name),
-                             pump_station_id=_resolve_pump_id(session, pump_station),
-                             resin_spec_id=_resolve_resin_id(session, resin_type)))
+        os.remove(os.path.join(UPLOAD_DIR, filename))
+    except OSError:
+        pass
+
+
+def add_cleanliness_audit(audit_type: str, operator_name: str, pump_station: str, shift: str, resin_type: str,
+                          notes: str, is_spill: bool, uploaded_files=None) -> bool:
+    """Record a cleanliness audit, with one or more photos.
+
+    The first photo goes to the legacy image_filename column, so every
+    reader that expects it there sees the audit exactly as before. The rest
+    hang on the cleanliness_audit_photos table, in upload order. At most
+    MAX_AUDIT_PHOTOS are kept, no matter how many are passed.
+
+    Photos are written to disk before the row commits, and if the commit
+    fails the files this call wrote are removed again: the audit owns its
+    photos, and a photo with no audit behind it is an orphan nobody can
+    find.
+    """
+    session = ScopedSession()
+    saved = []
+    try:
+        for uploaded_file in list(uploaded_files or [])[:MAX_AUDIT_PHOTOS]:
+            saved.append(_audit_photo_name(uploaded_file))
+            with open(os.path.join(UPLOAD_DIR, saved[-1]), "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+        audit = CleanlinessAudit(
+            audit_type=audit_type,
+            operator_name=operator_name,
+            pump_station=pump_station,
+            shift=shift,
+            resin_type=resin_type if resin_type else None,
+            image_filename=saved[0] if saved else None,
+            is_spill="Yes" if is_spill else "No",
+            notes=notes,
+            operator_id=_resolve_user_id(session, operator_name),
+            pump_station_id=_resolve_pump_id(session, pump_station),
+            resin_spec_id=_resolve_resin_id(session, resin_type)
+        )
+        session.add(audit)
+        session.flush()  # gives audit.id, so the extras can hang on it
+
+        for filename in saved[1:]:
+            session.add(CleanlinessAuditPhoto(audit_id=audit.id, filename=filename))
+
         session.commit()
         return True
     except Exception as e:
+        logger.error(f"Error adding cleanliness audit: {str(e)}")
         session.rollback()
-        raise e
+        for filename in saved:
+            _remove_audit_photo(filename)
+        return False
     finally:
         session.close()
 
@@ -1916,6 +2038,26 @@ def get_cleanliness_audits_df() -> pd.DataFrame:
                            session.bind)
     finally:
         session.close()
+
+
+def get_cleanliness_audit_photos() -> dict:
+    """Extra audit photos keyed by audit id: {audit_id: [filename, ...]}.
+
+    The first photo of each audit is already on the audit row itself
+    (image_filename); this returns the extras only, in upload order, for
+    the gallery to render as a strip below the main photo. Audits with no
+    extras are absent from the mapping.
+    """
+    session = ScopedSession()
+    try:
+        rows = (session.query(CleanlinessAuditPhoto.audit_id, CleanlinessAuditPhoto.filename)
+                .order_by(CleanlinessAuditPhoto.audit_id, CleanlinessAuditPhoto.id).all())
+    finally:
+        session.close()
+    by_audit = {}
+    for audit_id, filename in rows:
+        by_audit.setdefault(audit_id, []).append(filename)
+    return by_audit
 
 
 def get_production_logs_df(start_date=None, end_date=None, shift=None, pump=None, resin=None,
@@ -2060,15 +2202,28 @@ def delete_downtime_log(log_id: int) -> bool:
 
 def delete_cleanliness_audit(audit_id: int) -> bool:
     session = ScopedSession()
+    orphaned = []
     try:
         audit = session.query(CleanlinessAudit).filter(CleanlinessAudit.id == audit_id).first()
-        if audit:
-            session.delete(audit)
-            session.commit()
-            return True
-        return False
+        if not audit:
+            return False
+        # The audit owns its photos: the first is its own column, the rest
+        # hang on the photo table (and leave the table with the row, through
+        # the FK's CASCADE). Deleting the row alone used to leave every one
+        # of them on disk with nothing pointing at them.
+        orphaned = [audit.image_filename] if audit.image_filename else []
+        orphaned += [p.filename for p in session.query(CleanlinessAuditPhoto)
+                     .filter(CleanlinessAuditPhoto.audit_id == audit_id).all()]
+        session.delete(audit)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
+    for filename in orphaned:
+        _remove_audit_photo(filename)
+    return True
 
 def send_floor_message(operator_name: str, sender_name: str, message: str, is_manager: bool):
     session = ScopedSession()
@@ -2258,10 +2413,45 @@ def delete_user_by_username(username: str) -> bool:
         session.close()
 
 
+def _resin_spec_to_dict(spec: ResinSpec) -> dict:
+    """Serialize a ResinSpec row to a plain dict for the audit trail."""
+    return {
+        "id": spec.id,
+        "cartridge_type": spec.cartridge_type,
+        "sku": spec.sku,
+        "resin_code": spec.resin_code,
+        "resin_name": spec.resin_name,
+        "actual_spec_g": spec.actual_spec_g,
+        "min_weight_g": spec.min_weight_g,
+        "max_weight_g": spec.max_weight_g,
+        "acceptable_range": spec.acceptable_range,
+        "lifetime_months": spec.lifetime_months,
+        "multiplier": spec.multiplier,
+        "color_tag": spec.color_tag,
+        "units_per_skid": spec.units_per_skid,
+    }
+
+
+def _log_resin_spec_history(session, spec_id: int, action: str,
+                            old_values: dict | None, new_values: dict | None,
+                            changed_by: str | None) -> None:
+    """Write one entry to the resin specification audit trail."""
+    import json
+    session.add(ResinSpecHistory(
+        resin_spec_id=spec_id,
+        action=action,
+        changed_by=changed_by,
+        changed_at=datetime.utcnow(),
+        old_values=json.dumps(old_values) if old_values else None,
+        new_values=json.dumps(new_values) if new_values else None,
+    ))
+
+
 def add_resin_spec(cartridge_type: str, sku: str, resin_code: str, resin_name: str,
                    actual_spec_g: float, min_weight_g: float, max_weight_g: float,
                    lifetime_months: str = "24", multiplier: float = 1.0,
-                   color_tag: str = None, units_per_skid: int = 500) -> bool:
+                   color_tag: str = None, units_per_skid: int = 500,
+                   changed_by: str = None) -> bool:
     """Inserts a new proprietary resin formulation directly into PostgreSQL.
 
     color_tag defaults to None rather than a colour on purpose. A caller that
@@ -2288,6 +2478,11 @@ def add_resin_spec(cartridge_type: str, sku: str, resin_code: str, resin_name: s
             units_per_skid=units_per_skid
         )
         session.add(spec)
+        session.flush()  # get spec.id before logging
+        _log_resin_spec_history(
+            session, spec.id, "ADD", None,
+            _resin_spec_to_dict(spec), changed_by
+        )
         session.commit()
         return True
     except Exception:
@@ -2298,13 +2493,17 @@ def add_resin_spec(cartridge_type: str, sku: str, resin_code: str, resin_name: s
         session.close()
 
 
-def delete_resin_spec(spec_id: int) -> bool:
+def delete_resin_spec(spec_id: int, changed_by: str = None) -> bool:
     """Permanently deletes a resin specification from PostgreSQL."""
     session = ScopedSession()
     try:
         spec = session.query(ResinSpec).filter(ResinSpec.id == spec_id).first()
         if spec:
+            old_values = _resin_spec_to_dict(spec)
             session.delete(spec)
+            _log_resin_spec_history(
+                session, spec_id, "DELETE", old_values, None, changed_by
+            )
             session.commit()
             return True
         return False
@@ -2411,8 +2610,15 @@ tuple[bool, str]:
         if new_fullname and new_fullname.strip():
             user.full_name = new_fullname.strip()
 
-        # Re-hash PIN with bcrypt if updated
+        # Re-hash PIN with bcrypt if updated. Checked against this account's
+        # OWN role (self-service credential changes never touch role), so an
+        # admin changing their own PIN here is held to the same minimum as
+        # Admin Panel's account-creation and PIN-reset forms - one policy,
+        # not three copies of it that can drift apart.
         if new_pin and new_pin.strip():
+            _pin_err = pin_policy_error(user.role, new_pin)
+            if _pin_err:
+                return False, _pin_err
             user.pin = bcrypt.hashpw(new_pin.strip().encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         session.commit()
@@ -2574,7 +2780,7 @@ def get_user_by_session_token(token: str) -> dict | None:
         return {
             "id": user.id, "username": user.username, "full_name": user.full_name,
             "role": user.role, "shift": user.shift,
-            "preferred_theme": getattr(user, "preferred_theme", "Default Dark"),
+            "preferred_theme": getattr(user, "preferred_theme", "Formlabs Forge"),
             "avatar_filename": user.avatar_filename,
         }
     finally:

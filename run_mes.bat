@@ -15,5 +15,13 @@ if not exist venv\Scripts\activate.bat (
 )
 
 call venv\Scripts\activate.bat
-streamlit run Home.py --server.address=0.0.0.0
+
+rem HTTPS if certs\mes.crt / mes.key exist (setup\generate_tls_cert.py writes
+rem them), plain HTTP otherwise. Doesn't generate or check them here - that's
+rem what generate_tls_cert.py and START_HERE.bat option 8 are for.
+set "SSL_ARGS="
+if exist certs\mes.crt if exist certs\mes.key set "SSL_ARGS=--server.sslCertFile=certs\mes.crt --server.sslKeyFile=certs\mes.key"
+if not defined SSL_ARGS echo [!] No HTTPS certificate - running on plain HTTP. See START_HERE.bat option 8.
+
+streamlit run Home.py --server.address=0.0.0.0 %SSL_ARGS%
 pause

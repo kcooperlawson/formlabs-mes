@@ -35,6 +35,7 @@ from device_crud import (
 )
 from device_gateway.registry import PROTOCOL_LABELS
 from device_gateway.normalize import CANONICAL_METRICS
+from device_gateway.discovery import list_serial_ports, guess_local_subnet, scan_network
 
 st.set_page_config(page_title="Device Gateway | Formlabs MES", page_icon="🔌", layout="wide")
 st.logo("assets/formlabs_logo.png")
@@ -43,10 +44,10 @@ st.logo("assets/formlabs_logo.png")
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
-st.markdown(THEMES.get(active_theme, THEMES["Default Dark"]), unsafe_allow_html=True)
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
+st.markdown(THEMES.get(active_theme, THEMES["Formlabs Forge"]), unsafe_allow_html=True)
 
 cookie_manager = stx.CookieManager(key="device_registry_cookies")
 check_authentication(cookie_manager)
@@ -129,7 +130,118 @@ k2.metric("Online", int((df_devices["status"] == "Online").sum()) if not df_devi
 k3.metric("Error", int((df_devices["status"] == "Error").sum()) if not df_devices.empty else 0)
 k4.metric("Disabled", int((~df_devices["is_enabled"]).sum()) if not df_devices.empty else 0)
 
-tab_devices, tab_add, tab_readings = st.tabs(["📋 Devices", "➕ Add / Test Device", "📈 Recent Readings"])
+tab_scan, tab_devices, tab_add, tab_readings = st.tabs(
+    ["🔍 Find Devices", "📋 Devices", "➕ Add / Test Device", "📈 Recent Readings"]
+)
+
+# ============================== FIND DEVICES TAB =============================
+with tab_scan:
+    st.markdown("#### 🔎 Serial / COM Ports")
+    st.caption(
+        "Everything Windows currently sees plugged in — bench scales and RS-485/RS-232 "
+        "dongles show up here the moment they're connected. Covers Modbus RTU and Serial ASCII devices."
+    )
+    if st.button("🔄 Refresh serial ports", key="scan_serial_btn"):
+        st.session_state["_serial_scan_results"] = list_serial_ports()
+
+    serial_results = st.session_state.get("_serial_scan_results")
+    if serial_results is None:
+        st.info("Click **Refresh serial ports** to see what's plugged into this PC.")
+    elif not serial_results:
+        st.caption("Nothing found — plug in the scale or serial adapter, then refresh again.")
+    else:
+        for sp in serial_results:
+            with st.container():
+                c_info, c_use = st.columns([4, 1])
+                with c_info:
+                    sub = " · ".join(x for x in [sp["manufacturer"], sp["description"]] if x)
+                    st.markdown(
+                        f"<div style='background:#0F172A; padding:10px 14px; border-radius:6px; "
+                        f"border:1px solid #1E293B; margin-bottom:6px;'>"
+                        f"<b style='color:#FFFFFF;'>🔌 {esc(sp['port'])}</b> "
+                        f"<span style='color:#94A3B8; font-size:0.85rem;'>{esc(sub)}</span>"
+                        f"</div>", unsafe_allow_html=True,
+                    )
+                with c_use:
+                    if st.button("Use →", key=f"use_serial_{sp['port']}", use_container_width=True):
+                        st.session_state["_prefill"] = {
+                            "device_name": f"Device on {sp['port']}",
+                            "device_role": "scale",
+                            "protocol": "serial_ascii",
+                            "connection": {"port": sp["port"], "baud": 9600},
+                        }
+                        st.toast(f"Prefilled {sp['port']} — finish it in Add / Test Device.")
+                        st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### 📡 Network Scan")
+    st.caption(
+        "Probes this subnet for the ports the network protocols conventionally use "
+        "(502 Modbus TCP, 4840 OPC-UA, 1883 MQTT, 80/443 HTTP) — like a Wi-Fi picker, but for "
+        "plant equipment. An open port is a strong hint, not a confirmed match; use **Test "
+        "Connection** in the Add tab afterward to be sure before saving. This only opens plain "
+        "outbound TCP connections on your local network — nothing is written to any machine."
+    )
+    sc1, sc2 = st.columns([3, 1])
+    subnet_input = sc1.text_input(
+        "Subnet to scan (CIDR)", value=st.session_state.get("_scan_subnet", guess_local_subnet()),
+        key="_scan_subnet",
+    )
+    with sc2:
+        st.write("")
+        st.write("")
+        scan_clicked = st.button("🔍 Scan network", use_container_width=True)
+
+    if scan_clicked:
+        try:
+            with st.spinner(f"Scanning {subnet_input}..."):
+                st.session_state["_network_scan_results"] = scan_network(subnet_input)
+        except ValueError as exc:
+            st.error(str(exc))
+            st.session_state["_network_scan_results"] = None
+
+    net_results = st.session_state.get("_network_scan_results")
+    if net_results is None:
+        st.info("Click **Scan network** to look for machines on this subnet.")
+    elif not net_results:
+        st.caption("Nothing answered on those ports on this subnet — the machine may be on a "
+                   "different VLAN, or need its Modbus/OPC-UA/MQTT server turned on first.")
+    else:
+        for host in net_results:
+            with st.container():
+                c_info, c_use = st.columns([4, 1])
+                with c_info:
+                    guess = host["guessed_protocol"]
+                    guess_label = PROTOCOL_LABELS.get(guess, "unknown — open port(s) only") if guess else "unknown protocol"
+                    name_bit = f" ({esc(host['hostname'])})" if host.get("hostname") else ""
+                    st.markdown(
+                        f"<div style='background:#0F172A; padding:10px 14px; border-radius:6px; "
+                        f"border:1px solid #1E293B; margin-bottom:6px;'>"
+                        f"<b style='color:#FFFFFF;'>📟 {esc(host['ip'])}</b>{name_bit} "
+                        f"<span style='color:#94A3B8; font-size:0.85rem;'>· ports open: "
+                        f"{', '.join(str(p) for p in host['open_ports'])} · likely: {esc(guess_label)}</span>"
+                        f"</div>", unsafe_allow_html=True,
+                    )
+                with c_use:
+                    if st.button("Use →", key=f"use_net_{host['ip']}", use_container_width=True):
+                        proto = guess or "modbus_tcp"
+                        conn = {"host": host["ip"]}
+                        if proto == "modbus_tcp":
+                            conn.update({"port": 502, "unit_id": 1})
+                        elif proto == "opcua":
+                            conn = {"endpoint": f"opc.tcp://{host['ip']}:4840"}
+                        elif proto == "mqtt":
+                            conn.update({"port": 1883})
+                        elif proto == "http_poll":
+                            conn = {"url": f"http://{host['ip']}/", "method": "GET", "timeout_s": 5.0}
+                        st.session_state["_prefill"] = {
+                            "device_name": f"Device @ {host['ip']}",
+                            "device_role": "filling_station" if proto == "modbus_tcp" else "other",
+                            "protocol": proto,
+                            "connection": conn,
+                        }
+                        st.toast(f"Prefilled {host['ip']} — finish it in Add / Test Device.")
+                        st.rerun()
 
 # ============================== DEVICES TAB ================================
 with tab_devices:
@@ -201,11 +313,26 @@ with tab_devices:
 with tab_add:
     st.markdown("#### Register a Device")
 
+    _prefill = st.session_state.pop("_prefill", None) or {}
+    _prefill_conn = _prefill.get("connection", {})
+    if _prefill:
+        st.success("Filled in from **Find Devices** — double-check the details below, then Test Connection.")
+
+    _role_options = ["filling_station", "scale", "label_printer", "reactor_sensor", "other"]
+    _protocol_options = list(PROTOCOL_LABELS)
+
     col1, col2 = st.columns(2)
     with col1:
-        device_name = st.text_input("Device Name", placeholder="e.g. Filling Station 3 (ICC HMI)")
-        device_role = st.selectbox("Role", ["filling_station", "scale", "label_printer", "reactor_sensor", "other"])
-        protocol = st.selectbox("Protocol", list(PROTOCOL_LABELS), format_func=lambda p: PROTOCOL_LABELS[p])
+        device_name = st.text_input("Device Name", value=_prefill.get("device_name", ""),
+                                     placeholder="e.g. Filling Station 3 (ICC HMI)")
+        device_role = st.selectbox(
+            "Role", _role_options,
+            index=_role_options.index(_prefill["device_role"]) if _prefill.get("device_role") in _role_options else 0,
+        )
+        protocol = st.selectbox(
+            "Protocol", _protocol_options, format_func=lambda p: PROTOCOL_LABELS[p],
+            index=_protocol_options.index(_prefill["protocol"]) if _prefill.get("protocol") in _protocol_options else 0,
+        )
     with col2:
         pumps = get_all_pumps_df()
         pump_options = {"— none —": None}
@@ -223,39 +350,41 @@ with tab_add:
 
     st.markdown("##### Connection Details")
     connection: dict = {}
+    _pc = _prefill_conn if _prefill.get("protocol") == protocol else {}
     if protocol == "modbus_tcp":
         c1, c2, c3 = st.columns(3)
-        connection["host"] = c1.text_input("Host / IP", placeholder="10.0.4.22")
-        connection["port"] = c2.number_input("Port", value=502)
-        connection["unit_id"] = c3.number_input("Unit / Slave ID", value=1)
+        connection["host"] = c1.text_input("Host / IP", value=_pc.get("host", ""), placeholder="10.0.4.22")
+        connection["port"] = c2.number_input("Port", value=int(_pc.get("port", 502)))
+        connection["unit_id"] = c3.number_input("Unit / Slave ID", value=int(_pc.get("unit_id", 1)))
     elif protocol == "modbus_rtu":
         c1, c2, c3, c4 = st.columns(4)
-        connection["port"] = c1.text_input("COM Port", placeholder="COM5")
-        connection["baud"] = c2.number_input("Baud", value=9600)
+        connection["port"] = c1.text_input("COM Port", value=_pc.get("port", ""), placeholder="COM5")
+        connection["baud"] = c2.number_input("Baud", value=int(_pc.get("baud", 9600)))
         connection["parity"] = c3.selectbox("Parity", ["N", "E", "O"])
-        connection["unit_id"] = c4.number_input("Unit / Slave ID", value=1)
+        connection["unit_id"] = c4.number_input("Unit / Slave ID", value=int(_pc.get("unit_id", 1)))
     elif protocol == "opcua":
-        connection["endpoint"] = st.text_input("Endpoint URL", placeholder="opc.tcp://10.0.4.40:4840")
+        connection["endpoint"] = st.text_input("Endpoint URL", value=_pc.get("endpoint", ""),
+                                                placeholder="opc.tcp://10.0.4.40:4840")
         c1, c2 = st.columns(2)
         connection["username"] = c1.text_input("Username (optional)") or None
         connection["password"] = c2.text_input("Password (optional)", type="password") or None
     elif protocol == "mqtt":
         c1, c2 = st.columns(2)
-        connection["host"] = c1.text_input("Broker Host", placeholder="10.0.4.5")
-        connection["port"] = c2.number_input("Broker Port", value=1883)
+        connection["host"] = c1.text_input("Broker Host", value=_pc.get("host", ""), placeholder="10.0.4.5")
+        connection["port"] = c2.number_input("Broker Port", value=int(_pc.get("port", 1883)))
         c3, c4 = st.columns(2)
         connection["username"] = c3.text_input("Username (optional)") or None
         connection["password"] = c4.text_input("Password (optional)", type="password") or None
     elif protocol == "serial_ascii":
         c1, c2, c3 = st.columns(3)
-        connection["port"] = c1.text_input("COM Port", placeholder="COM4")
-        connection["baud"] = c2.number_input("Baud", value=9600)
+        connection["port"] = c1.text_input("COM Port", value=_pc.get("port", ""), placeholder="COM4")
+        connection["baud"] = c2.number_input("Baud", value=int(_pc.get("baud", 9600)))
         connection["read_timeout_s"] = c3.number_input("Read Timeout (s)", value=1.0)
         connection["request_command"] = st.text_input(
             "Request Command (leave blank for continuous-stream scales)",
             placeholder=r"P\r\n") or None
     elif protocol == "http_poll":
-        connection["url"] = st.text_input("URL", placeholder="http://10.0.4.60/api/status")
+        connection["url"] = st.text_input("URL", value=_pc.get("url", ""), placeholder="http://10.0.4.60/api/status")
         c1, c2 = st.columns(2)
         connection["method"] = c1.selectbox("Method", ["GET", "POST"])
         connection["timeout_s"] = c2.number_input("Timeout (s)", value=5.0)

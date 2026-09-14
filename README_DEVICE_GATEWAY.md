@@ -38,6 +38,7 @@ device_gateway/
     modbus_tcp.py  modbus_rtu.py  opcua_client.py  mqtt_client.py  serial_ascii.py  http_poll.py
   registry.py                     # protocol name -> adapter class (the one place to edit for a 7th protocol)
   normalize.py                    # the canonical metric vocabulary (weight_g, units_poured_delta, ...)
+  discovery.py                    # "find devices" - serial port enumeration + local-subnet TCP scan for the admin page
   writer.py                       # normalized reading -> DeviceReading row + (if it's a fill cycle) add_hourly_log()
   service.py                      # the background poller: one thread per enabled device, hot-reloads the devices table
 run_gateway.py                    # `python run_gateway.py` — standalone entrypoint, run as its own process/service
@@ -103,6 +104,15 @@ The one thing that has to be done manually, one time, on whichever PC hosts the 
 This is plant-network exposure, not internet exposure — nothing here opens Postgres to anything outside the local network. It's a one-time setting on the database PC, not something to redo per move or per gateway.
 
 **Escape hatch:** if a floor PC's network genuinely can't pass mDNS traffic (managed switch doing client isolation, a separate VLAN, etc.), set `GATEWAY_DB_URL` in that one PC's `.env` to a full, manually-typed connection string. Skips discovery entirely for that machine only — everything else keeps auto-discovering as normal.
+
+## Find Devices — a Wi-Fi-picker-style scan instead of typing in connection details
+
+The **🔍 Find Devices** tab on `pages/Device_Registry.py` (`device_gateway/discovery.py`) turns "I need this machine's IP address or COM port" into a list to click, the same way connecting to Wi-Fi does:
+
+- **Serial / COM ports** — enumerates every port Windows currently sees plugged in (via `pyserial`, already a dependency for `modbus_rtu`/`serial_ascii`), so a scale or an RS-485 USB dongle appears the moment it's plugged in. Click **Use →** and it prefills COM port + a `serial_ascii` starting point in the Add tab.
+- **Network scan** — a fast, read-only TCP connect-sweep of one subnet (defaulted from this PC's own LAN IP, editable for VLANs/other ranges) against the ports the network protocols conventionally use: 502 (Modbus TCP), 4840 (OPC-UA), 1883 (MQTT), 80/443 (HTTP). A host with one of those open shows up as a candidate with a guessed protocol; click **Use →** to prefill it. An open port is a hint, not a confirmed identification — always run **Test Connection** afterward (same probe the Add tab already used) before saving.
+
+This only opens plain outbound TCP connections on the local network and closes them immediately, or reads OS-level serial port metadata — nothing is written to any machine, and nothing leaves the subnet you type in. It runs from wherever `pages/Device_Registry.py` itself is being viewed from (same process as the rest of the admin page); if `run_gateway.py` ends up running on a separate floor PC from the Streamlit app, scan from whichever PC actually has network/USB access to the equipment being added, and use the discovered IP/COM port to register the device from there.
 
 ## Rollout plan — start with what's easiest to test
 

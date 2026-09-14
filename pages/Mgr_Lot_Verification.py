@@ -18,8 +18,8 @@ from resin_palette import resin_chip, stored_color_map, style_resin_column
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
-st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Default Dark"), THEMES["Default Dark"]), unsafe_allow_html=True)
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Formlabs Forge"), THEMES["Formlabs Forge"]), unsafe_allow_html=True)
 
 # Restore the session before deciding whether to refuse it. Without this the
 # role check below runs against an empty session on any cold load - a refresh,

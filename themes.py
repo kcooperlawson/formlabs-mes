@@ -258,7 +258,7 @@ THEMES = {
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: #1E293B !important; color: #F97316 !important; border: 1px solid #475569 !important; border-radius: 4px !important; font-weight: 600; }
         .stTextInput > div > div > input:focus { border-color: #EA580C !important; box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2) !important; }
-        .stButton>button { background: #EA580C !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 4px !important; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button { background: #CD4D0B !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 4px !important; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }   /* was #EA580C: 3.56:1 with white text, below WCAG AA */
         .stButton>button:hover { background: #F97316 !important; box-shadow: 0 6px 12px rgba(234, 88, 12, 0.4) !important; }
         .filter-section-card { background: #1E293B; border: 1px solid #334155; border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
 
@@ -267,7 +267,7 @@ THEMES = {
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
         [data-testid="stSidebarNav"] a { color: #94A3B8 !important; font-weight: 600 !important; border-radius: 6px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: #1E293B !important; color: #EA580C !important; transform: translateX(5px) !important; }
-        [data-testid="stSidebarNav"] a[aria-current="page"] { background: #EA580C !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 8px rgba(234, 88, 12, 0.3) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: #CD4D0B !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 8px rgba(234, 88, 12, 0.3) !important; }
     </style>
     """ + BASE_UI_CSS,
 
@@ -300,13 +300,13 @@ THEMES = {
         .stApp { background-color: #1A0B2E !important; color: #E0B0FF !important; font-family: "Trebuchet MS", sans-serif !important; }
         header[data-testid="stHeader"] { background: transparent !important; }
         .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(90deg, #4A00E0 0%, #8E2DE2 100%); border: 2px solid #00FFFF; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0, 255, 255, 0.4); }
-        .system-badge { background: #FF007F; color: #FFFFFF; font-size: 0.85rem; font-weight: 900; letter-spacing: 0.2em; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; margin-left: 14px; box-shadow: 0 0 10px #FF007F; }
+        .system-badge { background: #E50072; color: #FFFFFF; font-size: 0.85rem; font-weight: 900; letter-spacing: 0.2em; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; margin-left: 14px; box-shadow: 0 0 10px #FF007F; }
         .telemetry-grid-card { background: #2B1055; border: 1px solid #FF007F; border-radius: 12px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; box-shadow: inset 0 0 15px rgba(255, 0, 127, 0.2); }
         .telemetry-grid-card:hover { transform: translateY(-5px); border-color: #00FFFF; box-shadow: 0 8px 20px rgba(0, 255, 255, 0.4); }
         .telemetry-label { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; color: #00FFFF; text-transform: uppercase; }
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FF007F; line-height: 1.2; text-shadow: 2px 2px #4A00E0; }
         .stTextInput > div > div > input { background-color: #2B1055 !important; color: #00FFFF !important; border: 2px solid #FF007F !important; border-radius: 8px !important; letter-spacing: 0.05em; font-weight: bold; }
-        .stButton>button { background: linear-gradient(45deg, #FF007F, #4A00E0) !important; color: #FFFFFF !important; font-weight: 900 !important; border: 2px solid #00FFFF !important; border-radius: 8px !important; box-shadow: 0 4px 10px rgba(255, 0, 127, 0.5) !important; text-transform: uppercase; letter-spacing: 0.15em; }
+        .stButton>button { background: linear-gradient(45deg, #E50072, #4A00E0) !important; color: #FFFFFF !important; font-weight: 900 !important; border: 2px solid #00FFFF !important; border-radius: 8px !important; box-shadow: 0 4px 10px rgba(255, 0, 127, 0.5) !important; text-transform: uppercase; letter-spacing: 0.15em; }
         .stButton>button:hover { background: linear-gradient(45deg, #00FFFF, #4A00E0) !important; box-shadow: 0 0 20px #00FFFF !important; color: #000000 !important; }
         .filter-section-card { background: #2B1055; border: 2px solid #4A00E0; border-radius: 12px; padding: 14px 16px; margin: 16px 0; }
 
@@ -315,7 +315,7 @@ THEMES = {
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
         [data-testid="stSidebarNav"] a { color: #E0B0FF !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: #2B1055 !important; color: #00FFFF !important; transform: translateX(5px) !important; }
-        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(45deg, #FF007F, #4A00E0) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(255, 0, 127, 0.5) !important; border: 1px solid #00FFFF !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(45deg, #E50072, #4A00E0) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(255, 0, 127, 0.5) !important; border: 1px solid #00FFFF !important; }
     </style>
     """ + BASE_UI_CSS,
 
@@ -356,7 +356,7 @@ THEMES = {
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: rgba(15, 23, 42, 0.6) !important; color: #7DD3FC !important; border: 1px solid #334155 !important; border-radius: 8px !important; }
         .stTextInput > div > div > input:focus { border-color: #8B5CF6 !important; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3) !important; }
-        .stButton>button { background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button { background: linear-gradient(135deg, #1E6FF5 0%, #8B5CF6 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
         .stButton>button:hover { background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%) !important; box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important; transform: scale(1.02); }
         .filter-section-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 16px; padding: 14px 16px; margin: 16px 0; backdrop-filter: blur(10px); }
 
@@ -365,7 +365,7 @@ THEMES = {
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
         [data-testid="stSidebarNav"] a { color: #94A3B8 !important; font-weight: 600 !important; border-radius: 12px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: #0F172A !important; color: #7DD3FC !important; transform: translateX(5px) !important; }
-        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, #1E6FF5 0%, #8B5CF6 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important; }
     </style>
     """ + BASE_UI_CSS,
 
@@ -437,7 +437,7 @@ THEMES = {
         /* SIDEBAR STYLING */
         [data-testid="stSidebar"] { background-color: #282A36 !important; border-right: 1px solid #44475A !important; }
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
-        [data-testid="stSidebarNav"] a { color: #6272A4 !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
+        [data-testid="stSidebarNav"] a { color: #8692B9 !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }   /* was #6272A4: 3.03:1 on the sidebar, below WCAG AA */
         [data-testid="stSidebarNav"] a:hover { background-color: #44475A !important; color: #8BE9FD !important; transform: translateX(5px) !important; }
         [data-testid="stSidebarNav"] a[aria-current="page"] { background: #BD93F9 !important; color: #282A36 !important; font-weight: 900 !important; box-shadow: 0 4px 10px rgba(189, 147, 249, 0.4) !important; }
     </style>
@@ -480,7 +480,7 @@ THEMES = {
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: #001220 !important; color: #00E5FF !important; border: 1px solid #003B5C !important; border-radius: 8px !important; }
         .stTextInput > div > div > input:focus { border-color: #00E5FF !important; box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.2) !important; }
-        .stButton>button { background: linear-gradient(180deg, #00B4D8 0%, #0369A1 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: 1px solid #00E5FF !important; border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3) !important; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease !important; }
+        .stButton>button { background: linear-gradient(180deg, #00819B 0%, #0369A1 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: 1px solid #00E5FF !important; border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3) !important; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease !important; }
         .stButton>button:hover { background: linear-gradient(180deg, #00E5FF 0%, #0284C7 100%) !important; box-shadow: 0 6px 18px rgba(0, 229, 255, 0.5) !important; text-shadow: 0 0 5px rgba(255,255,255,0.8); }
         .filter-section-card { background: #001D36; border: 1px solid #003B5C; border-radius: 12px; padding: 14px 16px; margin: 16px 0; }
 
@@ -489,7 +489,7 @@ THEMES = {
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
         [data-testid="stSidebarNav"] a { color: #5B8C9E !important; font-weight: 600 !important; border-radius: 8px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: #001D36 !important; color: #00E5FF !important; transform: translateX(5px) !important; }
-        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(180deg, #00B4D8 0%, #0369A1 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3) !important; border: 1px solid #00E5FF !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(180deg, #00819B 0%, #0369A1 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3) !important; border: 1px solid #00E5FF !important; }
     </style>
     """ + BASE_UI_CSS,
 
@@ -523,14 +523,14 @@ THEMES = {
         .stApp { background-color: #0F0C29 !important; color: #E2E8F0 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }
         header[data-testid="stHeader"] { background: transparent !important; }
         .brand-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(90deg, #302B63 0%, #24243E 100%); border: 1px solid #FF416C; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(255, 65, 108, 0.2); }
-        .system-badge { background: linear-gradient(90deg, #FF4B2B 0%, #FF416C 100%); color: #FFFFFF; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin-left: 14px; box-shadow: 0 2px 8px rgba(255, 65, 108, 0.5); border: none; }
+        .system-badge { background: linear-gradient(90deg, #E52300 0%, #FF416C 100%); color: #FFFFFF; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin-left: 14px; box-shadow: 0 2px 8px rgba(255, 65, 108, 0.5); border: none; }
         .telemetry-grid-card { background: #1B1833; border: 1px solid #302B63; border-radius: 12px; padding: 12px 16px; min-height: 96px; transition: all 0.3s ease; box-shadow: inset 0 -2px 10px rgba(255, 65, 108, 0.05); }
         .telemetry-grid-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(255, 75, 43, 0.2); border-color: #FF4B2B; }
         .telemetry-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; color: #A6A4C2; text-transform: uppercase; }
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; text-shadow: 2px 2px 4px rgba(255, 65, 108, 0.6); }
         .stTextInput > div > div > input { background-color: #0F0C29 !important; color: #FF4B2B !important; border: 1px solid #302B63 !important; border-radius: 8px !important; font-weight: bold; }
         .stTextInput > div > div > input:focus { border-color: #FF416C !important; box-shadow: 0 0 0 2px rgba(255, 65, 108, 0.3) !important; }
-        .stButton>button { background: linear-gradient(90deg, #FF4B2B 0%, #FF416C 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.3s ease !important; }
+        .stButton>button { background: linear-gradient(90deg, #E52300 0%, #FF416C 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.3s ease !important; }
         .stButton>button:hover { background: linear-gradient(90deg, #FF416C 0%, #FF4B2B 100%) !important; box-shadow: 0 6px 20px rgba(255, 75, 43, 0.6) !important; transform: scale(1.03); }
         .filter-section-card { background: #1B1833; border: 1px solid #302B63; border-radius: 12px; padding: 14px 16px; margin: 16px 0; }
 
@@ -539,7 +539,7 @@ THEMES = {
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
         [data-testid="stSidebarNav"] a { color: #A6A4C2 !important; font-weight: 600 !important; border-radius: 6px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: #1B1833 !important; color: #FF416C !important; transform: translateX(5px) !important; border-left: 2px solid #FF416C !important; }
-        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(90deg, #FF4B2B 0%, #FF416C 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(90deg, #E52300 0%, #FF416C 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important; }
     </style>
     """ + BASE_UI_CSS,
 
@@ -630,7 +630,7 @@ THEMES = {
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: #1C160F !important; color: #FF8C42 !important; border: 1px solid #3A2E20 !important; border-radius: 4px !important; font-weight: 600; }
         .stTextInput > div > div > input:focus { border-color: #FF6B1A !important; box-shadow: 0 0 0 2px rgba(255, 107, 26, 0.2) !important; }
-        .stButton>button { background: linear-gradient(180deg, #FF6B1A 0%, #CC5514 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 4px !important; box-shadow: 0 4px 10px rgba(255, 107, 26, 0.3) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button { background: linear-gradient(180deg, #CC4800 0%, #CC5514 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 4px !important; box-shadow: 0 4px 10px rgba(255, 107, 26, 0.3) !important; transition: all 0.2s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
         .stButton>button:hover { background: linear-gradient(180deg, #FF8C42 0%, #E0631A 100%) !important; box-shadow: 0 6px 18px rgba(255, 107, 26, 0.5) !important; }
         .filter-section-card { background: #1F1811; border: 1px solid #3A2E20; border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
 
@@ -755,7 +755,7 @@ THEMES = {
         .telemetry-val-large { font-size: 1.7rem; font-weight: 900; color: #FFFFFF; line-height: 1.2; }
         .stTextInput > div > div > input { background-color: rgba(255, 255, 255, 0.05) !important; color: #C4B5FD !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 10px !important; backdrop-filter: blur(10px); }
         .stTextInput > div > div > input:focus { border-color: #C4B5FD !important; box-shadow: 0 0 0 2px rgba(196, 181, 253, 0.25) !important; }
-        .stButton>button { background: linear-gradient(135deg, #8B5CF6 0%, #14B8A6 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 10px !important; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
+        .stButton>button { background: linear-gradient(135deg, #8452F5 0%, #14B8A6 100%) !important; color: #FFFFFF !important; font-weight: 800 !important; border: none !important; border-radius: 10px !important; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4) !important; transition: all 0.3s ease !important; text-transform: uppercase; letter-spacing: 0.1em; }
         .stButton>button:hover { background: linear-gradient(135deg, #A78BFA 0%, #2DD4BF 100%) !important; box-shadow: 0 8px 28px rgba(139, 92, 246, 0.6) !important; transform: scale(1.02); }
         .filter-section-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; padding: 14px 16px; margin: 16px 0; backdrop-filter: blur(16px); }
 
@@ -764,7 +764,7 @@ THEMES = {
         [data-testid="stSidebarNav"] { padding-top: 1.5rem; }
         [data-testid="stSidebarNav"] a { color: #A5A5C0 !important; font-weight: 600 !important; border-radius: 12px !important; margin: 4px 16px !important; transition: all 0.3s ease !important; }
         [data-testid="stSidebarNav"] a:hover { background-color: rgba(255, 255, 255, 0.06) !important; color: #C4B5FD !important; transform: translateX(5px) !important; }
-        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, #8B5CF6 0%, #14B8A6 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.35) !important; }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, #8452F5 0%, #14B8A6 100%) !important; color: #FFFFFF !important; font-weight: 900 !important; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.35) !important; }
     </style>
     """ + BASE_UI_CSS,
 

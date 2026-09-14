@@ -5,7 +5,7 @@ This file safely routes all existing UI imports to our new modular architecture.
 """
 from db_core import engine, ScopedSession, Base
 from models import (User, ProductionLog, DowntimeLog, AssignedRun, Reactor,
-                    ResinSpec, PumpStation, DowntimeReason, DailyChecklist,
+                    ResinSpec, ResinSpecHistory, PumpStation, DowntimeReason, DailyChecklist,
                     CleanlinessAudit, FloorMessage, PlantSettings, Suggestion,
                     LotVerification)
 from utils import esc, UPLOAD_DIR, AVATAR_DIR, LOT_PHOTO_DIR, BACKUP_DIR, create_database_backup, restore_database_backup, list_backup_files, prune_old_backups, run_scheduled_backup, do_logout, check_authentication, get_avatar_path, get_avatar_data_uri, set_cookie, flash, draw_flashes

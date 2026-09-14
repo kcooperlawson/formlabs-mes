@@ -17,12 +17,12 @@ echo   INSTALL - MES / Logger
 echo  ===================================================
 echo.
 
-echo  [1/6] Python...
+echo  [1/7] Python...
 call "setup\_ensure_python.bat"
 if not defined PY_CMD goto :fail_quiet
 
 echo.
-echo  [2/6] Virtual environment...
+echo  [2/7] Virtual environment...
 if exist "venv\Scripts\python.exe" goto :venv_ready
 %PY_CMD% -m venv venv
 if errorlevel 1 goto :fail_venv
@@ -32,7 +32,7 @@ set "VPY=venv\Scripts\python.exe"
 echo     Ready.
 
 echo.
-echo  [3/6] Dependencies ^(a few minutes the first time^)...
+echo  [3/7] Dependencies ^(a few minutes the first time^)...
 set "USED_OFFLINE="
 if not exist "wheels" goto :online
 echo     Offline packages found in wheels\ - installing without the network.
@@ -55,12 +55,12 @@ if exist "requirements-device-gateway.txt" "%VPY%" -m pip install -r requirement
 echo     Installed.
 
 echo.
-echo  [4/6] PostgreSQL...
+echo  [4/7] PostgreSQL...
 call "setup\_ensure_postgres.bat"
 if errorlevel 1 goto :fail_quiet
 
 echo.
-echo  [5/6] Database connection and .env...
+echo  [5/7] Database connection and .env...
 "%VPY%" "setup\_configure_env.py" mes
 if errorlevel 1 goto :fail_env
 
@@ -68,7 +68,7 @@ if errorlevel 1 goto :fail_env
 if errorlevel 1 goto :fail_ensuredb
 
 echo.
-echo  [6/6] Schema and data...
+echo  [6/7] Schema and data...
 
 rem A backup in backups\ is an OFFER, not a requirement. A plant starting
 rem fresh should start fresh: the app builds its own schema on first run
@@ -133,6 +133,24 @@ echo     Bringing the schema up to date...
 if errorlevel 1 goto :fail_schema
 echo     Schema is up to date.
 
+rem seed_initial_data() (inside "import crud" above) only ever creates the
+rem manager/admin account when the users table is completely empty - by
+rem design, so this never touches a plant's real accounts on a restore or a
+rem re-run. On a genuine clean start it should always have just run, but
+rem this makes the login a guarantee instead of a hope: same account, same
+rem PIN, made or re-confirmed by the same tool as the "IT Admin - Accounts"
+rem emergency reset, rather than leaving day one dependent on nothing
+rem having gone sideways in seeding.
+if defined CLEAN_START (
+    echo.
+    echo  Confirming the admin account can sign in...
+    "%VPY%" create_admin.py manager admin123 "Plant Lead"
+)
+
+echo.
+echo  [7/7] HTTPS certificate...
+"%VPY%" "setup\generate_tls_cert.py"
+
 echo.
 echo  ===================================================
 echo   DONE - this PC is set up as the MES / Logger.
@@ -141,7 +159,7 @@ if not defined CLEAN_START goto :addr
 echo.
 echo   Clean database. Sign in with:
 echo       username:  manager
-echo       PIN:       admin
+echo       PIN:       admin123
 echo   Then, from IT Admin:
 echo     1. Change that PIN ^(Account ^& Preferences, top of sidebar^).
 echo     2. Replace the placeholder pumps with the real ones.

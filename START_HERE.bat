@@ -36,6 +36,13 @@ echo.
 echo   UPDATE
 echo     7  Apply an update ^(from the updates folder^)
 echo.
+echo   SECURITY
+if exist "certs\mes.crt" (
+    echo     8  HTTPS certificate ^(present - renew it^)
+) else (
+    echo     8  HTTPS certificate ^(NOT set up - the MES is running on plain HTTP^)
+)
+echo.
 echo     Q  Quit
 echo.
 set "PICK="
@@ -48,6 +55,7 @@ if /i "%PICK%"=="4" goto :run_gw
 if /i "%PICK%"=="5" goto :diagnose
 if /i "%PICK%"=="6" goto :package
 if /i "%PICK%"=="7" goto :update
+if /i "%PICK%"=="8" goto :tls_cert
 if /i "%PICK%"=="Q" goto :eof
 goto :menu
 
@@ -69,7 +77,10 @@ echo.
 echo  Starting the MES. Close this window to stop it.
 echo  Operators open the address printed below on their phones.
 echo.
-venv\Scripts\python.exe -m streamlit run Home.py --server.address=0.0.0.0
+set "SSL_ARGS="
+if exist "certs\mes.crt" if exist "certs\mes.key" set "SSL_ARGS=--server.sslCertFile=certs\mes.crt --server.sslKeyFile=certs\mes.key"
+if not defined SSL_ARGS echo  [!] No HTTPS certificate yet - running on plain HTTP. Option 8 sets one up.
+venv\Scripts\python.exe -m streamlit run Home.py --server.address=0.0.0.0 %SSL_ARGS%
 echo.
 pause
 goto :menu
@@ -125,6 +136,14 @@ if not exist "venv\Scripts\python.exe" goto :not_setup
 if not exist "updates" mkdir "updates"
 echo.
 venv\Scripts\python.exe "setup\apply_update.py"
+echo.
+pause
+goto :menu
+
+:tls_cert
+if not exist "venv\Scripts\python.exe" goto :not_setup
+echo.
+venv\Scripts\python.exe "setup\generate_tls_cert.py"
 echo.
 pause
 goto :menu

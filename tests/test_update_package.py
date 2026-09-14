@@ -16,6 +16,9 @@ The cases are the ones that actually happen on a floor:
     USB stick
   * .env and backups\\, which belong to the machine and must survive an
     update that would otherwise overwrite them
+  * a package that is not signed with the real key, or was changed after
+    it was signed - a checksum alone cannot tell either of those apart
+    from a good release
 """
 import hashlib
 import json
@@ -30,8 +33,18 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "setup"))
 
 import apply_update  # noqa: E402
+import update_signing  # noqa: E402
 
 FAILURES, COUNT = [], 0
+
+# A throwaway key pair for this test run only - never the real
+# dev/update_signing_private.pem. Every fake_plant() gets the public half
+# in its own setup/, so signature checks run for real without touching
+# anything that actually protects a live plant PC.
+_TEST_KEYS = pathlib.Path(tempfile.mkdtemp(prefix="mes_testkeys_"))
+_TEST_PRIVATE = _TEST_KEYS / "private.pem"
+_TEST_PUBLIC = _TEST_KEYS / "public.pem"
+update_signing.generate_keypair(_TEST_PRIVATE, _TEST_PUBLIC)
 
 
 def check(cond, what):
@@ -55,12 +68,20 @@ def fake_plant(version="PT-V3.40"):
     (root / "backups").mkdir()
     (root / "backups" / "mes_backup_1.sql").write_text("dump", encoding="utf-8")
     (root / "logs").mkdir()
+    (root / "setup").mkdir()
+    shutil.copy(_TEST_PUBLIC, root / "setup" / "update_signing_public.pem")
     return root
 
 
 def make_package(files, to_version="PT-V3.41", from_version="PT-V3.40",
-                 delete=(), packages=(), notes="", corrupt=False):
-    """A package built the way dev/make_update.py builds one."""
+                 delete=(), packages=(), notes="", corrupt=False, sign=True,
+                 signing_key=None):
+    """A package built the way dev/make_update.py builds one.
+
+    sign=False leaves the manifest exactly as an update built before this
+    feature existed would look - no "signature" key at all. signing_key
+    lets a case sign with the WRONG key, to prove that is caught too.
+    """
     path = pathlib.Path(tempfile.mkdtemp(prefix="mes_pkg_")) / f"mes_update_{to_version}.zip"
     manifest = {"format": 1, "from_version": from_version, "to_version": to_version,
                 "built_at": "now", "notes": notes, "files": [],
@@ -73,6 +94,9 @@ def make_package(files, to_version="PT-V3.41", from_version="PT-V3.40",
                 "sha256": hashlib.sha256(data if not corrupt else b"different").hexdigest(),
                 "bytes": len(data)})
             zf.writestr("files/" + rel, data)
+        if sign:
+            manifest["signature"] = update_signing.sign(
+                manifest, signing_key or _TEST_PRIVATE)
         zf.writestr("mes_update.json", json.dumps(manifest))
     return path
 
@@ -155,6 +179,50 @@ check(apply_update.read_version(plant) == "PT-V3.40", "before anything is writte
 check("old" in read(plant, "Home.py"), "the file on disk is untouched")
 check(not (pathlib.Path(plant) / "rollback").is_dir(),
       "and it did not even get as far as copying the project aside")
+
+# --------------------------------------------------------- signed, or refused --
+print("\nA package must be signed with the real key")
+
+plant = fake_plant()
+pkg = make_package({"Home.py": 'APP_VERSION = "PT-V3.41"\n'}, sign=False)
+code = run(pkg, plant)
+check(code == 1, "an unsigned package is refused")
+check(apply_update.read_version(plant) == "PT-V3.40", "nothing is changed")
+check(not (pathlib.Path(plant) / "rollback").is_dir(),
+      "it never got as far as copying the project aside")
+
+plant = fake_plant()
+_wrong_priv = _TEST_KEYS / "wrong.pem"
+if not _wrong_priv.exists():
+    update_signing.generate_keypair(_wrong_priv, _TEST_KEYS / "wrong_pub.pem")
+pkg = make_package({"Home.py": 'APP_VERSION = "PT-V3.41"\n'}, signing_key=_wrong_priv)
+code = run(pkg, plant)
+check(code == 1, "a package signed with the wrong key is refused")
+check(apply_update.read_version(plant) == "PT-V3.40", "nothing is changed")
+
+plant = fake_plant()
+pkg = make_package({"Home.py": 'APP_VERSION = "PT-V3.41"\nHELLO = "new"\n'})
+# Tamper with the checksum AND the payload together, consistently, after
+# signing - the case a checksum alone cannot catch, because the file and
+# its recorded hash still agree with each other.
+with zipfile.ZipFile(pkg) as zf:
+    manifest = json.loads(zf.read("mes_update.json"))
+    members = {n: zf.read(n) for n in zf.namelist() if n != "mes_update.json"}
+tampered = b'APP_VERSION = "PT-V3.41"\nHELLO = "malicious"\n'
+members["files/Home.py"] = tampered
+for entry in manifest["files"]:
+    if entry["path"] == "Home.py":
+        entry["sha256"] = hashlib.sha256(tampered).hexdigest()
+        entry["bytes"] = len(tampered)
+pkg.unlink()
+with zipfile.ZipFile(pkg, "w") as zf:
+    for name, data in members.items():
+        zf.writestr(name, data)
+    zf.writestr("mes_update.json", json.dumps(manifest))  # old signature, new content
+code = run(pkg, plant)
+check(code == 1, "content changed after signing is refused, even with a "
+                 "self-consistent checksum")
+check(apply_update.read_version(plant) == "PT-V3.40", "nothing is changed")
 
 # ------------------------------------------------------------ wrong version --
 print("\nThe wrong package for this PC")

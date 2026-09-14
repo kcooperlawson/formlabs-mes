@@ -7,6 +7,7 @@ PC, in the order they fail, and prints one line each. It changes nothing.
     python setup/_preflight.py                 full report
     python setup/_preflight.py --address-only  just the URL for the phones
 """
+import datetime
 import os
 import re
 import socket
@@ -16,6 +17,8 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
+CERT_FILE = ROOT / "certs" / "mes.crt"
+KEY_FILE = ROOT / "certs" / "mes.key"
 
 OK, WARN, BAD = "[ok]", "[! ]", "[X ]"
 _problems = []
@@ -57,12 +60,15 @@ def lan_ip():
 def print_address():
     ip = lan_ip()
     name = socket.gethostname()
+    scheme = "https" if CERT_FILE.exists() and KEY_FILE.exists() else "http"
     print("   Operators open this on their phones:")
     if ip:
-        print(f"       http://{ip}:8501")
-    print(f"       http://{name}:8501")
+        print(f"       {scheme}://{ip}:8501")
+    print(f"       {scheme}://{name}:8501")
     if not ip:
         print("   (couldn't work out this PC's network address)")
+    if scheme == "http":
+        print("   (plain HTTP - no certificate yet, see HTTPS / TLS above)")
 
 
 # -------------------------------------------------------------- checks
@@ -249,6 +255,47 @@ def check_port():
             line(WARN, "Couldn't read the firewall state")
 
 
+def check_tls():
+    head("HTTPS / TLS")
+    if not CERT_FILE.exists() or not KEY_FILE.exists():
+        line(WARN, "No certificate configured",
+             "running on plain HTTP - PINs and session cookies go over the "
+             "network unencrypted")
+        print("        -> START_HERE.bat, option 8")
+        return
+
+    try:
+        from cryptography import x509
+    except ImportError:
+        line(WARN, "Certificate files present but can't be checked",
+             "'cryptography' isn't installed - run option 1 or 2")
+        return
+
+    try:
+        cert = x509.load_pem_x509_certificate(CERT_FILE.read_bytes())
+    except Exception as exc:
+        line(BAD, "Certificate file can't be read", str(exc))
+        print("        -> START_HERE.bat, option 8, to regenerate it")
+        return
+
+    try:
+        expires = cert.not_valid_after_utc.replace(tzinfo=None)
+    except AttributeError:  # older cryptography versions
+        expires = cert.not_valid_after
+    days_left = (expires - datetime.datetime.utcnow()).days
+
+    if days_left < 0:
+        line(BAD, "Certificate has expired", expires.date().isoformat())
+        print("        -> START_HERE.bat, option 8, to renew it")
+    elif days_left < 30:
+        line(WARN, f"Certificate expires in {days_left} day(s)",
+             expires.date().isoformat())
+        print("        -> START_HERE.bat, option 8, to renew it")
+    else:
+        line(OK, "Certificate present and valid",
+             f"expires {expires.date().isoformat()}")
+
+
 def check_files():
     head("Project files")
     for rel in ["Home.py", "crud.py", "requirements.txt", "migrations",
@@ -256,6 +303,14 @@ def check_files():
         p = ROOT / rel
         line(OK if p.exists() else BAD, rel,
              "" if p.exists() else "missing - unzip the whole package")
+
+    pubkey = ROOT / "setup" / "update_signing_public.pem"
+    if pubkey.exists():
+        line(OK, "setup/update_signing_public.pem")
+    else:
+        line(WARN, "setup/update_signing_public.pem", "missing - "
+             "setup/apply_update.py will refuse every update until this "
+             "is restored from a source you trust")
 
     # The two documents the application hands out from inside itself: the
     # question mark on the operator form and the grey line at the bottom of
@@ -286,6 +341,7 @@ def main():
     values = check_env()
     check_database(values)
     check_port()
+    check_tls()
 
     print()
     print("  ===================================================")

@@ -20,6 +20,15 @@ thing a new starter sees, and the difference between a tool that looks
 finished and one that looks broken is whether it says what happens next.
 `empty_state` exists to make the useful version the easy one to write.
 
+**Feedback was a one-way trip.** Eight pages each had their own copy of a
+"Universal Feedback Box" - a form that posted to the Suggestion table and
+then a toast, and nothing else. IT could see and update every submission
+from the Admin Panel, but the person who submitted it had no way to find
+out whether anyone had looked, let alone what was decided - the only way
+to learn "did my bug report go anywhere" was to ask someone in person.
+`render_feedback_box` is the same form, plus that person's own submission
+history - status and any note back - immediately underneath it.
+
 Deliberately plain functions returning HTML strings, or thin wrappers over
 st.markdown - not a widget framework. Every page here already knows how to
 render markdown, and the goal is one definition per component, not a new
@@ -29,6 +38,7 @@ from __future__ import annotations
 
 import html
 
+import pandas as pd
 import streamlit as st
 
 
@@ -63,6 +73,81 @@ def empty_state(title: str, body: str = "", *, icon: str = "📭",
         f'{esc(body)}</div>{action_html}</div>',
         unsafe_allow_html=True,
     )
+
+
+# ---------------------------------------------------------------- feedback --
+_FEEDBACK_STATUS_COLOUR = {
+    "Open": "#EF4444", "In Review": "#F59E0B",
+    "Implemented": "#10B981", "Dismissed": "#94A3B8",
+}
+
+
+def render_feedback_box(current_user: str, current_role: str, *,
+                        form_key: str = "settings_sug_form") -> None:
+    """The Universal Feedback Box, plus the submitter's own history.
+
+    Every page that has this form calls this one function now instead of
+    carrying its own copy - so the fix below reaches all of them at once,
+    the same way a nav or shell fix does.
+
+    Submitting used to be the whole story: a toast, then nothing. Nobody
+    reading a stale-numbers bug report or a plant-floor issue back could
+    tell if IT had even seen it, and there was no page to check - the
+    Admin Panel's inbox is IT's view, not the submitter's. This adds that
+    view: everything this person has ever sent in, newest first, with its
+    current status and IT's note back the moment one is added - so the
+    answer to "did anything happen with that" is right where they
+    submitted it, not something they have to ask around for.
+    """
+    from database import add_suggestion, get_all_suggestions_df
+
+    st.markdown("#### Universal Feedback Box")
+    with st.form(form_key, clear_on_submit=True):
+        s_cat = st.selectbox("Category",
+                             ("Feature Request", "App Bug / Error", "Plant Floor Issue", "General Feedback"))
+        s_txt = st.text_area("Observation / Description")
+        if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
+            if s_txt.strip():
+                add_suggestion(current_user, current_role, s_cat, s_txt.strip())
+                st.success("✅ Submitted to IT Admin!")
+
+    st.markdown("---")
+    st.markdown("#### 📬 My Submitted Feedback")
+
+    df_mine = get_all_suggestions_df()
+    # Suggestion has no FK to users (free-text submitter name only, same as
+    # the Admin Panel's inbox and its avatar match) - a renamed account just
+    # shows nothing here rather than the wrong person's history.
+    if not df_mine.empty:
+        df_mine = df_mine[df_mine["user_name"] == current_user]
+
+    if df_mine.empty:
+        empty_state("Nothing submitted yet",
+                    "Anything you send above shows up here, with its status and "
+                    "any note back from IT, once it's been looked at.", icon="📭")
+        return
+
+    for _, row in df_mine.sort_values("timestamp", ascending=False).iterrows():
+        badge = _FEEDBACK_STATUS_COLOUR.get(row["status"], "#94A3B8")
+        note_html = (
+            f'<div style="margin-top:8px;padding-top:8px;'
+            f'border-top:1px solid rgba(148,163,184,0.25);color:#38BDF8;font-size:0.85rem;">'
+            f'<b>Note back from IT:</b> {esc(row["admin_notes"])}</div>'
+            if row.get("admin_notes") else "")
+        st.markdown(
+            f'<div style="border:1px solid rgba(148,163,184,0.25);border-radius:8px;'
+            f'padding:12px 14px;margin-bottom:8px;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+            f'<span style="background:{badge};color:#fff;font-size:0.72rem;font-weight:800;'
+            f'padding:2px 8px;border-radius:4px;">● {esc(row["status"]).upper()}</span>'
+            f'<span style="font-size:0.78rem;opacity:0.7;">{esc(row["category"])} · '
+            f'{pd.to_datetime(row["timestamp"]).strftime("%Y-%m-%d %H:%M")}</span>'
+            f'</div>'
+            f'<div style="margin-top:8px;font-size:0.9rem;">{esc(row["suggestion"])}</div>'
+            f'{note_html}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 
 # ---------------------------------------------------------------- containers --

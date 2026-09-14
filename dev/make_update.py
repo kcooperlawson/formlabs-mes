@@ -1,5 +1,6 @@
 """Build the single file that gets carried to the plant PC.
 
+    python dev/make_update.py --init-keys                 once, ever
     python dev/make_update.py --from PT-V3.40
     python dev/make_update.py --from PT-V3.40 --files crud.py pages/Home.py
     python dev/make_update.py --from PT-V3.40 --since <git rev> --notes "..."
@@ -11,6 +12,13 @@ of them with its checksum, the version it goes from and to, anything to delete,
 and any new packages. setup/apply_update.py on the other end reads that and
 nothing else - the package carries no code that runs, because a USB stick that
 executes on a plant PC is a different object from one that carries files.
+
+Every build is also signed (setup/update_signing.py) with the private key at
+dev/update_signing_private.pem. A checksum proves a file arrived intact; a
+signature proves it came from whoever holds that key, not just whoever last
+wrote to the USB stick. Run --init-keys once to create the key pair - it
+prints exactly what to do with each half. After that, every build signs
+itself automatically and refuses to produce an unsigned package.
 
 Which files go in: whatever changed in git since the deployed version, or an
 explicit list. Never .env, backups, logs, uploads, venv, the tests or the
@@ -34,6 +42,9 @@ from datetime import datetime
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
+
+sys.path.insert(0, str(ROOT / "setup"))
+import update_signing  # noqa: E402
 
 # Not the machine's, not needed on the floor, or simply large.
 SKIP_DIRS = {"venv", "backups", "logs", "uploads", "updates", "rollback",
@@ -107,6 +118,7 @@ def build(from_version, to_version, files, deletes, packages, notes):
                 "bytes": len(data),
             })
             zf.writestr("files/" + rel.replace("\\", "/"), data)
+        manifest["signature"] = update_signing.sign(manifest)
         zf.writestr("mes_update.json", json.dumps(manifest, indent=2))
     return out, manifest
 
@@ -127,7 +139,26 @@ def main():
     ap.add_argument("--notes", default="",
                     help="what is in it, in one or two lines, shown before "
                          "the person confirms")
+    ap.add_argument("--init-keys", action="store_true",
+                    help="create the signing key pair (once, ever) and exit")
     args = ap.parse_args()
+
+    if args.init_keys:
+        try:
+            priv, pub = update_signing.generate_keypair()
+        except FileExistsError as exc:
+            sys.exit(str(exc))
+        print(f"\n  Wrote {priv.relative_to(ROOT)} and {pub.relative_to(ROOT)}\n")
+        print(f"  {priv.name} signs every release from here on. Keep it")
+        print("  somewhere that is not this repo and not a plant PC - a")
+        print("  password manager or an encrypted drive, not a USB stick")
+        print("  that also carries update packages. If it's ever lost, every")
+        print("  plant PC's copy of update_signing_public.pem stops matching")
+        print("  anything you can sign until you redistribute a new one.")
+        print()
+        print(f"  {pub.name} is not a secret - commit it. Every PC needs it")
+        print("  to check a release actually came from here.\n")
+        return
 
     to_version = app_version()
     if not to_version:
@@ -145,8 +176,11 @@ def main():
     if not files and not deletes:
         sys.exit("Nothing changed - no package built.")
 
-    out, manifest = build(args.from_version, to_version, files, deletes,
-                          args.packages, args.notes)
+    try:
+        out, manifest = build(args.from_version, to_version, files, deletes,
+                              args.packages, args.notes)
+    except FileNotFoundError as exc:
+        sys.exit(str(exc))
 
     print(f"\n  {out.relative_to(ROOT)}   ({out.stat().st_size / 1024:.0f} KB)")
     print(f"  {manifest['from_version'] or 'any'} -> {manifest['to_version']}\n")

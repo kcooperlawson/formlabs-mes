@@ -2,6 +2,7 @@
 
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, ForeignKey
+from sqlalchemy.orm import relationship
 from datetime import datetime, date
 from db_core import Base
 import secrets
@@ -17,7 +18,7 @@ class User(Base):
     target_lph = Column(Float, default=400.0)
     shift = Column(String(20), default="Shift 1")
     # NEW COLUMN FOR THEME ENGINE
-    preferred_theme = Column(String(255), default="Default Dark")
+    preferred_theme = Column(String(255), default="Formlabs Forge")
     avatar_filename = Column(String(255), nullable=True)
     # --- LOGIN LOCKOUT ---
     failed_login_attempts = Column(Integer, default=0, nullable=False)
@@ -231,6 +232,24 @@ class ResinSpec(Base):
     color_tag = Column(String(20), nullable=True)
     units_per_skid = Column(Integer, default=500)
 
+class ResinSpecHistory(Base):
+    """Audit trail for changes to the resin specification table.
+
+    Every add, edit and delete of a resin spec is recorded here with the
+    old and new values as JSON, who made the change and when. The
+    resin_spec_id is kept even after the spec is deleted so the trail still
+    points at the right row in time.
+    """
+    __tablename__ = "resin_spec_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    resin_spec_id = Column(Integer, nullable=True, index=True)
+    action = Column(String(10), nullable=False)  # ADD, EDIT, DELETE
+    changed_by = Column(String(100), nullable=True)
+    changed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    old_values = Column(Text, nullable=True)
+    new_values = Column(Text, nullable=True)
+
+
 class PumpStation(Base):
     __tablename__ = "pump_stations"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -284,6 +303,28 @@ class CleanlinessAudit(Base):
     image_filename = Column(String(255), nullable=True)
     is_spill = Column(String(10), default="No")
     notes = Column(Text, nullable=True)
+
+    # Relationship to additional photos (cascade delete so photos go with their audit)
+    photos = relationship("CleanlinessAuditPhoto", back_populates="audit", cascade="all, delete-orphan")
+
+class CleanlinessAuditPhoto(Base):
+    """An extra photo attached to an audit.
+
+    The FIRST photo lives on CleanlinessAudit.image_filename, because every
+    existing reader (the gallery, exports, rows written before this table
+    existed) looks for it there and stays untouched. Additional photos hang
+    here, one row per photo in upload order, and leave with their audit
+    through the FK's CASCADE.
+    """
+    __tablename__ = "cleanliness_audit_photos"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    audit_id = Column(Integer, ForeignKey("cleanliness_audits.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    note = Column(String(240), nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship back to the audit
+    audit = relationship("CleanlinessAudit", back_populates="photos")
 
 class FloorMessage(Base):
     __tablename__ = "floor_messages"

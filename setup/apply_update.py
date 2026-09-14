@@ -20,12 +20,16 @@ What it will not do, on purpose:
   * It does not carry on after something fails. Every step that can fail is
     checked, and a failure after the files have moved puts the previous
     version back before it says anything else.
+  * It does not apply a package that is not signed by the real key, even if
+    every checksum matches. A checksum only proves the zip arrived intact -
+    it says nothing about who put those files in it. See
+    setup/update_signing.py.
 
 The order matters and is deliberate:
 
-    verify the package  ->  check the version  ->  back up the database
-    ->  copy the whole project aside  ->  apply  ->  prove it boots
-    ->  keep it, or roll the whole thing back
+    verify the package  ->  check the signature  ->  check the version
+    ->  back up the database  ->  copy the whole project aside  ->  apply
+    ->  prove it boots  ->  keep it, or roll the whole thing back
 
 Proving it boots is the step that makes this worth having. It compiles every
 file that was copied and then runs the application's own start-up, which is
@@ -43,6 +47,8 @@ import subprocess
 import sys
 import zipfile
 from datetime import datetime
+
+import update_signing
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPDATES = os.path.join(ROOT, "updates")
@@ -280,6 +286,15 @@ def apply(package_path, root=ROOT, assume_yes=False):
             say("        looks exactly like this.")
             return 1
         say(OK, f"{len(manifest.get('files', []))} files, every checksum matches")
+
+        sig_ok, sig_detail = update_signing.verify(manifest)
+        if not sig_ok:
+            say(BAD + f"Signature check failed: {sig_detail}.")
+            say("        Nothing has been changed. This package did not come")
+            say("        from the real signing key, or was altered after it")
+            say("        was built - do not apply it.")
+            return 1
+        say(OK, sig_detail)
 
         wanted = manifest.get("from_version")
         target = manifest.get("to_version", "")

@@ -8,10 +8,84 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 3.47 — Friday, September 11, 2026
+**Streamlit reruns the entire page on every input — mitigated on two spots on the operator screen, more to come**
+
+`Operator_Form.py` reruns top to bottom on every widget interaction, which is just how Streamlit works, but it got reported from the floor as a jarring wait after typing or tapping anything. Two changes so far, both picked because neither one has any live cross-widget behaviour that a rerun-per-keystroke was actually holding up:
+
+- The Downtime tab's four fields are inside `st.form("downtime_form")` now — the page used to rerun on every character typed into "Corrective Action Taken"; it reruns once, when the button is pressed.
+- The resin lookup quick-reference (added the same day, see below) is `@st.fragment`-wrapped — its search box reruns only that table, not the whole page.
+- Deliberately left alone: the Pouring tab (live tank-changeover detection depends on an immediate rerun when station/resin are picked) and the Audit tab (the photo preview only works because the camera/upload widgets rerun live). Both need me actually standing there clicking through them right after the change, which is why they're not in this entry yet.
+
+**Finding 9 — admin and manager PINs held to a longer minimum**
+
+The security posture doc flagged four-digit PINs everywhere, admin included, as a floor trade that makes no sense for an account that reaches Admin Panel, the user roster, and database backup/restore — reachable from anywhere on the network, not just a pump. `crud.pin_policy_error(role, pin)` is the one place this gets decided now (6 characters minimum for `admin`/`manager`, 4 unchanged for `operator`/`packer`), and every path that sets a PIN checks it: `update_user_credentials` (self-service, all seven pages that use it), Admin Panel's "Provision New User" and "Reset User PIN", and `create_admin.py`'s emergency tool.
+
+- Knock-on fix: both installers' own `CLEAN_START` step calls `create_admin.py manager admin "Plant Lead"` to guarantee the seeded login works (see the 9/11 entry below) — with the new rule in place that call would have failed its own check on every fresh install. Bootstrap PIN is `admin123` now in both `install_mes.bat` and `Setup_On_New_PC.bat`, in the command and in the printed "sign in with" instructions, and `seed_initial_data()`'s own direct-INSERT default (the one write that happens outside `create_user`/`update_user_credentials` and so isn't caught by the new check) got bumped to match.
+- **Not retroactive.** My own live `manager` login was very likely seeded or reset with the old 4-character default at some point — I need to go into IT Admin → Account & Preferences myself and give it a real PIN of 6+ characters, since the new rule only stops a *short* PIN from being *set* going forward.
+
+**Looked at and found already done: startup diagnostics**
+
+Went looking for a gap in `setup/_preflight.py` — the idea being that testing the real Postgres connection at diagnose-time could have caught yesterday's password mismatch before it showed up as a raw traceback. Turned out `check_database()` already does exactly that, already has a specific "password authentication failed → wrong password in .env, re-run option 1" message, and `check_env()` already verifies `PG_BIN_DIR` points at a real `pg_dump.exe`. Nothing to add here — `START_HERE.bat` → 5 already catches both of today's failure modes.
+
+**Looked at and set aside: idle session timeout**
+
+Also on my "what to do next" list off the security doc. Turns out to need more than a quick add: a new `last_seen_at` column (schema migration), and — the real complication — `utils.check_authentication()` currently short-circuits the moment a browser tab is already authenticated, so it never re-touches the database or re-checks anything for the rest of that tab's life. Making idle timeout actually work means changing that short-circuit to periodically re-validate, which is auth code every single page depends on. That risk profile is closer to the Pouring tab than to anything else done today, so I'm holding it for its own careful pass with live testing rather than bundling it in here.
+
+**The SCADA volume card only knew about two cartridge types**
+
+Reported from the floor: the Volume Output card on the SCADA terminal (`Home.py`) read "0 V2 | 0 RPS" style subtext no matter what actually ran, because it kept exactly two counters — one for anything containing "RPS", and everything else (unless it said "Pigment") went into the V2 counter, whether it was V2 or not. A day that poured entirely V1, like today, was silently counted and displayed as V2; a bulk drum pour would have been too; Pigment pours were dropped from the subtext entirely even though they were still in the liters total above it.
+
+- Replaced the two hardcoded counters with a `cart_type_counts` dict keyed by whatever `cartridge_type` the row actually carries, and the subtext now lists every type that was poured, busiest first, instead of a fixed "V2 | RPS" pair. A future cartridge format added in Mgr_Resin_Canvas needs no change here to show up on this card.
+
+**Also looked at: the startup checklist asking twice on old pumps**
+
+Reported alongside it: going to an "old pump" sometimes re-asks the startup checklist even though another operator already cleared it today, and sometimes doesn't ask at all at a pump nobody has touched. `has_completed_daily_checklist`/`submit_daily_checklist` in `crud.py` are keyed on `(operator_name, shift, pump_station)`, and `pump_station` is a name in the `PumpStation` table — that part is working as designed (Section 4/5 of the security posture doc covers the per-pump intent). The twenty old pumps don't have that many distinct rows in `PumpStation` yet — we haven't figured out a label system for them — so two different physical pumps can resolve to the same station name, or the same name inconsistently, and that reads exactly like "sometimes already done, sometimes not." Not a code fix: every old pump needs adding as its own named station under IT Admin → Master Plant Equipment & Configuration → Pump Stations, the same way the three new pumps are set up.
+
+- **Temporary override added, pending that.** The startup checklist gate (`Operator_Form.py`) now has a "this pump was already checked today" expander above Step 1: an operator can type who actually did it and unlock the terminal without redoing the photo and boxes. It records as a `CleanlinessAudit` row (audit type "Startup Checklist — marked already done (pump not yet labeled)") naming who unlocked it and who they say already did the work, so it shows up on Mgr_Cleanliness same as any other audit. Meant to come back out once the old pumps each have their own station name and the per-pump gate can be trusted on its own.
+
+**`Setup_On_New_PC.bat` was broken, and wasn't installing PostgreSQL either**
+
+Reported as "moving to another work PC has been a struggle." Opened the script and found why: an earlier edit had left it with a stray pair of unmatched `)` right after the `:launch` label, followed by an entire second, slightly different copy of the database-restore-and-schema steps and a second `:launch` label. In `cmd.exe` a bare `)` outside of an open block is a syntax error, so the script broke immediately after building the schema on every run, before it ever reached the point of restoring data or launching the app.
+
+- Rewrote it as one clean flow instead of patching around the break. It also used to only *check* for PostgreSQL and stop with manual download instructions if missing, unlike `install_mes.bat`, which offers to install it automatically with winget — so a work PC without Postgres already on it needed a separate manual install before this script could do anything. It now calls the same `setup\_ensure_python.bat`, `setup\_ensure_postgres.bat` and `setup\_configure_env.py` that `install_mes.bat` uses, so both installers install Python and PostgreSQL the same way, ask for the Postgres login the same way and verify the connection before continuing, instead of two scripts that can quietly drift apart the way this one just had.
+- Folded in the `verify_restore` row-count check that the broken duplicate section had been trying to add — it was a real feature, just wired in wrong. A restore now confirms the row counts match the backup's manifest before I call the database good, rather than only checking that `pg_restore` didn't error.
+- Net effect: `Move_To_New_PC.bat` on the old PC, copy the one zip it produces to the new PC, unzip, run `Setup_On_New_PC.bat` — Python, PostgreSQL, the database, the restored data and the HTTPS certificate are all handled by that one script now, same as a from-scratch install with `install_mes.bat`.
+
+**Two more from testing that install on a real machine: wrong Postgres version, and a login that wasn't guaranteed**
+
+- **`_ensure_postgres.bat` installed PostgreSQL 17.** Every other PC here runs 18 — it's what `database.py` and the security posture doc both assume — so a fresh install landed a version behind everything else, including any backup taken from an 18 machine (an older server can't read a newer one's dump; see Finding in `check_dump_compat`). It installs 18 first now, falls back to winget's unversioned id, and only then to 17 as a last resort, so an install always ends up current unless nothing newer is available at all.
+- **The seeded `manager`/admin login wasn't guaranteed.** `seed_initial_data()` only creates the `manager` account when the users table is completely empty, which should always be true on a clean install — but I still needed `create_admin.py` by hand to get into this one. Rather than chase why that one run's seeding didn't take, both installers now call `create_admin.py manager admin "Plant Lead"` right after the schema step, but **only when `CLEAN_START` is set** — never on a restore or a re-run, so a plant's real admin password is never silently reset. `create_admin.py` itself gained a non-interactive form (`create_admin.py <username> <pin> <full name> [email]`) so the installers can call it without anybody typing at a prompt; run with no arguments, it still asks interactively exactly as before, for using by hand as an emergency reset.
+
+**Two more from moving to another PC, once it could actually get that far: a `pg_dump` that couldn't find itself, and a password Postgres no longer had**
+
+- **`utils.py`'s `_get_pg_bin()` trusted a broken `PG_BIN_DIR` forever.** A reinstalled Postgres had left `.env`'s `PG_BIN_DIR` as `'C:\\Program Files\\PostgreSQL\\18\\bin'` — literal doubled backslashes and stray quotes, not a real path, since `.env` doesn't interpret `\\` as an escape. `_get_pg_bin()` returned that value unconditionally with no check that it pointed at anything real, so every backup failed with a bare `WinError 2` and nothing that explained why. It checks the file actually exists before trusting `PG_BIN_DIR` now, and falls back to re-detecting PostgreSQL (same scan `install_mes.bat` uses) when it doesn't — a bad value heals itself the next time anything touches the database instead of staying broken until I find this exact line again. The auto-detect path also persists with forward slashes now rather than `os.path.dirname()`'s native backslashes, since a persisted backslash path is exactly what `set_key()`'s quoting mangled in the first place.
+- **Password authentication failed after the same Postgres reinstall.** Straightforward once found: reinstalling Postgres set a new password for the `postgres` role, and `.env`'s `DB_URL`/`PG_PASS` still had the old one. No code fix — just `setup/_configure_env.py mes` (or a manual `.env` edit) run again with the current password.
+
+**Finding 11 — the resin lookup panel operators use mid-pour had no access check at all**
+
+Section 8 of the security posture doc flagged this as the one open finding that actually exposes confidential information rather than an operational number: any signed-in account, any role, could open the "Master Resin Specification Lookup" expander on the operator screen (`Operator_Form.py`) and see — and, via `st.dataframe`'s own built-in toolbar, one-click export — the entire resin table, SKUs and internal codes included, for formulations that aren't even released yet.
+
+- Added a new ability, `view_resin_lookup` (`crud.py`), granted to every role by default — operator and packer included, since checking a target weight mid-pour is the actual job and taking that away would break it. What changed is that it's a real, named door now rather than "anyone signed in", the same way every other screen in the app already works.
+- The operator's quick-reference panel no longer shows the SKU or internal resin code — only what a pour is actually checked against: container format, resin name, target/min/max weight and the kg conversion. It's a plain HTML table now (the same pattern `Mgr_Resin_Canvas.py` already used for its own table) instead of `st.dataframe`, so there's no built-in export button to click.
+- The full table, SKUs included, along with add/edit/delete, stays exactly where it already was — the manager-only Resin Canvas page, behind `manage_resins`, unchanged.
+
+## 3.46 — Friday, September 11, 2026
+**Security posture, findings 1, 5, 6, 7 and 8**
+
+Went through `Formlabs_MES_Security_Posture.pdf` (PT-V3.46) one finding at a time. Found a stray, non-functional set of Ruby on Rails files sitting in the project (`app/models/`, `database/migrations/`) that something else had dropped in while apparently trying to fix Finding 5 — deleted them; this is a Python project with no Ruby anywhere in it, and the real fix for Finding 5 (the `ResinSpecHistory` audit trail in `models.py`/`crud.py`) was already in place. Finding 8 (the mDNS announcer ignoring the gateway toggle) turned out to already be fixed too — `service_announcer.py` already checks `enable_device_gateway` before it broadcasts anything, I just hadn't crossed it off the list.
+
+- **Finding 1, plain HTTP, closed.** `setup/generate_tls_cert.py` writes a self-signed certificate to `certs/mes.crt` / `mes.key`, covering this PC's hostname, LAN IP, `localhost` and `127.0.0.1`. `run_mes.bat` and `START_HERE.bat` (option 3) pick it up automatically and serve HTTPS instead of HTTP whenever both files are present; option 8 generates or renews one by hand. `install_mes.bat` now runs it as step 7 of setup, and `_preflight.py` reports the certificate's presence and expiry.
+- Self-signed means a one-time "not trusted" warning on each phone the first time it connects — expected, not a bug. An internal CA certificate can go in at the same two paths instead.
+- Added `cryptography` to `requirements.txt` for the cert generation; I haven't pinned it to an exact version yet, since it's a brand-new dependency and there's no venv here to read the installed version off of.
+- **Finding 6, unsigned update packages, closed.** `setup/update_signing.py` is the one place both `dev/make_update.py` and `setup/apply_update.py` now agree on what a signature covers. Every build signs its manifest with an Ed25519 private key (`dev/update_signing_private.pem`, never committed, created once with `dev/make_update.py --init-keys`); `apply_update.py` checks it against `setup/update_signing_public.pem` (committed — not a secret) right after the checksum check, and refuses the update, same as before, if it's missing or doesn't match. A checksum only ever proved a file arrived intact; this is what proves it actually came from me.
+- `_preflight.py` now also reports whether `setup/update_signing_public.pem` is present.
+- **Finding 7, plain-text gateway credentials, closed.** `gateway_crypto.py` encrypts `Device.connection_json` (MQTT/OPC-UA usernames and passwords, mainly) at the one boundary that ever touches it, `device_crud.py` — every page and protocol adapter still just hands over a plain `connection` dict and has no idea encryption exists underneath. The key lives in `.env` as `GATEWAY_ENCRYPTION_KEY`, generated automatically the first time any device is ever saved, so a plant that never touches the gateway never gets one. It reads a plain-JSON row from before this fix without complaint, so I had nothing to migrate — no devices were configured here yet anyway.
+
 ## 3.38 – 3.45 — Wednesday, September 9, 2026
 **The day before test day**
 
-Eight releases. Same as the 7th, they are under one heading and sorted by subject, with the version numbers in brackets so I can still find any of it in the history.
+Ten releases. Same as the 7th, they are under one heading and sorted by subject, with the version numbers in brackets so I can still find any of it in the history.
 
 ### Going over the documents before test day *(3.38)*
 
@@ -124,7 +198,7 @@ Ten new checks in `tests/test_reactor_level.py` cover all three holes and the tw
 
 Also `dev/run_tests.py`. The test scripts wanted `pgserver`, which only builds on Linux and macOS, so on this machine every one of them died before it ran a single check. It reads the address out of `.env`, points a scratch database at the same server, and runs whichever script you name.
 
-### QC times, and how long resin sits in a reactor *(3.46)*
+### QC times, and how long resin sits in a reactor *(3.45.1)*
 
 My manager asked when resin goes to QC, how long it is there, when it comes out, and how long it sits in the reactor. All four are durations, and a duration needs two ends. The tank level is worked out from the logs every time somebody looks, so there was nothing to measure between and nothing to hang a QC result on.
 
@@ -140,7 +214,7 @@ A filling of a vessel is a record now. It opens when a vessel is changed over an
 
 The page says plainly that QC times are hand entered. A turnaround figure built from when somebody got to a screen measures data entry, not QC.
 
-### Two lines of work merged, and a test that was writing to the live database *(3.46)*
+### Two lines of work merged, and a test that was writing to the live database *(3.45.2)*
 
 Two sessions built releases the same day and both numbered a migration 0020. Two migrations with the same parent gives the database two heads and it stops migrating at all, so the batch one is 0021 now and follows the pump rates.
 

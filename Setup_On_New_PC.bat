@@ -1,136 +1,94 @@
 @echo off
-setlocal enabledelayedexpansion
-cd /d %~dp0
+rem ===================================================================
+rem  Formlabs MES - First-Time Setup on This PC.
+rem
+rem  Unzip a package built by Move_To_New_PC.bat anywhere on this PC,
+rem  then run this from inside that folder. It installs Python if this
+rem  PC doesn't have it, installs PostgreSQL if this PC doesn't have
+rem  that either, creates the database and connects to it, and restores
+rem  the backup the package was built with - all without needing
+rem  anything typed into a config file by hand first.
+rem
+rem  This calls the exact same setup\ scripts install_mes.bat does, so
+rem  a PC set up this way and a PC set up fresh behave identically and
+rem  a fix to one script fixes both installers at once.
+rem ===================================================================
+setlocal
+cd /d "%~dp0"
 
-echo ===================================================
-echo  Formlabs MES - First-Time Setup on This PC
-echo ===================================================
+echo.
+echo  ===================================================
+echo   Formlabs MES - First-Time Setup on This PC
+echo  ===================================================
 echo.
 
-if not exist .env (
-    if exist .env.example (
-        copy .env.example .env >nul
-        echo [NOTICE] No .env here yet - created one from .env.example.
-        echo          Open .env in Notepad and set DB_URL to this PC's Postgres
-        echo          login before continuing. The line looks like:
-        echo            DB_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/formlabs_mes
-        echo.
-        pause
-    ) else (
-        echo [ERROR] No .env file and no .env.example - this doesn't look like
-        echo         the project folder. Run this from inside it.
-        pause
-        exit /b 1
-    )
-)
+echo  [1/6] Python...
+call "setup\_ensure_python.bat"
+if not defined PY_CMD goto :fail_quiet
 
-echo [1/6] Checking for Python...
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo [STOP] Python isn't installed on this PC.
-    echo        Install Python 3.11+ from https://www.python.org/downloads/
-    echo        - during install, check "Add python.exe to PATH" -
-    echo        then run this script again.
-    pause
-    exit /b 1
-)
-echo     Found it.
+echo.
+echo  [2/6] Virtual environment...
+if exist "venv\Scripts\python.exe" goto :venv_ready
+%PY_CMD% -m venv venv
+if errorlevel 1 goto :fail_venv
+:venv_ready
+set "VPY=venv\Scripts\python.exe"
+"%VPY%" -m pip install --upgrade pip --quiet
+echo     Ready.
 
-echo [2/6] Setting up the virtual environment...
-if not exist venv (
-    python -m venv venv
-)
-call venv\Scripts\activate.bat
-python -m pip install --upgrade pip >nul
+echo.
+echo  [3/6] Dependencies ^(a few minutes the first time^)...
+rem If Move_To_New_PC.bat bundled offline packages, this needs no
+rem internet at all - the usual blocker on a locked-down work PC.
+set "USED_OFFLINE="
+if not exist "wheels" goto :online
+echo     Offline packages found in wheels\ - installing without the network.
+"%VPY%" -m pip install --no-index --find-links=wheels -r requirements.txt
+if errorlevel 1 goto :offline_failed
+set "USED_OFFLINE=1"
+if exist "requirements-device-gateway.txt" "%VPY%" -m pip install --no-index --find-links=wheels -r requirements-device-gateway.txt
+goto :deps_done
 
-echo [3/6] Installing dependencies (this can take a few minutes the first time)...
-rem If the move package was built with offline packages, install from those
-rem first. A work PC often can't reach PyPI - locked-down network, or a proxy
-rem pip doesn't know about - and that failure comes minutes into setup with a
-rem wall of red text. Falls back to a normal download if the local copies are
-rem missing or were built for a different Python version.
-set USED_OFFLINE=
-if exist wheels (
-    echo     Found offline packages in wheels\ - installing without the network...
-    pip install --no-index --find-links=wheels -r requirements.txt
-    if errorlevel 1 (
-        echo     [NOTICE] Offline install didn't work here - most likely these
-        echo              packages were built for a different Python version.
-        echo              Falling back to downloading from the internet.
-    ) else (
-        set USED_OFFLINE=1
-    )
-)
-if not defined USED_OFFLINE (
-    pip install -r requirements.txt
-    if errorlevel 1 (
-        echo.
-        echo [ERROR] Installing requirements.txt failed - see the error above.
-        echo         If this PC has no internet access for pip, re-run
-        echo         Move_To_New_PC.bat on the old PC and answer Y when it
-        echo         offers to include the offline packages.
-        pause
-        exit /b 1
-    )
-)
-if exist requirements-device-gateway.txt (
-    pip install -r requirements-device-gateway.txt
-    if errorlevel 1 (
-        echo     [WARNING] Device Gateway extras failed to install - the main
-        echo               app will still run fine, just without machine
-        echo               integration until this is resolved.
-    )
-)
+:offline_failed
+echo     [NOTICE] The offline packages don't fit this Python version.
+echo              Falling back to downloading from the internet.
 
-echo [4/6] Checking for the PostgreSQL command-line tools (psql / pg_dump)...
-python _migration_helper.py check_pg_cli
-if errorlevel 1 (
-    echo.
-    echo [STOP] PostgreSQL doesn't appear to be installed on this PC yet.
-    echo        This app needs a local Postgres server here, matching the
-    echo        one it used on the old PC.
-    echo.
-    echo        1. Install PostgreSQL from https://www.postgresql.org/download/
-    echo           and remember the password you set for the "postgres" user.
-    echo        2. Open the .env file in this folder and update DB_URL (and
-    echo           PG_PASS, if used) so the password matches what you just set.
-    echo        3. Run this script again.
-    echo.
-    echo        (If PostgreSQL installs to a non-default folder, also set
-    echo        PG_BIN_DIR in .env to its "bin" folder, e.g.
-    echo        PG_BIN_DIR=C:\Program Files\PostgreSQL\18\bin )
-    pause
-    exit /b 1
-)
-echo     Found psql and pg_dump.
+:online
+"%VPY%" -m pip install -r requirements.txt
+if errorlevel 1 goto :fail_deps
+if exist "requirements-device-gateway.txt" "%VPY%" -m pip install -r requirements-device-gateway.txt
 
-echo [5/6] Preparing the database...
-python _migration_helper.py ensure_db
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Couldn't reach the Postgres server or create the database.
-    echo         Double-check .env's DB_URL / PG_PASS match this PC's
-    echo         Postgres installation, and that the Postgres service is
-    echo         running (services.msc -^> postgresql-x64-...).
-    pause
-    exit /b 1
-)
+:deps_done
+echo     Installed.
 
-rem A backup in backups\ is an OFFER, not a requirement. A plant starting
-rem fresh should start fresh: the app builds its own schema on first run and
-rem seeds one administrator account, three placeholder pumps and the downtime
-rem reasons, and the real pumps and people get entered from the console. The
-rem restore path exists for moving an established database between machines,
-rem and it asks before it does anything, because restoring over a database
-rem that is already in use replaces it.
-set LATEST_DUMP=
+echo.
+echo  [4/6] PostgreSQL...
+call "setup\_ensure_postgres.bat"
+if errorlevel 1 goto :fail_quiet
+
+echo.
+echo  [5/6] Database connection and .env...
+rem Asks once for this PC's PostgreSQL login, writes .env, and proves the
+rem connection actually works before going any further - instead of
+rem finding out three steps later from an error that never mentions a
+rem password.
+"%VPY%" "setup\_configure_env.py" mes
+if errorlevel 1 goto :fail_env
+
+"%VPY%" _migration_helper.py ensure_db
+if errorlevel 1 goto :fail_ensuredb
+
+rem A backup in backups\ is there because Move_To_New_PC.bat took one
+rem before packaging. Restoring it is what makes this a MOVE rather than
+rem a fresh install - it asks first, because restoring replaces whatever
+rem is already in the database this PC just connected to.
+set "LATEST_DUMP="
 for /f "delims=" %%f in ('dir /b /o-d "backups\*.sql" 2^>nul') do (
-    if not defined LATEST_DUMP set LATEST_DUMP=%%f
+    if not defined LATEST_DUMP set "LATEST_DUMP=%%f"
 )
 if not defined LATEST_DUMP (
     echo     No database backup in backups\ - starting clean.
-    set CLEAN_START=1
+    set "CLEAN_START=1"
     goto :schema
 )
 
@@ -139,199 +97,177 @@ echo     A database backup is included: %LATEST_DUMP%
 echo.
 echo       R = Restore it into this PC's database ^(brings across every log,
 echo           account and setting from the PC it was taken on^)
-echo       C = Start Clean ^(empty database; one administrator account^)
+echo       C = Start clean ^(empty database; one administrator account^)
 echo.
 choice /c RC /m "     Restore the backup, or start clean"
 if errorlevel 2 (
-    echo     Starting clean. The backup stays in backups\ if you want it later:
-    echo       python _migration_helper.py restore %LATEST_DUMP%
-    set CLEAN_START=1
+    echo     Starting clean. The backup stays in backups\ if you want it later.
+    set "CLEAN_START=1"
     goto :schema
 )
 
-for /f "delims=" %%h in ('python _migration_helper.py db_host') do set DB_HOST=%%h
-if /i not "%DB_HOST%"=="localhost" if /i not "%DB_HOST%"=="127.0.0.1" (
-    echo.
-    echo     [NOTICE] .env is NOT pointing at a local database - it points at
-    echo     "%DB_HOST%", which may be a live, shared database. Restoring the
-    echo     backup on top of it would OVERWRITE whatever is there now.
-    echo.
-    choice /c YN /m "     Are you SURE you want to restore into %DB_HOST%"
-    if errorlevel 2 (
-        echo     Skipping the restore. Starting clean instead.
-        set CLEAN_START=1
-        goto :schema
-    )
+set "DB_HOST="
+for /f "delims=" %%h in ('"%VPY%" _migration_helper.py db_host') do set "DB_HOST=%%h"
+if /i "%DB_HOST%"=="localhost" goto :dump_compat
+if /i "%DB_HOST%"=="127.0.0.1" goto :dump_compat
+echo.
+echo     [NOTICE] .env points at "%DB_HOST%", not this PC. That may be a
+echo     live, shared database, and restoring would OVERWRITE it.
+echo.
+choice /c YN /m "     Are you SURE you want to restore into %DB_HOST%"
+if errorlevel 2 (
+    echo     Skipping the restore. Starting clean instead.
+    set "CLEAN_START=1"
+    goto :schema
 )
 
-python _migration_helper.py check_dump_compat "%LATEST_DUMP%"
-if errorlevel 1 (
-    echo.
-    echo [STOP] The PostgreSQL installed on this PC is OLDER than the one the
-    echo        backup came from, and cannot read this dump. The restore would
-    echo        fail partway through with a message about an "invalid command"
-    echo        that says nothing about the real problem.
-    echo.
-    echo        Install a PostgreSQL at least as new as the version shown
-    echo        above from https://www.postgresql.org/download/windows/
-    echo        then run this script again - or run it again and choose C.
-    pause
-    exit /b 1
-)
+:dump_compat
+"%VPY%" _migration_helper.py check_dump_compat "%LATEST_DUMP%"
+if errorlevel 1 goto :fail_pgold
 
 echo     Restoring %LATEST_DUMP% ...
-python _migration_helper.py restore "%LATEST_DUMP%"
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Restore failed - check the logs\ folder for the exact
-    echo         Postgres error ^(often a password mismatch in .env^). The
-    echo         restore stops on the FIRST real error rather than skipping
-    echo         bad tables, so whatever is in the logs is the problem.
-    pause
-    exit /b 1
-)
+"%VPY%" _migration_helper.py restore "%LATEST_DUMP%"
+if errorlevel 1 goto :fail_restore
 echo     Database restored.
 
+rem The restore said it worked. This checks whether it did. Every backup
+rem carries a manifest of the row counts at the moment it was taken, and
+rem this counts the same tables here and prints both columns - a dump
+rem truncated while copying is otherwise invisible until a month has a
+rem hole in it.
+echo     Checking the data actually came across...
+"%VPY%" _migration_helper.py verify_restore "%LATEST_DUMP%"
+if errorlevel 1 goto :fail_verify
+
 :schema
-echo     Bringing the database schema up to date...
 rem Deliberately NOT "alembic stamp head". A restored dump carries its own
 rem alembic_version, and "stamp" would overwrite that with head without
 rem running anything - silently skipping every migration added since the
 rem dump was taken, invisible until something touches a column that was
 rem never created.
 rem
-rem Importing crud runs the same boot the app itself runs: an empty database
-rem gets every migration and the seed accounts; a restored one gets only the
-rem migrations it is missing; one from before Alembic existed is stamped at
-rem the baseline and then brought forward. All three are tested, in separate
-rem processes, by tests\test_boot_paths.py.
-python -c "import crud"
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Could not build or update the database schema - see logs\.
-    pause
-    exit /b 1
-)
+rem crud.init_db() is the same boot the app itself runs: a restored
+rem database gets only the migrations it's missing, one from before
+rem Alembic existed is stamped at the baseline and brought forward, and an
+rem empty one gets everything plus the seed accounts.
+echo     Bringing the schema up to date...
+"%VPY%" -c "import crud; crud.init_db()"
+if errorlevel 1 goto :fail_schema
 echo     Schema is up to date.
 
-:launch
-    )
-)
-
-python _migration_helper.py ensure_db
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Couldn't reach the Postgres server or create the database.
-    echo         Double-check .env's DB_URL / PG_PASS match this PC's
-    echo         Postgres installation, and that the Postgres service is
-    echo         running (services.msc -^> postgresql-x64-...).
-    pause
-    exit /b 1
-)
-
-set LATEST_DUMP=
-for /f "delims=" %%f in ('dir /b /o-d "backups\*.sql" 2^>nul') do (
-    if not defined LATEST_DUMP set LATEST_DUMP=%%f
-)
-if not defined LATEST_DUMP (
-    echo.
-    echo [ERROR] No .sql backup found in the backups\ folder - this package
-    echo         may not have been built with Move_To_New_PC.bat.
-    pause
-    exit /b 1
-)
-python _migration_helper.py check_dump_compat "%LATEST_DUMP%"
-if errorlevel 1 (
-    echo.
-    echo [STOP] The PostgreSQL installed on this PC is OLDER than the one the
-    echo        backup came from, and cannot read this dump. The restore would
-    echo        fail partway through with a message about an "invalid command"
-    echo        that says nothing about the real problem.
-    echo.
-    echo        Install a PostgreSQL at least as new as the version shown
-    echo        above from https://www.postgresql.org/download/windows/
-    echo        then run this script again.
-    pause
-    exit /b 1
-)
-
-echo     Restoring %LATEST_DUMP% ...
-python _migration_helper.py restore "%LATEST_DUMP%"
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Restore failed - check the logs\ folder for the exact
-    echo         Postgres error ^(often a password mismatch in .env^) - the
-    echo         restore now stops on the FIRST real error instead of
-    echo         silently skipping bad tables, so whatever's in the logs
-    echo         is the actual problem to fix.
-    pause
-    exit /b 1
-)
-echo     Database restored successfully.
-
-echo     Bringing the restored database's schema up to date...
-rem Deliberately NOT "alembic stamp head". pg_dump includes the
-rem alembic_version table, so the restored database already knows which
-rem migration it was on - and "stamp" would OVERWRITE that with head
-rem without running anything, silently skipping every migration added
-rem since the dump was taken. That is invisible until something touches a
-rem column that was never created.
-rem
-rem crud.init_db() is the same code path the app itself runs on boot and
-rem already handles all three cases: a restored database that carries a
-rem version (upgrade only what's missing), one from before Alembic existed
-rem (stamp at baseline), and an empty one (run everything).
-python -c "import crud; crud.init_db()"
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Could not apply database migrations - see logs\ for details.
-    echo         The data restored fine; the schema just isn't caught up, so
-    echo         the app may fail on a screen that uses a newer column.
-    pause
-    exit /b 1
-)
-
-rem The restore said it worked. This checks whether it did. Every backup
-rem carries a manifest of the row counts at the moment it was taken, and this
-rem counts the same tables here and prints both columns. A dump truncated
-rem while copying, a restore that ran against the wrong database, a table
-rem that failed while the rest went through - none of those announce
-rem themselves, and the first sign is a month with a hole in it.
-echo.
-echo     Checking the data actually came across...
-python _migration_helper.py verify_restore "%LATEST_DUMP%"
-if errorlevel 1 (
-    echo.
-    echo [STOP] The restored database has fewer rows than the backup said it
-    echo        should. Do NOT start logging on this PC yet - the machine the
-    echo        backup came from still has the data, so nothing is lost as
-    echo        long as nothing new is written here first.
-    echo.
-    echo        Re-copy the backup file and run this script again; a dump
-    echo        truncated during the copy is the usual cause.
-    pause
-    exit /b 1
-)
-echo     Schema is up to date.
-
-:launch
-echo [6/6] Launching the app...
-echo.
-echo ===================================================
-echo  Setup complete.
+rem seed_initial_data() (inside "import crud" above) only ever creates the
+rem manager/admin account when the users table is completely empty - by
+rem design, so this never touches a plant's real accounts on a restore or a
+rem re-run. On a genuine clean start it should always have just run, but
+rem this makes the login a guarantee instead of a hope: same account, same
+rem PIN, made or re-confirmed by the same tool as the "IT Admin - Accounts"
+rem emergency reset, rather than leaving day one dependent on nothing
+rem having gone sideways in seeding.
 if defined CLEAN_START (
     echo.
-    echo  This is a clean database. Sign in with:
-    echo      username:  manager
-    echo      PIN:       admin
-    echo  and do these first, from IT Admin:
-    echo    1. Change that PIN ^(Account ^& Preferences, top of the sidebar^).
-    echo    2. Replace the three placeholder pumps with the real ones.
-    echo    3. Add the operators.
-    echo  Day to day, start the app with run_mes.bat.
+    echo  Confirming the admin account can sign in...
+    "%VPY%" create_admin.py manager admin123 "Plant Lead"
 )
+
 echo.
-echo  Starting... close this window to stop the app.
-echo ===================================================
-streamlit run Home.py
-pause
+echo  [6/6] HTTPS certificate...
+"%VPY%" "setup\generate_tls_cert.py"
+
+echo.
+echo  ===================================================
+echo   DONE - this PC is set up and ready.
+echo  ===================================================
+if not defined CLEAN_START goto :addr
+echo.
+echo   Clean database. Sign in with:
+echo       username:  manager
+echo       PIN:       admin123
+echo   Then, from IT Admin:
+echo     1. Change that PIN ^(Account ^& Preferences, top of sidebar^).
+echo     2. Replace the placeholder pumps with the real ones.
+echo     3. Add the operators.
+
+:addr
+echo.
+"%VPY%" "setup\_preflight.py" --address-only
+echo.
+echo   Day to day: run START_HERE.bat and choose 3.
+echo.
+endlocal
+exit /b 0
+
+rem --- failures -----------------------------------------------------
+
+:fail_quiet
+echo.
+echo  Setup stopped. Fix the item above and run this again.
+endlocal
+exit /b 1
+
+:fail_venv
+echo.
+echo  [ERROR] Could not create the virtual environment.
+echo          Most often this is antivirus or a locked-down folder.
+echo          Try moving this whole folder to C:\formlabs-mes and
+echo          running this script again.
+endlocal
+exit /b 1
+
+:fail_deps
+echo.
+echo  [ERROR] Installing requirements.txt failed - the real error is in
+echo          the red text above.
+echo          If this PC has no internet for pip, re-run
+echo          Move_To_New_PC.bat on the old PC and answer Y when it
+echo          offers to include the offline packages.
+endlocal
+exit /b 1
+
+:fail_env
+echo.
+echo  [ERROR] Could not reach PostgreSQL with the details given.
+echo          Run this script again to retry the password.
+endlocal
+exit /b 1
+
+:fail_ensuredb
+echo.
+echo  [ERROR] Reached PostgreSQL but could not create the database.
+echo          Check the Postgres service is running:
+echo          services.msc -^> postgresql-x64-...
+endlocal
+exit /b 1
+
+:fail_pgold
+echo.
+echo  [STOP] The PostgreSQL on this PC is OLDER than the one the backup
+echo         came from and cannot read the dump. Install a newer
+echo         PostgreSQL, or run this again and choose C to start clean.
+endlocal
+exit /b 1
+
+:fail_restore
+echo.
+echo  [ERROR] Restore failed - the exact Postgres error is in logs\.
+echo          Usually a password mismatch. The restore stops on the
+echo          FIRST real error rather than skipping tables, so whatever
+echo          is in the log is the problem.
+endlocal
+exit /b 1
+
+:fail_verify
+echo.
+echo  [STOP] The restored database has fewer rows than the backup said it
+echo         should. Do NOT start logging on this PC yet - the old PC
+echo         still has the data, so nothing is lost as long as nothing
+echo         new is written here first. Re-copy the backup file and run
+echo         this script again; a dump truncated during the copy is the
+echo         usual cause.
+endlocal
+exit /b 1
+
+:fail_schema
+echo.
+echo  [ERROR] Could not build or update the schema - see logs\.
+endlocal
+exit /b 1

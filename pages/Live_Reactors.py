@@ -2,7 +2,6 @@
 import os
 import sys
 import base64
-from datetime import datetime, date, timedelta
 
 import streamlit as st
 import extra_streamlit_components as stx
@@ -25,17 +24,16 @@ from database import (
     delete_reactor,
     update_reactor_config,
     get_active_pumps,
-    add_suggestion,
     do_logout,
     check_authentication,
     role_can_administer,
     role_can_view_scada,
     can,
     current_batch,
-    set_batch_qc,
     close_batch,
 )
 from database import esc
+from components import render_feedback_box
 from resin_palette import resin_chip, stored_color_map, resin_color
 from bulk_pour import (DEFAULT_DENSITY_KG_L, UNITS, density_map, resin_density,
                        pour_litres, check_pour, describe_pour)
@@ -60,11 +58,11 @@ st.logo("assets/formlabs_logo.png")
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
 if active_theme not in THEMES:
-    active_theme = "Default Dark"
+    active_theme = "Formlabs Forge"
 
 st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 # ===================================================================
@@ -94,11 +92,11 @@ current_user = st.session_state.get("user_name") or "Keagan C."
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
 if active_theme not in THEMES:
-    active_theme = "Default Dark"
+    active_theme = "Formlabs Forge"
 
 st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 # ===================================================================
@@ -168,7 +166,7 @@ with st.sidebar:
         # TAB 2: THEME & AVATAR
         with set_tab2:
             st.markdown("#### Interface Preferences")
-            current_t = st.session_state.get("preferred_theme", "Default Dark")
+            current_t = st.session_state.get("preferred_theme", "Formlabs Forge")
             chosen_t = st.selectbox("System Theme", list(THEMES.keys()),
                                     index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
 
@@ -195,17 +193,7 @@ with st.sidebar:
 
         # TAB 3: FEEDBACK & CHANGELOG
         with set_tab3:
-            st.markdown("#### Universal Feedback Box")
-            with st.form("settings_sug_form", clear_on_submit=True):
-                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue"))
-                s_txt = st.text_area("Observation / Description")
-                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                    if s_txt.strip():
-                        from database import add_suggestion
-
-                        add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat,
-                                       s_txt)
-                        st.success("✅ Submitted to IT Admin!")
+            render_feedback_box(st.session_state.get("user_name"), st.session_state.get("user_role"))
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -566,59 +554,6 @@ if not df_reactors.empty:
                         f"{esc(_age)} &middot; <span style='color:{_qc_col}; "
                         f"font-weight:700;'>{esc(_qc_txt)}</span></div>",
                         unsafe_allow_html=True)
-
-                if can("manage_qc") and _batch:
-                    with st.expander(f"🧪 QC — {r_name}", expanded=False):
-                        _now = datetime.now()
-                        _sent_on = st.date_input(
-                            "Sample sent", value=(_batch["qc_sent_at"] or _now).date(),
-                            key=f"qc_sd_{_batch['id']}")
-                        _sent_at = st.time_input(
-                            "at", value=(_batch["qc_sent_at"] or _now).time(),
-                            key=f"qc_st_{_batch['id']}")
-                        _has_result = st.checkbox(
-                            "The result has come back",
-                            value=bool(_batch["qc_result_at"]),
-                            key=f"qc_has_{_batch['id']}")
-                        _res_on = _res_at = None
-                        _result = ""
-                        if _has_result:
-                            _res_on = st.date_input(
-                                "Result received",
-                                value=(_batch["qc_result_at"] or _now).date(),
-                                key=f"qc_rd_{_batch['id']}")
-                            _res_at = st.time_input(
-                                "at ",
-                                value=(_batch["qc_result_at"] or _now).time(),
-                                key=f"qc_rt_{_batch['id']}")
-                            _result = st.radio(
-                                "Result", ("pass", "hold", "fail"),
-                                index=("pass", "hold", "fail").index(
-                                    _batch["qc_result"] or "pass"),
-                                horizontal=True, key=f"qc_r_{_batch['id']}")
-                        _note = st.text_input("Note (optional)",
-                                              value=_batch["qc_note"],
-                                              max_chars=200,
-                                              key=f"qc_n_{_batch['id']}")
-                        st.caption(
-                            "Times are typed rather than stamped, because the "
-                            "result usually arrives before anybody is at a "
-                            "screen. Put in when it actually happened.")
-                        if st.button("💾 Save QC", key=f"qc_save_{_batch['id']}",
-                                     use_container_width=True):
-                            _ok, _msg = set_batch_qc(
-                                _batch["id"],
-                                sent_at=datetime.combine(_sent_on, _sent_at),
-                                result_at=(datetime.combine(_res_on, _res_at)
-                                           if _has_result else None),
-                                result=_result if _has_result else "",
-                                note=_note,
-                                by=st.session_state.get("user_name", ""))
-                            st.toast(("✅ " if _ok else "❌ ") + _msg)
-                            if _ok:
-                                st.rerun()
-                        if _batch.get("qc_by"):
-                            st.caption(f"Last recorded by {esc(_batch['qc_by'])}.")
 
                 if can("manage_reactors") and _batch:
                     if st.button(f"Mark {r_name} empty", key=f"empty_{_batch['id']}",

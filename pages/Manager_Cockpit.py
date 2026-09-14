@@ -24,11 +24,11 @@ st.set_page_config(page_title="Manager Cockpit | Formlabs MES", page_icon="📊"
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
 if active_theme not in THEMES:
-    active_theme = "Default Dark"
+    active_theme = "Formlabs Forge"
 
 st.markdown(THEMES[active_theme], unsafe_allow_html=True)
 st.logo("assets/formlabs_logo.png")
@@ -36,6 +36,7 @@ st.logo("assets/formlabs_logo.png")
 # --- PERSISTENT AUTO-LOGIN ENGINE & SECURITY GATE ---
 from database import (do_logout, check_authentication, get_plant_settings,
                       role_can_administer, role_can_view_scada, can, set_cookie)
+from components import render_feedback_box
 
 cookie_manager = stx.CookieManager(key="mgr_cookies")
 try:
@@ -116,7 +117,7 @@ with st.sidebar:
 
         with set_tab2:
             st.markdown("#### Interface Preferences")
-            current_t = st.session_state.get("preferred_theme", "Default Dark")
+            current_t = st.session_state.get("preferred_theme", "Formlabs Forge")
             chosen_t = st.selectbox("System Theme", list(THEMES.keys()), index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
 
             if chosen_t != current_t:
@@ -140,15 +141,7 @@ with st.sidebar:
                     st.rerun()
 
         with set_tab3:
-            st.markdown("#### Universal Feedback Box")
-            with st.form("settings_sug_form", clear_on_submit=True):
-                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue"))
-                s_txt = st.text_area("Observation / Description")
-                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                    if s_txt.strip():
-                        from database import add_suggestion
-                        add_suggestion(st.session_state.get("user_name"), st.session_state.get("user_role"), s_cat, s_txt)
-                        st.success("✅ Submitted to IT Admin!")
+            render_feedback_box(st.session_state.get("user_name"), st.session_state.get("user_role"))
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.session_state.get("user_role") in ["admin", "manager"]:

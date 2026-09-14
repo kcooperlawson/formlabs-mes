@@ -37,8 +37,8 @@ st.set_page_config(page_title="Theme Gallery | Formlabs MES", page_icon="🎨", 
 try:
     from themes import THEMES, PALETTES
 except ImportError:
-    THEMES, PALETTES = {"Default Dark": "<style></style>"}, {}
-st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Default Dark"),
+    THEMES, PALETTES = {"Formlabs Forge": "<style></style>"}, {}
+st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Formlabs Forge"),
                        list(THEMES.values())[0]), unsafe_allow_html=True)
 
 # Restore the session before deciding whether to refuse it. Without this the

@@ -7,7 +7,6 @@ facade with one import line and every existing page style still applies.
     from device_models import Device, DeviceTagMap, DeviceReading
     from device_crud import *
 """
-import json
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -17,6 +16,7 @@ from db_core import ScopedSession
 from models import PumpStation, Reactor
 from device_models import Device, DeviceTagMap, DeviceReading
 from app_logger import logger
+from gateway_crypto import encrypt_connection, decrypt_connection
 
 
 # --- DEVICES ---------------------------------------------------------------
@@ -65,7 +65,7 @@ def get_device_dict(device_id: int) -> dict | None:
             "device_name": device.device_name,
             "device_role": device.device_role,
             "protocol": device.protocol,
-            "connection": json.loads(device.connection_json or "{}"),
+            "connection": decrypt_connection(device.connection_json),
             "poll_interval_s": device.poll_interval_s,
             "is_enabled": device.is_enabled,
             "pump_station_id": device.pump_station_id,
@@ -88,7 +88,7 @@ def create_device(device_name: str, device_role: str, protocol: str, connection:
             return None
         device = Device(
             device_name=device_name.strip(), device_role=device_role, protocol=protocol,
-            connection_json=json.dumps(connection), poll_interval_s=poll_interval_s,
+            connection_json=encrypt_connection(connection), poll_interval_s=poll_interval_s,
             pump_station_id=pump_station_id, reactor_id=reactor_id, notes=notes,
             is_enabled=is_enabled, status="Unknown",
         )
@@ -113,7 +113,7 @@ def update_device(device_id: int, **fields) -> bool:
         if not device:
             return False
         if "connection" in fields:
-            fields["connection_json"] = json.dumps(fields.pop("connection"))
+            fields["connection_json"] = encrypt_connection(fields.pop("connection"))
         for key, value in fields.items():
             if hasattr(device, key):
                 setattr(device, key, value)

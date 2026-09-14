@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from database import get_all_resin_specs_df, add_resin_spec, bulk_update_resin_specs, delete_resin_spec, do_logout
+from database import (get_all_resin_specs_df, add_resin_spec, bulk_update_resin_specs,
+                        delete_resin_spec, get_resin_spec_history, do_logout)
 from resin_palette import resin_color, resin_colors, resin_chip
 from utils import esc
 
@@ -21,8 +22,8 @@ st.set_page_config(page_title="Resin Specifications | Formlabs MES", page_icon="
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
-st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Default Dark"), THEMES["Default Dark"]), unsafe_allow_html=True)
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Formlabs Forge"), THEMES["Formlabs Forge"]), unsafe_allow_html=True)
 
 # Restore the session before deciding whether to refuse it. Without this the
 # role check below runs against an empty session on any cold load - a refresh,
@@ -44,6 +45,7 @@ from ui_shell import render_shell
 from components import empty_state
 cookie_manager = render_shell()
 current_role = st.session_state.get("user_role", "operator")
+current_user = st.session_state.get("user_name") or "Unknown"
 
 st.subheader("⚖️ Formlabs Master Resin Specification Lookup Table")
 
@@ -75,7 +77,8 @@ with (st.expander("➕ Add New Proprietary Resin Formulation", expanded=False)):
         if st.form_submit_button("💾 Save New Resin to Database", type="primary", use_container_width=True):
             if new_resin_name.strip():
                 if add_resin_spec(new_cart_type, new_sku, new_code, new_resin_name, new_target_g, new_min_g, new_max_g,
-                                  color_tag=None if auto_colour else picked_colour):
+                                  color_tag=None if auto_colour else picked_colour,
+                                  changed_by=current_user):
                     st.toast(f"✅ Successfully registered '{new_resin_name}'!")
                     st.rerun()
                 else:
@@ -196,13 +199,14 @@ with st.expander("✏️ Edit or Delete Resin Specifications"):
                     help="Used everywhere this resin's name is shown - the operator screen, "
                          "run lists, the TV board and the charts.",
                 )
-                if st.form_submit_button("💾 Save Specification Update", type="primary", use_container_width=True):
-                    bulk_update_resin_specs(pd.DataFrame([{"id": spec_id, "sku": spec_row["sku"], "resin_code": spec_row["resin_code"], "resin_name": spec_row["resin_name"], "actual_spec_g": new_spec, "min_weight_g": new_min, "max_weight_g": new_max, "multiplier": spec_row["multiplier"], "lifetime_months": spec_row["lifetime_months"], "color_tag": new_colour}]))
+                if st.form_submit_button("💾 Save Specification Update", type="primary", width="stretch"):
+                    bulk_update_resin_specs(pd.DataFrame([{"id": spec_id, "sku": spec_row["sku"], "resin_code": spec_row["resin_code"], "resin_name": spec_row["resin_name"], "actual_spec_g": new_spec, "min_weight_g": new_min, "max_weight_g": new_max, "multiplier": spec_row["multiplier"], "lifetime_months": spec_row["lifetime_months"], "color_tag": new_colour}]),
+                                          changed_by=current_user)
                     st.success(f"✅ Updated tolerances for {selected_spec_name}!")
                     st.rerun()
         with e_col2:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button(f"🗑️ Delete {selected_spec_name}", type="primary", use_container_width=True):
-                delete_resin_spec(spec_id)
+            if st.button(f"🗑️ Delete {selected_spec_name}", type="primary", width="stretch"):
+                delete_resin_spec(spec_id, changed_by=current_user)
                 st.toast(f"Deleted '{selected_spec_name}'!")
                 st.rerun()

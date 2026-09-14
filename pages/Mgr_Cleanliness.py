@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 from datetime import datetime, timedelta
-from database import get_cleanliness_audits_df, delete_cleanliness_audit, UPLOAD_DIR, do_logout
+from database import get_cleanliness_audits_df, get_cleanliness_audit_photos, delete_cleanliness_audit, UPLOAD_DIR, do_logout
 
 st.set_page_config(page_title="Cleanliness Gallery | Formlabs MES", page_icon="📸", layout="wide")
 from database import esc
@@ -15,8 +15,8 @@ from components import empty_state
 try:
     from themes import THEMES
 except ImportError:
-    THEMES = {"Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
-st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Default Dark"), THEMES["Default Dark"]), unsafe_allow_html=True)
+    THEMES = {"Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+st.markdown(THEMES.get(st.session_state.get("preferred_theme", "Formlabs Forge"), THEMES["Formlabs Forge"]), unsafe_allow_html=True)
 
 # Restore the session before deciding whether to refuse it. Without this the
 # role check below runs against an empty session on any cold load - a refresh,
@@ -41,6 +41,7 @@ current_role = st.session_state.get("user_role", "operator")
 st.subheader("📸 Cleanliness & Station Photo Gallery")
 
 df_audits = get_cleanliness_audits_df()
+extra_photos = get_cleanliness_audit_photos()
 
 k1, k2, k3, k4, k5 = st.columns(5)
 total_audits = len(df_audits) if not df_audits.empty else 0
@@ -75,18 +76,27 @@ if not df_audits.empty:
                     f"<b style='color:{badge_color}; font-size:0.85rem;'>● {esc(row['audit_type'])}</b>"
                     f"<span style='float:right; font-size:0.8rem; color:#94A3B8;'>{esc(row['pump_station'])}</span><br>",
                     unsafe_allow_html=True)
-                if row["image_filename"]:
-                    img_path = os.path.join(UPLOAD_DIR, str(row["image_filename"]))
-                    if os.path.exists(img_path):
-                        st.image(img_path, use_container_width=True)
-                    else:
-                        st.caption("🖼️ Image file not found on disk.")
+                main_photo = str(row["image_filename"]) if row["image_filename"] else None
+                extras = [str(f) for f in extra_photos.get(int(row["id"]), [])]
+                if main_photo or extras:
+                    if main_photo:
+                        main_path = os.path.join(UPLOAD_DIR, main_photo)
+                        if os.path.exists(main_path):
+                            st.image(main_path, use_container_width=True)
+                        else:
+                            st.caption("🖼️ Main photo not found on disk.")
+                    for extra in extras:
+                        extra_path = os.path.join(UPLOAD_DIR, extra)
+                        if os.path.exists(extra_path):
+                            st.image(extra_path, width=220)
+                        else:
+                            st.caption(f"🖼️ {extra} not found on disk.")
                 else:
                     st.caption("📝 Log entry without image attachment.")
                 st.caption(f"📅 **Time:** `{row['timestamp']}` | 👤 **Operator:** {row['operator_name']}")
                 st.markdown(f"*{row['notes'] if row['notes'] else 'No additional operator notes logged.'}*")
                 st.markdown("</div>", unsafe_allow_html=True)
-                if st.button(f"🗑️ Delete Photo Audit #{row['id']}", key=f"del_gal_aud_{row['id']}", use_container_width=True):
+                if st.button(f"🗑️ Delete Photo Audit #{row['id']}", key=f"del_gal_aud_{row['id']}", width="stretch"):
                     delete_cleanliness_audit(row["id"])
                     st.success(f"Deleted Audit #{row['id']}")
                     st.rerun()

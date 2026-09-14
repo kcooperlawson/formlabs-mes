@@ -24,6 +24,16 @@ blinker==1.9.0
 certifi==2026.7.22
 charset-normalizer==3.5.1
 click==8.5.0
+
+# Self-signed HTTPS certificate generation (setup/generate_tls_cert.py),
+# added to close Finding 1 from the security posture doc: the app was
+# serving plain HTTP, including the PIN at sign-in and every session
+# cookie. Not pinned to an exact version yet, unlike everything else in
+# this file - there's no venv with it installed to read the version off
+# of. Run `pip show cryptography` after the next install and change this
+# to an exact pin, the same way every line above started.
+cryptography>=42
+
 extra-streamlit-components==0.1.81
 greenlet==3.5.5
 h11==0.16.0

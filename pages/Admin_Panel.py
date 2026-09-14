@@ -17,12 +17,13 @@ from database import (
     unlock_user_account,
     get_plant_settings, update_plant_settings, create_database_backup, restore_database_backup,
     list_backup_files, prune_old_backups,
-    get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, add_suggestion, do_logout,
+    get_production_logs_df, add_hourly_log, BACKUP_DIR, update_user_theme, do_logout,
     check_authentication, get_assigned_runs_df, role_can_administer, set_cookie,
     can, grant_ability, revoke_ability
 )
 from backup_policy import backup_state, DUE_AFTER_HOURS, KEEP_BACKUPS
 from database import esc
+from components import render_feedback_box
 import crud
 from shifts import picker_options as shift_picker_options
 import external_links
@@ -37,10 +38,10 @@ try:
     from themes import THEMES
 except ImportError:
     THEMES = {
-        "Default Dark": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
+        "Formlabs Forge": "<style>.stApp { background-color: #02040A !important; color: #E2E8F0 !important; }</style>"}
 
-active_theme = st.session_state.get("preferred_theme", "Default Dark")
-st.markdown(THEMES.get(active_theme, THEMES["Default Dark"]), unsafe_allow_html=True)
+active_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
+st.markdown(THEMES.get(active_theme, THEMES["Formlabs Forge"]), unsafe_allow_html=True)
 
 cookie_manager = stx.CookieManager(key="admin_cookies")
 try:
@@ -132,7 +133,7 @@ with st.sidebar:
         # TAB 2: THEME & AVATAR
         with set_tab2:
             st.markdown("#### Interface Preferences")
-            current_t = st.session_state.get("preferred_theme", "Default Dark")
+            current_t = st.session_state.get("preferred_theme", "Formlabs Forge")
             chosen_t = st.selectbox("System Theme", list(THEMES.keys()),
                                     index=list(THEMES.keys()).index(current_t) if current_t in THEMES else 0)
 
@@ -157,19 +158,9 @@ with st.sidebar:
 
         # TAB 3: FEEDBACK
         with set_tab3:
-            st.markdown("#### Universal Feedback Box")
-            with st.form("admin_sug_form", clear_on_submit=True):
-                s_cat = st.selectbox("Category", ("Feature Request", "App Bug / Error", "Plant Floor Issue", "General Feedback"))
-                s_txt = st.text_area("Observation / Description")
-                if st.form_submit_button("🚀 Submit Feedback", type="primary", use_container_width=True):
-                    if s_txt.strip():
-                        add_suggestion(
-                            user_name=st.session_state.get("user_name", "Anonymous"),
-                            user_role=st.session_state.get("user_role", "admin"),
-                            category=s_cat,
-                            suggestion=s_txt
-                        )
-                        st.success("✅ Submitted to IT Admin Inbox!")
+            render_feedback_box(st.session_state.get("user_name", "Anonymous"),
+                               st.session_state.get("user_role", "admin"),
+                               form_key="admin_sug_form")
 
     # --- SYSTEM CHANGELOG ---
     with st.popover("📜 System Changelog", use_container_width=True):
@@ -291,7 +282,14 @@ with tab_roster:
             new_target = st.number_input("Target Rate (L/h)", value=400.0, step=10.0)
 
             if st.form_submit_button("Create Account", type="primary", use_container_width=True):
-                if create_user(new_username, new_email, new_pin, new_fullname, new_role.lower(), float(new_target),
+                # Finding 9 in the security posture doc: manager/admin PINs
+                # reach Admin Panel and the database tools from anywhere on
+                # the network, not just a pump on the floor, so they're held
+                # to a longer minimum here - see crud.pin_policy_error.
+                _pin_err = crud.pin_policy_error(new_role, new_pin)
+                if _pin_err:
+                    st.error(f"❌ {_pin_err}")
+                elif create_user(new_username, new_email, new_pin, new_fullname, new_role.lower(), float(new_target),
                                new_shift):
                     st.toast("✅ Account created successfully!")
                     st.rerun()
@@ -407,9 +405,13 @@ with tab_roster:
             new_temp_pin = st.text_input("New PIN", type="password")
             if st.button("💾 Reset PIN", type="primary"):
                 user_row = df_users[df_users["username"] == target_user].iloc[0]
-                update_user_pin(int(user_row["id"]), new_temp_pin)
-                st.toast(f"✅ PIN updated for '{target_user}'.")
-                st.rerun()
+                _pin_err = crud.pin_policy_error(user_row["role"], new_temp_pin)
+                if _pin_err:
+                    st.error(f"❌ {_pin_err}")
+                else:
+                    update_user_pin(int(user_row["id"]), new_temp_pin)
+                    st.toast(f"✅ PIN updated for '{target_user}'.")
+                    st.rerun()
 
     with st.expander("🔓 Unlock Account", expanded=False):
         if not df_users.empty:

@@ -43,14 +43,23 @@ if errorlevel 1 goto :_pg_manual
 echo.
 echo     I can install it with winget now. It is a large download and
 echo     takes several minutes.
-choice /c YN /m "     Install PostgreSQL 17 now"
+choice /c YN /m "     Install PostgreSQL 18 now"
 if errorlevel 2 goto :_pg_manual
 
+rem 18 is what every PC here is meant to run - see database.py and the
+rem security posture doc. This used to install 17 unconditionally, which
+rem meant a fresh install silently ended up a version behind every other
+rem machine and any backup taken from one. Falls back to the unversioned
+rem id (whatever winget calls "current") and only then to 17, so an older
+rem PC never ends up unable to install anything at all.
 echo     Installing - leave this window alone until it finishes.
-winget install -e --id PostgreSQL.PostgreSQL.17 --accept-package-agreements --accept-source-agreements --silent
+winget install -e --id PostgreSQL.PostgreSQL.18 --accept-package-agreements --accept-source-agreements --silent
 if not errorlevel 1 goto :_pg_recheck
 echo     Trying the unversioned package id...
 winget install -e --id PostgreSQL.PostgreSQL --accept-package-agreements --accept-source-agreements --silent
+if not errorlevel 1 goto :_pg_recheck
+echo     Trying PostgreSQL 17...
+winget install -e --id PostgreSQL.PostgreSQL.17 --accept-package-agreements --accept-source-agreements --silent
 
 :_pg_recheck
 echo.
