@@ -62,16 +62,6 @@ openpyxl==3.1.5
 packaging==26.3
 pandas==3.0.5
 
-# A real, private PostgreSQL with no separate install - what
-# run_mes_portable.bat runs the plant PC's database on instead of asking
-# for a system-wide PostgreSQL install (winget, an admin password, a locked-
-# down work network with no access to either). Bundles its own Postgres
-# binaries in the wheel itself, so `pip download` (Move_To_New_PC.bat's own
-# offline-package step) carries them for free - nothing else to fetch on
-# the target PC. fasteners/platformdirs/psutil are its own dependencies,
-# pulled in automatically, same as pydantic's above.
-pgserver==0.1.4
-
 # Only dev/print_prep.py (handbook/print asset prep) still uses this - not
 # part of the running app itself.
 pillow==12.3.0

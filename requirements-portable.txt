@@ -1,0 +1,16 @@
+# The bundled-database option only - installed by run_mes_portable.bat, not
+# by setup/install_mes.bat. Kept out of requirements.txt on purpose: a PC
+# running the app against a real PostgreSQL install (the common case) has no
+# use for this, and pgserver's compiled wheels lag new Python releases by a
+# few months - a PC that happened to have the newest Python would otherwise
+# fail an install it didn't need to do at all.
+#
+# A real, private PostgreSQL with no separate install - what
+# run_mes_portable.bat runs the plant PC's database on instead of asking
+# for a system-wide PostgreSQL install (winget, an admin password, a locked-
+# down work network with no access to either). Bundles its own Postgres
+# binaries in the wheel itself, so `pip download` (Move_To_New_PC.bat's own
+# offline-package step) carries them for free - nothing else to fetch on
+# the target PC. fasteners/platformdirs/psutil are its own dependencies,
+# pulled in automatically.
+pgserver==0.1.4

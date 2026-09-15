@@ -73,6 +73,14 @@ if errorlevel 1 (
     if exist requirements-device-gateway.txt (
         "%VPY%" -m pip download -r requirements-device-gateway.txt -d wheels >nul 2>&1
     )
+    rem Best-effort: pgserver's compiled wheel doesn't exist for every Python
+    rem release yet, so a failure here isn't fatal the way one in the main
+    rem requirements.txt is - a PC on a newer Python just falls back to
+    rem downloading it fresh if it ever runs option 9, same as any package
+    rem missing from wheels\ already does.
+    if exist requirements-portable.txt (
+        "%VPY%" -m pip download -r requirements-portable.txt -d wheels >nul 2>&1
+    )
     echo     Done.
 )
 

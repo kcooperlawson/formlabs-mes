@@ -60,6 +60,13 @@ IMPORT_TO_PACKAGE = {
 # so the application runs without any of them.
 GATEWAY_ONLY = {"pymodbus", "serial", "opcua", "paho", "asyncua"}
 
+# Imported only by run_mes_portable.bat's bundled-database path
+# (api/portable_launcher.py, function-local), which has its own
+# requirements-portable.txt - kept separate from requirements.txt because
+# pgserver's compiled wheel lags new Python releases, and the common
+# install (a real PostgreSQL, setup/install_mes.bat) needs it not at all.
+PORTABLE_ONLY = {"pgserver"}
+
 # Ours, or the standard library's.
 LOCAL = ({p.stem for p in ROOT.glob("*.py")}
          | {p.stem for p in (ROOT / "api").rglob("*.py")}
@@ -98,7 +105,7 @@ def app_imports():
                     found.add(alias.name.split(".")[0])
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 found.add(node.module.split(".")[0])
-    return {m for m in found if m not in LOCAL and m not in GATEWAY_ONLY}
+    return {m for m in found if m not in LOCAL and m not in GATEWAY_ONLY and m not in PORTABLE_ONLY}
 
 
 print("=" * 62)

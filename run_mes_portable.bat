@@ -45,7 +45,7 @@ if not errorlevel 1 goto :deps_done
 "%VPY%" -m pip install --upgrade pip --quiet
 if not exist "wheels" goto :online
 echo     Offline packages found in wheels\ - installing without the network.
-"%VPY%" -m pip install --no-index --find-links=wheels -r requirements.txt
+"%VPY%" -m pip install --no-index --find-links=wheels -r requirements.txt -r requirements-portable.txt
 if errorlevel 1 goto :offline_failed
 goto :deps_done
 
@@ -54,7 +54,7 @@ echo     [NOTICE] The offline packages don't fit this Python version.
 echo              Falling back to downloading from the internet.
 
 :online
-"%VPY%" -m pip install -r requirements.txt
+"%VPY%" -m pip install -r requirements.txt -r requirements-portable.txt
 if errorlevel 1 goto :fail_deps
 
 :deps_done
@@ -94,5 +94,10 @@ echo.
 echo  [ERROR] Could not install dependencies. Check your internet
 echo          connection, or include offline packages next time this
 echo          is packaged with Move_To_New_PC.bat.
+echo.
+echo          If the real error above mentions pgserver, this PC's Python
+echo          is newer than pgserver has a build for yet - install Python
+echo          3.11 or 3.12 for this option, or use option 1 instead (a
+echo          real PostgreSQL install, no pgserver needed).
 pause
 exit /b 1
