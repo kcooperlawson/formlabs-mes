@@ -2,6 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { scadaApi, type ScadaQuery } from '../api/scada'
+import { useFlashOnChange } from '../hooks/useFlashOnChange'
+import { useRealtimeInvalidate } from '../hooks/useRealtimeInvalidate'
+import { Skeleton, StatCardSkeleton } from '../shell/Skeleton'
 import { Odometer } from '../tv/PrintBuild'
 import { fl } from '../theme'
 
@@ -34,6 +37,11 @@ export function ScadaPage() {
     queryFn: () => scadaApi.overview(query),
     refetchInterval: 10_000,
   })
+
+  // Belt-and-suspenders with the refetchInterval above: a live pour/pack/
+  // downtime push re-fetches immediately instead of waiting up to 10s, and
+  // if the socket is ever down the polling above still gets there.
+  useRealtimeInvalidate([['scada']])
 
   const patch = (p: Partial<ScadaQuery>) => setQuery((prev) => ({ ...prev, ...p }))
 
@@ -112,7 +120,12 @@ export function ScadaPage() {
         </details>
 
         {isLoading || !data ? (
-          <p className={`text-sm ${fl.muted}`}>Loading…</p>
+          <>
+            <Skeleton className="h-14 w-full" />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+            </div>
+          </>
         ) : (
           <>
             <div className={card} style={{ borderLeft: `4px solid ${data.headline_is_live ? '#10B981' : '#64748B'}` }}>
@@ -131,10 +144,11 @@ export function ScadaPage() {
               <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <StatCard label="Volume Output" value={<><Odometer value={data.pouring.liters_output} uid="vo" /> L</>}
-                            sub={data.pouring.cart_type_counts.map((c) => `${c.units} ${c.cartridge_type}`).join(' | ') || 'No cartridges logged'} />
-                  <StatCard label="Resin Mass Poured" value={<><Odometer value={data.pouring.resin_mass_kg} decimals={1} uid="rm" /> kg</>} />
-                  <StatCard label="Run Velocity" value={<><Odometer value={data.pouring.run_velocity_lh} decimals={1} uid="rv" /> L/h</>} sub={`Target: ${data.pouring.target_rate_lh.toFixed(0)} L/h`} />
-                  <StatCard label="Pouring Yield" value={<><Odometer value={data.pouring.yield_pct} decimals={1} uid="py" />%</>} sub={`${data.pouring.total_scrap} scrap units`} />
+                            sub={data.pouring.cart_type_counts.map((c) => `${c.units} ${c.cartridge_type}`).join(' | ') || 'No cartridges logged'}
+                            flashKey={data.pouring.liters_output} />
+                  <StatCard label="Resin Mass Poured" value={<><Odometer value={data.pouring.resin_mass_kg} decimals={1} uid="rm" /> kg</>} flashKey={data.pouring.resin_mass_kg} />
+                  <StatCard label="Run Velocity" value={<><Odometer value={data.pouring.run_velocity_lh} decimals={1} uid="rv" /> L/h</>} sub={`Target: ${data.pouring.target_rate_lh.toFixed(0)} L/h`} flashKey={data.pouring.run_velocity_lh} />
+                  <StatCard label="Pouring Yield" value={<><Odometer value={data.pouring.yield_pct} decimals={1} uid="py" />%</>} sub={`${data.pouring.total_scrap} scrap units`} flashKey={data.pouring.yield_pct} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -184,10 +198,10 @@ export function ScadaPage() {
             {data.packing && (
               <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <StatCard label="Total Units Packed" value={<Odometer value={data.packing.total_packed} uid="tp" />} />
-                  <StatCard label="Estimated Skids" value={<Odometer value={data.packing.total_skids_est} decimals={1} uid="es" />} />
-                  <StatCard label="Packing Velocity" value={<><Odometer value={data.packing.pack_velocity_uh} uid="pv" /> units/h</>} />
-                  <StatCard label="Unpacked WIP" value={<Odometer value={data.packing.unpacked_wip} uid="uw" />} />
+                  <StatCard label="Total Units Packed" value={<Odometer value={data.packing.total_packed} uid="tp" />} flashKey={data.packing.total_packed} />
+                  <StatCard label="Estimated Skids" value={<Odometer value={data.packing.total_skids_est} decimals={1} uid="es" />} flashKey={data.packing.total_skids_est} />
+                  <StatCard label="Packing Velocity" value={<><Odometer value={data.packing.pack_velocity_uh} uid="pv" /> units/h</>} flashKey={data.packing.pack_velocity_uh} />
+                  <StatCard label="Unpacked WIP" value={<Odometer value={data.packing.unpacked_wip} uid="uw" />} flashKey={data.packing.unpacked_wip} />
                 </div>
                 <div className={card}>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-violet-400">📦 Packed by Resin & Lot</p>
@@ -258,9 +272,13 @@ export function ScadaPage() {
   )
 }
 
-function StatCard({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
+// flashKey is a plain comparable primitive (the raw number), separate from
+// `value` (which is JSX - an Odometer plus a unit suffix) - useFlashOnChange
+// needs something it can actually compare across renders.
+function StatCard({ label, value, sub, flashKey }: { label: string; value: ReactNode; sub?: string; flashKey?: number }) {
+  const flashing = useFlashOnChange(flashKey)
   return (
-    <div className={fl.cardHover}>
+    <div className={`${fl.cardHover} ${flashing ? 'fl-flash' : ''}`}>
       <p className={`text-xs font-semibold uppercase tracking-wide ${fl.muted}`}>{label}</p>
       <p className="text-xl font-bold text-white">{value}</p>
       {sub && <p className={`text-xs ${fl.muted}`}>{sub}</p>}

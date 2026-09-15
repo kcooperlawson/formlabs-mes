@@ -5,6 +5,7 @@ cross-widget behavior), so it stays simple here: one endpoint, one write.
 from fastapi import APIRouter, Depends
 
 import crud
+from api import realtime
 from api.deps import get_current_user, resolve_operator_name
 from api.schemas.downtime import DowntimeSubmitRequest
 
@@ -17,4 +18,5 @@ def submit(body: DowntimeSubmitRequest, user: dict = Depends(get_current_user)):
         operator_name=resolve_operator_name(user, body.as_operator), pump_station=body.station, shift=user["shift"] or "",
         reason=body.reason, duration_min=body.duration_min, notes=body.notes,
     )
+    realtime.notify()
     return {"ok": True, "message": f"Recorded {body.duration_min} minutes downtime."}

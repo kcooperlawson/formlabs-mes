@@ -1,4 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import {
+  Activity, ArrowLeft, BarChart3, BookOpen, ClipboardEdit, Compass, FlaskConical, PanelLeftClose,
+  Plug, Settings, ShieldCheck, Tv, User, type LucideIcon,
+} from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminPanelPage } from './adminPanel/AdminPanelPage'
@@ -49,7 +53,7 @@ export type TabKey = 'cockpit' | 'scada' | 'reactors' | 'floor-comms' | 'cleanli
 // component, each mount gets its own refs and measures its own layout.
 function SidebarNav({
   items, activeKey, onSelect,
-}: { items: { key: TabKey; label: string }[]; activeKey: TabKey; onSelect: (key: TabKey) => void }) {
+}: { items: { key: TabKey; label: string; icon: LucideIcon }[]; activeKey: TabKey; onSelect: (key: TabKey) => void }) {
   const itemRefs = useRef<Partial<Record<TabKey, HTMLButtonElement>>>({})
   const [highlight, setHighlight] = useState<{ top: number; height: number } | null>(null)
 
@@ -80,6 +84,7 @@ function SidebarNav({
               : `font-semibold text-[var(--fl-body)] hover:bg-[var(--fl-overlay-weak)] hover:text-[var(--fl-ink)]`
           }`}
         >
+          <item.icon size={16} className="shrink-0" strokeWidth={2.25} />
           {item.label}
         </button>
       ))}
@@ -127,13 +132,13 @@ export function ManagerShell() {
   const canAdminister = user?.role === 'admin' || (simpleMode && user?.role === 'manager')
   const canSeeDeviceGateway = canAdminister && (settingsQuery.data?.enable_device_gateway ?? false)
 
-  const navItems: { key: TabKey; label: string }[] = [
-    { key: 'cockpit', label: '🏠 Manager Cockpit' },
-    { key: 'scada', label: '📊 Live SCADA' },
-    { key: 'reactors', label: '🛢️ Live Reactors' },
-    { key: 'analytics', label: '🌌 Analytics Hub' },
-    ...(canAdminister ? [{ key: 'admin' as TabKey, label: '🛡️ IT Admin' }] : []),
-    ...(canSeeDeviceGateway ? [{ key: 'devices' as TabKey, label: '🔌 Device Gateway' }] : []),
+  const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
+    { key: 'cockpit', label: 'Manager Cockpit', icon: Compass },
+    { key: 'scada', label: 'Live SCADA', icon: Activity },
+    { key: 'reactors', label: 'Live Reactors', icon: FlaskConical },
+    { key: 'analytics', label: 'Analytics Hub', icon: BarChart3 },
+    ...(canAdminister ? [{ key: 'admin' as TabKey, label: 'IT Admin', icon: ShieldCheck }] : []),
+    ...(canSeeDeviceGateway ? [{ key: 'devices' as TabKey, label: 'Device Gateway', icon: Plug }] : []),
   ]
 
   function go(next: TabKey) {
@@ -152,14 +157,16 @@ export function ManagerShell() {
         title="Collapse sidebar"
         className="hidden h-7 w-7 items-center justify-center self-end rounded text-[var(--fl-muted)] hover:bg-[var(--fl-overlay-weak)] hover:text-[var(--fl-ink)] md:flex"
       >
-        «
+        <PanelLeftClose size={16} />
       </button>
 
       <div className="flex items-center gap-3">
         {user?.avatar_filename ? (
           <img src={accountApi.avatarUrl(user.avatar_filename)} alt="" className="h-11 w-11 rounded-full object-cover" />
         ) : (
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--fl-ground)] text-xl">👤</span>
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--fl-ground)] text-[var(--fl-muted)]">
+            <User size={20} />
+          </span>
         )}
         <div className="min-w-0">
           <p className="truncate font-bold text-[var(--fl-ink)]">{user?.full_name}</p>
@@ -173,35 +180,35 @@ export function ManagerShell() {
       <hr className={fl.divider} />
 
       <nav className="flex flex-col gap-1">
-        <p className={`px-3 pb-1 ${fl.label}`}>🗺️ Navigation</p>
+        <p className={`px-3 pb-1 ${fl.label}`}>Navigation</p>
         <SidebarNav items={navItems} activeKey={tab} onSelect={go} />
         {/* A real route, not a tab - mirrors ui_shell.py's nav_links(),
             which offers every role the Operator Form/Workstation
             unconditionally. A manager/admin lands there with Debug Mode
             available to test or log on an operator's behalf. */}
-        <button onClick={() => navigate('/operator-form')} className={fl.navItem}>
-          📝 Operator Form
+        <button onClick={() => navigate('/operator-form')} className={`${fl.navItem} flex items-center gap-2.5`}>
+          <ClipboardEdit size={16} className="shrink-0" strokeWidth={2.25} /> Operator Form
         </button>
       </nav>
 
       <a
         href="/Formlabs_MES_Handbook.pdf" target="_blank" rel="noopener noreferrer"
-        className={`px-3 text-xs ${fl.muted} hover:text-[var(--fl-accent-2)]`}
+        className={`flex items-center gap-1.5 px-3 text-xs ${fl.muted} hover:text-[var(--fl-accent-2)]`}
       >
-        📘 Operations handbook (PDF)
+        <BookOpen size={13} className="shrink-0" /> Operations handbook (PDF)
       </a>
 
       <hr className={fl.divider} />
 
       <div className="flex flex-col gap-2">
         <div className="relative">
-          <button onClick={() => setShowAccount((v) => !v)} className={`${fl.btnSecondary} w-full`}>
-            ⚙️ Account & Preferences
+          <button onClick={() => setShowAccount((v) => !v)} className={`${fl.btnSecondary} w-full flex items-center justify-center gap-2`}>
+            <Settings size={15} /> Account & Preferences
           </button>
           {showAccount && <AccountPanel onClose={() => setShowAccount(false)} />}
         </div>
-        <a href="/tv" target="_blank" rel="noopener noreferrer" className={`${fl.btnSecondary} text-center`}>
-          📺 Launch TV Mode
+        <a href="/tv" target="_blank" rel="noopener noreferrer" className={`${fl.btnSecondary} flex items-center justify-center gap-2 text-center`}>
+          <Tv size={15} /> Launch TV Mode
         </a>
         <button onClick={logout} className={fl.btnDanger}>
           Log Out & Clear Device
@@ -282,8 +289,8 @@ export function ManagerShell() {
           <div className="relative z-10">
           {tab === 'cockpit' && <ManagerCockpitHub onNavigate={go} ordersOn={ordersOn} canAdminister={canAdminister} />}
           {tab !== 'cockpit' && (
-            <button onClick={() => go('cockpit')} className="mb-4 text-sm font-semibold text-[var(--fl-accent-2)] hover:underline">
-              ← Manager Cockpit
+            <button onClick={() => go('cockpit')} className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-[var(--fl-accent-2)] hover:underline">
+              <ArrowLeft size={15} /> Manager Cockpit
             </button>
           )}
 

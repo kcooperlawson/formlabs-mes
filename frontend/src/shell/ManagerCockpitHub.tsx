@@ -1,17 +1,22 @@
+import {
+  Camera, Cloud, ClipboardList, Droplets, LayoutDashboard, Lock, PieChart, Scale, Settings,
+  Shield, Target, Trash2, TrendingUp, Tv, Users, FlaskConical, type LucideIcon,
+} from 'lucide-react'
 import { Children, type ReactNode } from 'react'
 import { fl } from '../theme'
 import type { TabKey } from '../ManagerShell'
 
 function LaunchCard({
-  label, onClick, disabled, caption,
-}: { label: string; onClick: () => void; disabled?: boolean; caption?: string }) {
+  label, icon: Icon, onClick, disabled, caption,
+}: { label: string; icon: LucideIcon; onClick: () => void; disabled?: boolean; caption?: string }) {
   return (
     <div>
       <button
         onClick={onClick}
         disabled={disabled}
-        className={`${disabled ? 'cursor-not-allowed rounded-lg border border-[var(--fl-border)] bg-[var(--fl-surface)] p-3 opacity-40' : fl.cardHover} w-full text-left text-sm font-semibold text-[var(--fl-ink)]`}
+        className={`${disabled ? 'cursor-not-allowed rounded-lg border border-[var(--fl-border)] bg-[var(--fl-surface)] p-3 opacity-40' : fl.cardHover} flex w-full items-center gap-2.5 text-left text-sm font-semibold text-[var(--fl-ink)]`}
       >
+        <Icon size={17} className="shrink-0 text-[var(--fl-accent-2)]" strokeWidth={2.25} />
         {label}
       </button>
       {caption && <p className={`mt-1 text-xs ${fl.muted}`}>{caption}</p>}
@@ -19,11 +24,13 @@ function LaunchCard({
   )
 }
 
-function Section({ title, caption, children }: { title: string; caption?: string; children: ReactNode }) {
+function Section({ title, icon: Icon, caption, children }: { title: string; icon: LucideIcon; caption?: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--fl-body)]">{title}</h2>
+        <h2 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide text-[var(--fl-body)]">
+          <Icon size={15} className="shrink-0" /> {title}
+        </h2>
         {caption && <p className={`text-xs ${fl.muted}`}>{caption}</p>}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -59,45 +66,49 @@ export function ManagerCockpitHub({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold text-[var(--fl-ink)] sm:text-2xl">📊 Production Records</h1>
+        <h1 className="flex items-center gap-2 text-xl font-bold text-[var(--fl-ink)] sm:text-2xl">
+          <LayoutDashboard size={22} className="shrink-0" /> Production Records
+        </h1>
         <p className={`mt-1 text-sm ${fl.muted}`}>
           Everything here reads what the operators logged. Nothing on this page has to be filled in first.
         </p>
       </div>
 
-      <Section title="📈 What was poured">
-        <LaunchCard label="📈 Historical Production Trends" onClick={() => onNavigate('historical')} />
-        <LaunchCard label="📊 Scrap & Yield Intelligence" onClick={() => onNavigate('scrap-intel')} />
-        <LaunchCard label="🔒 Cartridge Lot Verification" onClick={() => onNavigate('lot-verification')} />
-        <LaunchCard label="🧪 Batch History & QC Turnaround" onClick={() => onNavigate('batch-history')} />
-        <LaunchCard label="📸 Cleanliness & Photo Audits" onClick={() => onNavigate('cleanliness')} />
-        <LaunchCard label="☁️ Google Cloud Sheets Sync" onClick={() => onNavigate('google-sync')} />
+      <Section title="What was poured" icon={Droplets}>
+        <LaunchCard label="Historical Production Trends" icon={TrendingUp} onClick={() => onNavigate('historical')} />
+        <LaunchCard label="Scrap & Yield Intelligence" icon={PieChart} onClick={() => onNavigate('scrap-intel')} />
+        <LaunchCard label="Cartridge Lot Verification" icon={Lock} onClick={() => onNavigate('lot-verification')} />
+        <LaunchCard label="Batch History & QC Turnaround" icon={FlaskConical} onClick={() => onNavigate('batch-history')} />
+        <LaunchCard label="Cleanliness & Photo Audits" icon={Camera} onClick={() => onNavigate('cleanliness')} />
+        <LaunchCard label="Google Cloud Sheets Sync" icon={Cloud} onClick={() => onNavigate('google-sync')} />
       </Section>
 
-      <Section title="👥 The floor">
-        <LaunchCard label="👥 Floor Staff Roster" onClick={() => onNavigate('roster')} />
-        <LaunchCard label="📋 Notes from the Floor" onClick={() => onNavigate('floor-comms')} />
-        <a href="/tv" target="_blank" rel="noopener noreferrer" className={`${fl.cardHover} block text-sm font-semibold text-[var(--fl-ink)]`}>
-          📺 Floor Display (TV Mode)
+      <Section title="The floor" icon={Users}>
+        <LaunchCard label="Floor Staff Roster" icon={Users} onClick={() => onNavigate('roster')} />
+        <LaunchCard label="Notes from the Floor" icon={ClipboardList} onClick={() => onNavigate('floor-comms')} />
+        <a href="/tv" target="_blank" rel="noopener noreferrer" className={`${fl.cardHover} flex items-center gap-2.5 text-sm font-semibold text-[var(--fl-ink)]`}>
+          <Tv size={17} className="shrink-0 text-[var(--fl-accent-2)]" strokeWidth={2.25} /> Floor Display (TV Mode)
         </a>
       </Section>
 
-      <Section title="⚙️ Setup — optional" caption="None of this is needed to log a pour. Set a piece up when you want the answer it gives you.">
+      <Section title="Setup — optional" icon={Settings} caption="None of this is needed to log a pour. Set a piece up when you want the answer it gives you.">
         <LaunchCard
-          label="🎯 Work Orders & Assigned Runs"
+          label="Work Orders & Assigned Runs"
+          icon={Target}
           onClick={() => onNavigate('assigned-runs')}
           disabled={!ordersOn}
           caption={!ordersOn ? 'Off while this plant runs as a logging system.' : undefined}
         />
         {canAdminister && (
           <LaunchCard
-            label="🛡️ Accounts, Equipment & Settings"
+            label="Accounts, Equipment & Settings"
+            icon={Shield}
             onClick={() => onNavigate('admin')}
             caption={!ordersOn ? 'Yours to run: PINs, pumps, resins, backups, and the mode above.' : undefined}
           />
         )}
-        <LaunchCard label="⚖️ Master Resin Specifications" onClick={() => onNavigate('resin-canvas')} caption="Target fill weights, so an out-of-band pour flags itself." />
-        <LaunchCard label="🗑️ Log Management & Cleanup" onClick={() => onNavigate('log-management')} />
+        <LaunchCard label="Master Resin Specifications" icon={Scale} onClick={() => onNavigate('resin-canvas')} caption="Target fill weights, so an out-of-band pour flags itself." />
+        <LaunchCard label="Log Management & Cleanup" icon={Trash2} onClick={() => onNavigate('log-management')} />
       </Section>
     </div>
   )

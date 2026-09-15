@@ -8,6 +8,7 @@ resin-spec row the picker already fetches.
 from fastapi import APIRouter, Depends
 
 import crud
+from api import realtime
 from api.deps import get_current_user, resolve_operator_name
 from api.schemas.packing import PackingSubmitRequest
 
@@ -23,4 +24,5 @@ def submit(body: PackingSubmitRequest, user: dict = Depends(get_current_user)):
         bottles=body.units_packed, scrap_empty=0, scrap_filled=0, notes=body.notes,
         log_type="Packing Count",
     )
+    realtime.notify()
     return {"ok": True, "message": f"Packing saved. Recorded {body.units_packed} units."}

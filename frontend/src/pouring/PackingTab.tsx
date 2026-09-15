@@ -4,6 +4,7 @@ import { referenceApi } from '../api/reference'
 import { packingApi } from '../api/packing'
 import { useSubmitLock } from '../hooks/useSubmitLock'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
+import { enqueue, isConnectivityError } from '../offline/queue'
 import { useToast } from '../toast/ToastProvider'
 import { fl } from '../theme'
 
@@ -50,6 +51,17 @@ export function PackingTab() {
       setNotes('')
       submitLock.lock()
       toast.show(resp.message)
+    },
+    onError: (err) => {
+      if (!isConnectivityError(err)) return
+      void enqueue('packing', Object.entries({
+        cartridge_type: cartCode, resin, lot_number: lot,
+        units_packed: String(unitsPacked), notes, as_operator: asOperator ?? '',
+      }))
+      setNotes('')
+      submitLock.lock()
+      toast.show('Recorded offline — queued to send.')
+      submitMutation.reset()
     },
   })
 

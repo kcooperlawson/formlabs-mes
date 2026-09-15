@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { tvApi, type PackingBreakdownRow, type TopPourer, type WorkOrderRow } from '../api/tv'
+import { useFlashOnChange } from '../hooks/useFlashOnChange'
+import { useRealtimeInvalidate } from '../hooks/useRealtimeInvalidate'
 import { BuildFinale, CartridgeBuild, LayerBar, Odometer, ScreenSweep } from './PrintBuild'
 
 const FINALE_SECONDS = 25_000
@@ -136,9 +138,19 @@ export function TvDashboardPage() {
   })
   const data = query.data
 
+  // A wall display is the one screen where "instant" actually matters - see
+  // useRealtimeInvalidate for what this rides on.
+  useRealtimeInvalidate([['tv-overview']])
+
   const todayKey = now.toISOString().slice(0, 10)
   const finaleKey = `${todayKey}::${data?.active_shift ?? ''}`
   const buildFinaleNow = useBuildFinale(!!data && data.shift_target_l > 0 && data.build_pct >= 99.95, finaleKey)
+
+  // The wall display is the one screen where a live update should be seen,
+  // not just eventually noticed - see useFlashOnChange.
+  const volumeFlash = useFlashOnChange(data?.current_output_l)
+  const packedFlash = useFlashOnChange(data?.scope_packed)
+  const wipFlash = useFlashOnChange(data?.unpacked_wip)
 
   if (!data) return <p className="p-6 text-center text-sm text-[#94A3B8]">Loading Plant Command...</p>
 
@@ -198,7 +210,7 @@ export function TvDashboardPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: kpiCols, gap: 16 }}>
-        <div style={{ ...cardStyle, padding: 15 }}>
+        <div className={volumeFlash ? 'fl-flash' : ''} style={{ ...cardStyle, padding: 15 }}>
           <div style={{ ...labelStyle, textAlign: 'left' }}>💧 TOTAL VOLUME POURED</div>
           <div style={{ fontSize: '3rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1.1, marginTop: 10, marginBottom: 10, textAlign: 'left' }}>
             <Odometer value={data.current_output_l} uid="vol" /> <span style={{ fontSize: '1.2rem', color: '#94A3B8' }}>Liters</span>
@@ -231,7 +243,7 @@ export function TvDashboardPage() {
         </div>
 
         {data.packing_enabled && (
-          <div style={{ ...cardStyle, borderColor: '#A855F7' }}>
+          <div className={packedFlash ? 'fl-flash' : ''} style={{ ...cardStyle, borderColor: '#A855F7' }}>
             <div style={{ ...labelStyle, color: '#A855F7' }}>📦 TOTAL UNITS PACKED</div>
             <div style={{ fontSize: '3.5rem', fontWeight: 900, color: '#A855F7', lineHeight: 1.1, marginTop: 10 }}>
               <Odometer value={data.scope_packed} uid="pack" /> <span style={{ fontSize: '1.5rem', color: '#94A3B8' }}>Units</span>
@@ -243,7 +255,7 @@ export function TvDashboardPage() {
         )}
 
         {data.packing_enabled && (
-          <div style={{ ...cardStyle, borderColor: '#F59E0B' }}>
+          <div className={wipFlash ? 'fl-flash' : ''} style={{ ...cardStyle, borderColor: '#F59E0B' }}>
             <div style={{ ...labelStyle, color: '#F59E0B' }}>⚠️ UNPACKED FLOOR W.I.P.</div>
             <div style={{ fontSize: '3.5rem', fontWeight: 900, color: '#F59E0B', lineHeight: 1.1, marginTop: 10 }}>
               <Odometer value={data.unpacked_wip} uid="wip" /> <span style={{ fontSize: '1.5rem', color: '#94A3B8' }}>Pending</span>

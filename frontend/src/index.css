@@ -94,6 +94,20 @@ input, select, textarea {
   to { opacity: 1; }
 }
 
+/* useFlashOnChange's visible half: a stat card briefly glows the instant
+   its number actually changes, so a WebSocket push reads as "something
+   just happened" rather than a number that was merely, silently, already
+   different. A ring rather than a background swap - it has to read clearly
+   over every one of the 18 themes without needing a per-theme color. */
+@keyframes fl-value-flash {
+  0% { box-shadow: 0 0 0 0 var(--fl-accent-2); }
+  15% { box-shadow: 0 0 0 3px var(--fl-accent-2); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.fl-flash {
+  animation: fl-value-flash 900ms ease-out;
+}
+
 /* A plant floor is exactly the environment where somebody genuinely needs
    this, not just a courtesy for desktop users - flashing wall displays and
    sliding UI chrome are a real problem for vestibular sensitivity, and

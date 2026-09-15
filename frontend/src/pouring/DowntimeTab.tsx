@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { downtimeApi } from '../api/downtime'
 import { referenceApi } from '../api/reference'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
+import { enqueue, isConnectivityError } from '../offline/queue'
 import { useToast } from '../toast/ToastProvider'
 import { fl } from '../theme'
 
@@ -32,6 +33,15 @@ export function DowntimeTab({ myStation }: { myStation: string }) {
     onSuccess: (resp) => {
       setNotes('')
       toast.show(resp.message)
+    },
+    onError: (err) => {
+      if (!isConnectivityError(err)) return
+      void enqueue('downtime', Object.entries({
+        station, reason, duration_min: String(duration), notes, as_operator: asOperator ?? '',
+      }))
+      setNotes('')
+      toast.show('Recorded offline — queued to send.')
+      submitMutation.reset()
     },
   })
 
