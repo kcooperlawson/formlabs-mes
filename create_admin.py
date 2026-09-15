@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import bcrypt
-from database import ScopedSession, User
+from crud import ScopedSession
+from models import User
 
 
 def create_emergency_admin(username, pin, full_name, email=""):

@@ -8,6 +8,10 @@ __pycache__/
 uploads/
 backups/
 
+# run_mes_portable.bat's bundled database - a real PostgreSQL data
+# directory (pgserver), specific to whichever PC it was created on.
+pgdata/
+
 # PyCharm configuration
 .idea/
 .vscode/

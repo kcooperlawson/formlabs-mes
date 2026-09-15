@@ -63,8 +63,8 @@ def print_address():
     scheme = "https" if CERT_FILE.exists() and KEY_FILE.exists() else "http"
     print("   Operators open this on their phones:")
     if ip:
-        print(f"       {scheme}://{ip}:8501")
-    print(f"       {scheme}://{name}:8501")
+        print(f"       {scheme}://{ip}:8000")
+    print(f"       {scheme}://{name}:8000")
     if not ip:
         print("   (couldn't work out this PC's network address)")
     if scheme == "http":
@@ -91,8 +91,8 @@ def check_python():
 
 def check_packages():
     head("Packages")
-    core = ["streamlit", "sqlalchemy", "psycopg2", "alembic", "pandas",
-            "dotenv", "bcrypt", "plotly"]
+    core = ["fastapi", "uvicorn", "sqlalchemy", "psycopg2", "alembic", "pandas",
+            "dotenv", "bcrypt"]
     missing = []
     for mod in core:
         try:
@@ -223,13 +223,13 @@ def check_port():
     head("Network")
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(1.5)
-    busy = s.connect_ex(("127.0.0.1", 8501)) == 0
+    busy = s.connect_ex(("127.0.0.1", 8000)) == 0
     s.close()
     if busy:
-        line(WARN, "Port 8501 is already in use",
+        line(WARN, "Port 8000 is already in use",
              "the app may already be running in another window")
     else:
-        line(OK, "Port 8501 is free")
+        line(OK, "Port 8000 is free")
 
     ip = lan_ip()
     if ip:
@@ -244,11 +244,11 @@ def check_port():
                 capture_output=True, text=True, timeout=10).stdout
             if re.search(r"State\s+ON", out, re.IGNORECASE):
                 line(WARN, "Windows Firewall is on",
-                     "phones can't reach 8501 until it's allowed through")
+                     "phones can't reach 8000 until it's allowed through")
                 print("        -> Run once, as administrator:")
                 print('           netsh advfirewall firewall add rule '
                       'name="Formlabs MES" dir=in action=allow '
-                      'protocol=TCP localport=8501')
+                      'protocol=TCP localport=8000')
             else:
                 line(OK, "Windows Firewall is off on this profile")
         except Exception:
@@ -298,8 +298,8 @@ def check_tls():
 
 def check_files():
     head("Project files")
-    for rel in ["Home.py", "crud.py", "requirements.txt", "migrations",
-                ".streamlit/config.toml"]:
+    for rel in ["crud.py", "requirements.txt", "migrations",
+                "api/main.py", "frontend/dist/index.html"]:
         p = ROOT / rel
         line(OK if p.exists() else BAD, rel,
              "" if p.exists() else "missing - unzip the whole package")

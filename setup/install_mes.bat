@@ -2,8 +2,8 @@
 rem ===================================================================
 rem  Install the MES / Logger on this PC.
 rem
-rem  This PC will run the Streamlit app AND host the PostgreSQL
-rem  database. Operators point their phones at it.
+rem  This PC will run the MES app AND host the PostgreSQL database.
+rem  Operators point their phones at it.
 rem
 rem  Every step is idempotent - running this twice is safe and is the
 rem  right move if something failed halfway through.

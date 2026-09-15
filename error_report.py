@@ -167,55 +167,10 @@ def user_message(ref: str) -> str:
             f"code. Everything else on the app still works; go back and carry "
             f"on, and give that code to whoever looks after this.")
 
-
-# --------------------------------------------------------------------------
-# The hook. Everything below needs Streamlit; everything above does not.
-# --------------------------------------------------------------------------
-
-_INSTALLED = False
-
-
-def install(recorder=None, page_name=None) -> bool:
-    """Route Streamlit's uncaught page exceptions through here as well.
-
-    `recorder` is called with the finished dict and returns the reference code
-    to show. Injected rather than imported so the pure half of this module
-    stays testable, and so a database that is itself the thing that broke
-    cannot turn one failure into two.
-
-    Returns False rather than raising if Streamlit's internals have moved.
-    Reporting a crash is worth a lot; taking the app down because the crash
-    reporter could not attach is worth nothing.
-    """
-    global _INSTALLED
-    if _INSTALLED:
-        return True
-    try:
-        import streamlit as st
-        from streamlit import error_util
-        original = error_util.handle_uncaught_app_exception
-    except Exception:
-        return False
-
-    def handler(exc, *args, **kwargs):
-        ref = None
-        try:
-            payload = describe(exc)
-            payload["page"] = str(page_name() if callable(page_name) else page_name or "")[:120]
-            if recorder is not None:
-                ref = recorder(payload)
-        except Exception:
-            # The reporter failing must never replace the real error with its
-            # own. Fall through and let Streamlit show what it was going to.
-            ref = None
-        if ref:
-            try:
-                st.error(user_message(ref))
-                return
-            except Exception:
-                pass
-        return original(exc, *args, **kwargs)
-
-    error_util.handle_uncaught_app_exception = handler
-    _INSTALLED = True
-    return True
+# install() used to live here - a hook into Streamlit's own uncaught-exception
+# handler, so a page crash got recorded the same way an explicitly-caught one
+# did. It retired along with Home.py/ui_shell.py/pages/ when the Streamlit UI
+# did: nothing calls it any more, and a crash in the FastAPI app is a 500
+# response, not a full-page exception screen, so there is no equivalent hook
+# left to attach. describe()/redact()/reference_code()/user_message() above
+# are what crud.record_error_report() actually still calls.

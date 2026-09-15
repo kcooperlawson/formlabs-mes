@@ -8,8 +8,7 @@ import shutil
 import base64
 from dotenv import load_dotenv, set_key
 from sqlalchemy.engine import make_url
-import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime
 from app_logger import logger
 
 load_dotenv()
@@ -339,7 +338,17 @@ def run_scheduled_backup(force: bool = False) -> str:
 
     Returns the filename if one was taken, otherwise None. Never raises: a
     failed backup must not be able to stop an operator logging an hour.
+
+    Guarded by MES_DISABLE_AUTO_BACKUP the same way api/backup_scheduler.py's
+    equivalent check is: BACKUP_DIR is a fixed path independent of DB_URL, so
+    running this app against a scratch/dev database still writes into and
+    prunes the SAME real backup rotation as production. That mismatch is
+    exactly what caused a real incident (three genuine backups pruned by a
+    dev session pointed at a test database) - this is the fix, on the one
+    code path both the Streamlit app and the API's own scheduler now share.
     """
+    if os.environ.get("MES_DISABLE_AUTO_BACKUP"):
+        return None
     from backup_policy import is_backup_due
     try:
         if not force and not is_backup_due(list_backup_files()):
@@ -391,163 +400,13 @@ def restore_database_backup(filename: str) -> bool:
         logger.exception(f"restore_database_backup({filename!r}) failed unexpectedly")
         return False
 
-# How long to let a cookie write reach the browser before the script may
-# rerun. Measured, not guessed: with no wait at all, not one cookie in this
-# application was ever written - verified in a browser by signing in with
-# "Remember this device" ticked and finding no token cookie afterwards. 1.2s
-# was enough on a desktop and on a 390x844 phone profile, and it is paid only
-# on the deliberate actions that write a cookie (signing in, changing theme,
-# toggling glove mode), never on an ordinary interaction.
-COOKIE_SETTLE_SECONDS = 1.2
-
-
-def set_cookie(cookie_manager, name, value, **kwargs):
-    """Write a cookie, and give the browser the time it needs to do it.
-
-    extra_streamlit_components does not write cookies from Python. `set()`
-    renders a Streamlit *component*: the browser has to receive that frame,
-    mount an iframe and run its JavaScript. `st.rerun()` or `st.switch_page()`
-    on the next line tears the frame down before any of that happens, so the
-    cookie is silently never written - and because `set()` also updates the
-    manager's in-memory copy, the same script run can read the value back and
-    look entirely successful.
-
-    Every cookie in this application was set that way, which is why "Remember
-    this device" did nothing, a chosen theme reset on the next visit, and
-    glove mode would not stay with a terminal. Route cookie writes through
-    here rather than calling `set()` directly, so the wait cannot be forgotten
-    at a new call site.
-    """
-    cookie_manager.set(name, value, **kwargs)
-    time.sleep(COOKIE_SETTLE_SECONDS)
-
-
-def flash(message, icon="✅"):
-    """Queue a confirmation for the run AFTER this one, and return.
-
-    st.toast has the milder version of the same problem: the toast belongs to
-    the delta for the current run, and a rerun immediately after can discard
-    it before the browser paints. On a desktop it usually won the race; at
-    390x844 it reliably lost - which is exactly the machine that matters, so
-    an operator submitting a log on a phone at the pump got no confirmation at
-    all and had to open the last submission to check the entry had saved.
-
-    A message queued here survives the rerun and is drawn by draw_flashes() at
-    the top of the next run, as an ordinary success banner. That is also the
-    better answer on a phone: a banner stays until the next action, where a
-    toast vanishes after four seconds whether or not anybody was looking.
-    """
-    st.session_state.setdefault("_flash_queue", []).append((str(message), icon))
-
-
-def draw_flashes():
-    """Render and clear anything flash() queued on a previous run.
-
-    Pinned to the bottom of the screen on a phone, and only on a phone.
-    Reported from the floor: the confirmation was drawing correctly at the top
-    of the page, but the operator form is four phone screens tall and the
-    operator is at the bottom of it when they submit. So the banner appeared
-    somewhere they could not see, and they were scrolling up every hour to
-    check the entry had saved - which is the exact thing the banner was added
-    to stop them doing.
-
-    Bottom rather than top, because that is where the thumb and the eye
-    already are after pressing Submit. On anything wider than a phone it stays
-    an ordinary banner in the flow of the page.
-    """
-    queued = st.session_state.pop("_flash_queue", [])
-    if not queued:
-        return
-    st.markdown(
-        "<style>"
-        ".mes-flash{background:#065F46; color:#ECFDF5; border-left:5px solid #34D399;"
-        "border-radius:8px; padding:12px 14px; margin:6px 0 14px 0; font-weight:600;"
-        "font-size:1rem; line-height:1.35;}"
-        "@media (max-width: 640px){"
-        ".mes-flash{position:fixed; left:10px; right:10px; bottom:14px; z-index:9999;"
-        "box-shadow:0 10px 28px rgba(0,0,0,0.45);}}"
-        "</style>"
-        + "".join(f'<div class="mes-flash">{esc(icon)} {esc(message)}</div>'
-                  for message, icon in queued),
-        unsafe_allow_html=True)
-
-
-def do_logout(cookie_manager):
-    """Sign out, in an order that survives being interrupted half way through.
-
-    The order is the whole fix. Writing a cookie renders a Streamlit
-    *component*: the browser mounts an iframe, runs its JavaScript and sends a
-    value back, and that returning value reruns the script. So the cookie call
-    does not return to the next line - it ends the run. Everything that used to
-    sit after it here never executed, and what sat after it was
-    `st.session_state.clear()`.
-
-    The visible symptom was that "Log Out & Clear Device" appeared to do
-    nothing. It was doing most of its job: the server-side session really was
-    revoked and the cookie really was removed. But `authenticated` was still
-    True in session state, so the rerun drew the signed-in screen again, and
-    only a manual refresh - which starts a fresh session with no state -
-    reached the sign-in page. An operator handing a phone to the next shift had
-    no way to know the account had actually been signed out.
-
-    So the state is torn down FIRST and the cookie touched LAST. If the cookie
-    component ends the run, it ends a run that has already forgotten who was
-    signed in, and the rerun lands on the sign-in screen the way it should.
-    Home reads `explicitly_logged_out` and clears the cookie again on that run
-    regardless, so nothing depends on this function reaching its final line.
-    """
-    from crud import delete_session  # local import avoids a circular import with crud.py
-
-    saved_theme = st.session_state.get("preferred_theme", "Formlabs Forge")
-
-    # Read the token before the state goes, and revoke it server-side: this is
-    # the part that must happen whatever else does, because it is what stops
-    # the token working from another device.
-    old_token = None
-    try:
-        old_token = cookie_manager.get(cookie="formlabs_mes_token")
-        if old_token:
-            delete_session(old_token)
-    except Exception:
-        logger.exception("do_logout() could not revoke the session token server-side")
-
-    # Now forget who was here. Nothing below this line is allowed to be
-    # load-bearing, because the cookie call may end the run.
-    st.session_state.clear()
-    st.session_state["preferred_theme"] = saved_theme
-    st.session_state["explicitly_logged_out"] = True
-
-    try:
-        set_cookie(cookie_manager, "formlabs_mes_token", "",
-                   expires_at=datetime.now() - timedelta(days=1))
-        cookie_manager.delete("formlabs_mes_token")
-    except Exception:
-        # The session is revoked and the state is gone either way; this only
-        # decides whether the browser keeps a token that no longer works.
-        logger.exception("do_logout() cookie cleanup failed (signed out regardless)")
-
-
-def check_authentication(cookie_manager):
-    """Validates the session-token cookie server-side and restores the session if valid.
-    Replaces the old per-page 'compare cookie to username' auto-login blocks."""
-    if st.session_state.get("authenticated", False):
-        return
-
-    from crud import get_user_by_session_token
-
-    cached_token = cookie_manager.get(cookie="formlabs_mes_token")
-    user_data = get_user_by_session_token(cached_token)
-
-    if user_data:
-        st.session_state.update({
-            "authenticated": True,
-            "user_id": user_data["id"],
-            "user_role": user_data["role"],
-            "user_name": user_data["full_name"],
-            "user_shift": user_data.get("shift", "Shift 1"),
-            "preferred_theme": user_data.get("preferred_theme", "Formlabs Forge"),
-            "avatar_filename": user_data.get("avatar_filename"),
-        })
-        st.rerun()
+# set_cookie/flash/draw_flashes/do_logout/check_authentication used to live
+# here - the Streamlit UI's own cookie-write timing fix, toast-that-survives-
+# a-rerun banner, sign-out sequencing, and session-restore. All five existed
+# only because Streamlit reruns the whole page script on every interaction;
+# the FastAPI app doesn't have that problem (api/deps.py's get_current_user
+# and api/routers/auth.py's login/logout are the real, current versions of
+# what these did), and retired along with Home.py/pages/ui_shell.py when the
+# Streamlit UI was.
 
 

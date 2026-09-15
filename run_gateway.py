@@ -1,11 +1,11 @@
 """
 run_gateway.py - Standalone entrypoint for the Device Gateway.
 
-Run this as its own long-lived process, separate from `streamlit run
-Home.py`. Streamlit's execution model (rerun the script top-to-bottom on
-every interaction) isn't a fit for continuous background polling, and
-running the gateway loop inside a Streamlit page would mean it stops the
-moment nobody has the app open in a browser tab.
+Run this as its own long-lived process, separate from the main app
+(run_mes_api.bat). A continuous background polling loop doesn't belong
+inside a request-driven web server - running it there would mean it stops
+the moment nobody happens to be hitting the app, and ties its lifetime to
+uvicorn's.
 
 Usage:
     python run_gateway.py
@@ -13,7 +13,7 @@ Usage:
 ZERO CONFIGURATION NEEDED to point this at the right database, on any PC:
 this always searches the local network first for a formlabsmes database
 announcing itself (see service_announcer.py, started automatically by
-Home.py on whichever PC runs the main app) via mDNS, and connects to
+api/main.py on whichever PC runs the main app) via mDNS, and connects to
 whatever it finds. That means the exact same project folder + .env you
 zip up on the PC hosting the app can be unzipped onto ANY other PC on the
 same network and just work - no file needs editing, because this never

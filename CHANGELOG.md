@@ -8,6 +8,33 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 4.00 — Monday, September 14, 2026
+**Streamlit is gone. The FastAPI + React app is the only app now.**
+
+The migration this changelog has been tracking piece by piece since the operator form pilot is finished: `Home.py`, every file in `pages/`, `ui_shell.py`, `components.py`, `database.py`, `theme_engine.py`, `themes.py`, `.streamlit/`, and `run_mes.bat` are deleted, not just unused. `streamlit`, `streamlit-lottie`, `extra-streamlit-components`, `altair`, `pydeck` and their own dependencies are out of `requirements.txt`. `START_HERE.bat` no longer offers a Streamlit option; `run_mes_api.bat` (a real PostgreSQL install) and `run_mes_portable.bat` (a bundled database, no install needed — see 3.4x) are the only two ways to start the app now.
+
+Six test files that only ever tested Streamlit's own rendering (`test_ui.py`, `test_pages.py`, `test_permissions.py`, `test_print_build.py`, `test_shifts_and_display.py`, `test_gateway_toggle.py`, plus `test_links.py`, `test_card_markup.py`, `visual_regression.py`, `smoke_browser.py`, `smoke_persistence.py`, `smoke_simple_mode.py`, and `test_parity_pouring.py` found along the way) are deleted with it. `test_fill_weight.py`, `test_error_report.py`, `test_batches_qc.py`, `test_roles.py` and `test_external_links.py` had real, still-valuable checks tangled up with Streamlit-only sections — those are trimmed rather than deleted, with a comment where the old section used to be explaining what retired and why.
+
+**Bugs the removal surfaced, not caused by it, fixed anyway:**
+- **WIP read as zero for several hours every evening.** `api/routers/admin.py`'s WIP endpoints computed "today" from `datetime.utcnow()`; `ProductionLog.date` is stamped from local time. Between local evening and UTC midnight, the two disagreed and the WIP tile silently showed 0 with real unpacked production on the floor. Now both read local time.
+- **A freshly-tracked reactor could show a negative dwell time.** `crud.backfill_batches()` (gives a vessel that already holds resin an opening batch row, once) copied a `ProductionLog.timestamp` — naive UTC — straight into `ReactorBatch.filled_at`, which is naive local everywhere else. Fixed the conversion; corrected the one row it had already written wrong.
+- **`Move_To_New_PC.bat` couldn't run.** `call venv\Scripts\activate.bat` bakes in the absolute path the venv was first created at; this project has moved folders since, so activation silently prepended a dead PATH entry and every `python` call underneath it hit the system interpreter instead — `ModuleNotFoundError: No module named 'dotenv'`. Switched to calling `venv\Scripts\python.exe` directly, the same fix `run_mes.bat`/`run_mes_api.bat` already had.
+- **An update package's signature always failed to verify.** `setup/apply_update.py` checked a package's signature against *this machine's own* `setup/update_signing_public.pem`, ignoring the `root` argument that says which PC's folder is actually being updated — harmless on the one PC that always is this one, wrong for anything else including its own test suite. Now resolved relative to `root`.
+- Two Windows-only bugs in the dev tooling: `dev/run_tests.py`'s own test-ordering fix (`test_fill_weight.py` needs `test_workflow.py`'s fixture to already exist) compared forward-slash literals against `str(Path.relative_to())`'s backslash output and never actually matched, so the ordering it named was never happening; and `tests/test_cleanliness_photos.py` expected a write failure to raise, when `crud.add_cleanliness_audit()` deliberately catches, logs and returns `False` instead (same as the rest of `crud.py`) — the test now checks the return value.
+- `pgdata\` (the portable launcher's bundled database) and `certs\` (the per-machine TLS cert) added to both the update builder's skip list and the applier's never-touch list — they were only protected on one side of that pair before.
+
+**The version is visible again.** Retired with `Home.py`'s own `APP_VERSION` line and never rebuilt: nothing in the running app said what it was running. `VERSION` at the project root is now the one place that's written (read by `dev/make_update.py`, `setup/apply_update.py`, and the new `GET /api/reference/app-version`), and the sidebar footer shows it, same as `update_guide.html` already told people to look for.
+
+**The launcher prints the address for the phones.** `run_mes_api.bat` and `run_mes_portable.bat` both call `setup/_preflight.py`'s address logic before starting the server now, instead of only on request from `Check_This_PC.bat`.
+
+**114 real resin specs added**, transcribed from the plant's own wall reference card — every V1, V1/V2 (split into one row per format, since a spec here is per-cartridge), V2, RPS, Pigment and Amazon formulation on it, SKU left blank as instructed. The two placeholder demo specs already in the database (`Standard Black V5`, `Standard Clear V5`) are untouched.
+
+**Known gap, not closed today:** `dev/make_update.py`'s default mode figures out what to ship by asking git what changed — and `api/` and `frontend/` have never been committed, so it currently can't see either one. Building an incremental update with `--from` alone would ship everything else and silently omit most of the running app. Fixed by this release's own commit going in; still worth knowing if a future release is built before that history exists.
+
+**Also not finished:** the handbook and operator guide still carry screenshots of the old Streamlit screens (`docs/figs_op/`, `docs/figs_print/`) — only the operator guide's sign-in figure was re-shot against the real React app before time ran out on this pass. `dev/shot_*.py`/`dev/reshoot_*.py` all drive Streamlit-specific selectors against port 8501 and need rewriting against the new app before the rest can be regenerated.
+
+---
+
 ## 3.47 — Friday, September 11, 2026
 **Streamlit reruns the entire page on every input — mitigated on two spots on the operator screen, more to come**
 

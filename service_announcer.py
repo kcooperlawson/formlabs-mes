@@ -10,11 +10,10 @@ gateway machine keeps its own DB_USER/DB_PASSWORD locally in its own .env
 (see service_discovery.py); only the "where is it" part ever travels over
 the network.
 
-Started once, automatically, from Home.py at startup (wrapped in
-@st.cache_resource there so it survives Streamlit's rerun-the-script-on-
-every-click model without re-registering). Safe to import and call
-start_announcing() more than once in the same process regardless - the
-module-level guard below makes every call after the first a no-op.
+Started once, automatically, from api/main.py at process startup. Safe to
+import and call start_announcing() more than once in the same process
+regardless - the module-level guard below makes every call after the first
+a no-op.
 
 Requires the 'zeroconf' package (see requirements.txt). If it isn't
 installed, this logs a warning and does nothing rather than crashing the
@@ -60,7 +59,7 @@ def start_announcing():
     # database location is only useful when a gateway poller somewhere on the
     # LAN might need it; otherwise it is unnecessary reconnaissance.
     try:
-        from database import get_plant_settings
+        from crud import get_plant_settings
         if not get_plant_settings().get("enable_device_gateway", False):
             logger.info("[service_announcer] device gateway is off - not announcing database")
             return

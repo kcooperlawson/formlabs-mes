@@ -47,6 +47,7 @@ import subprocess
 import sys
 import zipfile
 from datetime import datetime
+from pathlib import Path
 
 import update_signing
 
@@ -61,7 +62,7 @@ MANIFEST_NAME = "mes_update.json"
 # would point the floor PC at whatever database the update was built against.
 NEVER_TOUCH = {".env", ".env.local"}
 NEVER_TOUCH_DIRS = {"backups", "logs", "venv", "uploads", "updates", "rollback",
-                    ".git", "_to_delete", "__pycache__"}
+                    ".git", "_to_delete", "__pycache__", "pgdata", "certs"}
 
 OK, BAD, WARN = "  [ok]", "  [X] ", "  [!] "
 
@@ -81,11 +82,12 @@ def log_line(text, root=ROOT):
 
 # ------------------------------------------------------------- the version --
 def read_version(root=ROOT):
-    """The version this machine is running, straight off Home.py."""
+    """The version this machine is running, from the VERSION file at the
+    project root (used to be read off Home.py's own APP_VERSION line,
+    before the Streamlit UI was retired)."""
     try:
-        with open(os.path.join(root, "Home.py"), encoding="utf-8") as fh:
-            m = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', fh.read())
-            return m.group(1) if m else ""
+        with open(os.path.join(root, "VERSION"), encoding="utf-8") as fh:
+            return fh.read().strip()
     except Exception:
         return ""
 
@@ -287,7 +289,13 @@ def apply(package_path, root=ROOT, assume_yes=False):
             return 1
         say(OK, f"{len(manifest.get('files', []))} files, every checksum matches")
 
-        sig_ok, sig_detail = update_signing.verify(manifest)
+        # Explicit path: update_signing.verify()'s own default points at
+        # THIS repo's public key, which is right for the real applier but
+        # wrong for a test pointed at a fake plant folder - the key that
+        # matters is the one shipped on the machine being updated, i.e.
+        # relative to root, not to wherever apply_update.py's source lives.
+        sig_ok, sig_detail = update_signing.verify(
+            manifest, Path(root) / "setup" / "update_signing_public.pem")
         if not sig_ok:
             say(BAD + f"Signature check failed: {sig_detail}.")
             say("        Nothing has been changed. This package did not come")

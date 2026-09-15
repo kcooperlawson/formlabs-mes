@@ -172,85 +172,16 @@ check(True, "the pre-existing signature still accepts no weight argument")
 print("  existing callers (admin, reconciliation, gateway) are unaffected")
 
 # --------------------------------------------------------------- the page --
-section("7. THE TWO RULES, AGAINST THE REAL PAGE")
-from streamlit.testing.v1 import AppTest  # noqa: E402
-import streamlit as _st  # noqa: E402
-
-_st.page_link = lambda *a, **k: None
-_st.logo = lambda *a, **k: None
-_st.switch_page = lambda *a, **k: None
-
-from crud import submit_daily_checklist, create_user  # noqa: E402
-import uuid  # noqa: E402
-
-OP = "Wei " + uuid.uuid4().hex[:6].upper()
-create_user(OP.split()[1].lower(), f"{OP.split()[1].lower()}@x.com", "5555", OP, "operator")
-submit_daily_checklist(OP, "Shift 1", STATION)
-
-CART_LABEL = {"V1": "V1 (1L Cartridge)", "V2": "V2 (1L Cartridge)",
-              "RPS": "RPS (5L Bulk Jug)"}.get(str(CART), "V1 (1L Cartridge)")
-
-
-def open_form():
-    at = AppTest.from_file(str(ROOT / "pages" / "Operator_Form.py"), default_timeout=90)
-    # AppTest's session_state has no .update(); set keys one at a time.
-    for k, v in {"authenticated": True, "user_name": OP,
-                 "user_role": "operator", "user_shift": "Shift 1",
-                 "user_id": 1, "username": OP.split()[1].lower(),
-                 "h_pump": STATION}.items():
-        at.session_state[k] = v
-    at.run()
-    at.selectbox(key="h_cart").set_value(CART_LABEL).run()
-    at.selectbox(key="h_resin").set_value(RESIN).run()
-    at.text_input(key="h_lot_entered").set_value(f"L-{LOT}").run()
-    return at
-
-
-def submit_of(at):
-    return [b for b in at.button if "SUBMIT POURING LOG" in b.label][0]
-
-
-at = open_form()
-check(at.exception == [], "the page renders with the weight field present")
-weight_widgets = [n for n in at.number_input if n.key == "h_weight"]
-check(len(weight_widgets) == 1, "there is exactly one check-weight field")
-
-# RULE 2 - never pre-filled.
-check(weight_widgets[0].value is None,
-      "the weight box is EMPTY on load - a pre-filled target gets accepted, not measured")
-
-# RULE 1 - never blocks, with nothing typed.
-check(getattr(submit_of(at), "disabled", None) is False,
-      "submit is enabled with NO weight entered - the reading is optional")
-print("  empty on arrival, and an empty reading does not block the log")
-
-# ...and still does not block when the reading is bad news.
-at.number_input(key="h_weight").set_value(99000.0).run()   # unambiguously over any spec
-body = "\n".join(str(e.value) for grp in (at.markdown, at.caption, at.error, at.warning)
-                 for e in grp)
-check(getattr(submit_of(at), "disabled", None) is False,
-      "an OUT-OF-BAND weight still does not block submission")
-check("Over the high limit" in body, "the operator is told it is over, immediately")
-check(at.exception == [], "no exception on an out-of-band reading")
-print("  an out-of-band reading informs the operator and blocks nothing")
-
-# Derive an in-band value from the resin the page is actually showing, rather
-# than assuming it shares the constant used earlier in this file. The whole
-# point of the feature is that each resin has its own window; a test that
-# hardcodes one is testing a different resin than the operator sees.
-_specs = crud.get_all_resin_specs_df("ALL")
-_match = _specs[_specs["resin_name"] == RESIN]
-PAGE_SPEC = fw.spec_from_row(_match.iloc[0]) if not _match.empty else None
-check(PAGE_SPEC is not None, f"the page's resin ({RESIN}) has a spec on file to judge against")
-ON_TARGET = PAGE_SPEC["target"]
-check(fw.judge(ON_TARGET, PAGE_SPEC)["status"] == fw.IN, "its own target is in its own band")
-
-at2 = open_form()
-at2.number_input(key="h_weight").set_value(float(ON_TARGET)).run()
-body2 = "\n".join(str(e.value) for grp in (at2.markdown, at2.caption) for e in grp)
-check("In band" in body2, "an in-band reading is confirmed on screen")
-check(getattr(submit_of(at2), "disabled", None) is False, "and submit stays enabled")
-print(f"  live feedback appears as the number is typed ({RESIN} target {ON_TARGET:g} g)")
+# Section 7, "THE TWO RULES, AGAINST THE REAL PAGE", used to drive
+# pages/Operator_Form.py with streamlit.testing.v1.AppTest to prove the two
+# rules at the top of this file (never blocks, never pre-filled) against the
+# actual rendered weight field rather than just the fill_weight.py functions
+# above. It retired along with Operator_Form.py when the Streamlit UI did:
+# there is no page left to drive. Sections 1-6 above already cover the
+# arithmetic and the write path standalone; the two rules themselves now
+# belong to the FastAPI pouring form once it grows a check-weight field, and
+# should be re-proven there (e.g. via a TestClient/frontend test) rather than
+# here.
 
 section("THE IN-BAND HEADLINE NEVER ROUNDS AWAY THE EXCEPTION")
 # 349 of 350 is 99.71%, which a ".0f" prints as "100%" - directly above a

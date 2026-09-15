@@ -16,11 +16,16 @@
 # you installed it on.
 
 alembic==1.19.1
-altair==6.2.2
+
+# Request/response validation for the api/ package (the FastAPI backend -
+# see api/main.py). annotated-doc and typing-inspection are pydantic's own
+# dependencies, pulled in automatically.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+
 anyio==4.14.2
 attrs==26.1.0
 bcrypt==5.0.0
-blinker==1.9.0
 certifi==2026.7.22
 charset-normalizer==3.5.1
 click==8.5.0
@@ -28,23 +33,26 @@ click==8.5.0
 # Self-signed HTTPS certificate generation (setup/generate_tls_cert.py),
 # added to close Finding 1 from the security posture doc: the app was
 # serving plain HTTP, including the PIN at sign-in and every session
-# cookie. Not pinned to an exact version yet, unlike everything else in
-# this file - there's no venv with it installed to read the version off
-# of. Run `pip show cryptography` after the next install and change this
-# to an exact pin, the same way every line above started.
-cryptography>=42
+# cookie.
+cryptography==50.0.1
 
-extra-streamlit-components==0.1.81
+# The api/ package's web framework - see the note by annotated-doc above.
+fastapi==0.141.1
+
 greenlet==3.5.5
 h11==0.16.0
+
+# starlette.testclient.TestClient (tests/test_api_*.py) is built on httpx,
+# not requests - test-only, but this venv is the one thing that runs both
+# the app and its tests, so it belongs here same as everything else.
+httpcore==1.0.9
+httpx==0.28.1
+
 httptools==0.8.0
 idna==3.19
 itsdangerous==2.2.0
 Jinja2==3.1.6
-jsonschema==4.26.0
-jsonschema-specifications==2025.9.1
 MarkupSafe==3.0.3
-narwhals==2.25.0
 numpy==2.4.6
 
 # Excel export on the Google Sync page. pandas cannot write .xlsx without
@@ -53,29 +61,42 @@ numpy==2.4.6
 openpyxl==3.1.5
 packaging==26.3
 pandas==3.0.5
+
+# A real, private PostgreSQL with no separate install - what
+# run_mes_portable.bat runs the plant PC's database on instead of asking
+# for a system-wide PostgreSQL install (winget, an admin password, a locked-
+# down work network with no access to either). Bundles its own Postgres
+# binaries in the wheel itself, so `pip download` (Move_To_New_PC.bat's own
+# offline-package step) carries them for free - nothing else to fetch on
+# the target PC. fasteners/platformdirs/psutil are its own dependencies,
+# pulled in automatically, same as pydantic's above.
+pgserver==0.1.4
+
+# Only dev/print_prep.py (handbook/print asset prep) still uses this - not
+# part of the running app itself.
 pillow==12.3.0
-plotly==7.0.0
-protobuf==7.36.0
+
 psycopg2-binary==2.9.12
-pyarrow==25.0.1
-pydeck==0.9.3
+
+# See the note by annotated-doc above.
+pydantic==2.13.5
+pydantic_core==2.46.5
+
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.3
 python-multipart==0.0.32
-referencing==0.37.0
 requests==2.34.2
-rpds-py==2026.6.3
 six==1.17.0
 SQLAlchemy==2.0.52
 starlette==1.6.0
-streamlit==1.62.0
-streamlit-lottie==0.0.5
-toml==0.10.2
+
+# See the note by annotated-doc above.
+typing-inspection==0.4.4
+
 typing_extensions==4.16.0
 tzdata==2026.3
 urllib3==2.7.0
 uvicorn==0.52.4
-watchdog==6.0.0
 websockets==16.1.1
 
 # mDNS announcement, so a Device Gateway on another floor PC can find this

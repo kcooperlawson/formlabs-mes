@@ -59,6 +59,9 @@ def check(cond, what):
 def fake_plant(version="PT-V3.40"):
     """A folder shaped like the plant PC, with things that must not be touched."""
     root = pathlib.Path(tempfile.mkdtemp(prefix="mes_plant_"))
+    # apply_update.read_version() reads this file, not a line inside some
+    # other source file - see its own docstring for why.
+    (root / "VERSION").write_text(f"{version}\n", encoding="utf-8")
     (root / "Home.py").write_text(
         f'APP_VERSION = "{version}"\nHELLO = "old"\n', encoding="utf-8")
     (root / "crud.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -130,7 +133,8 @@ def read(root, rel):
 print("\nAn update that works")
 
 plant = fake_plant()
-pkg = make_package({"Home.py": 'APP_VERSION = "PT-V3.41"\nHELLO = "new"\n',
+pkg = make_package({"VERSION": "PT-V3.41\n",
+                    "Home.py": 'APP_VERSION = "PT-V3.41"\nHELLO = "new"\n',
                     "pages/New_Page.py": "# added\n"},
                    delete=["pages/Old_Page.py"], notes="Two things and a fix.")
 code = run(pkg, plant)
@@ -154,7 +158,8 @@ check("applied" in (read(plant, "logs/updates.log") or ""), "the log says what h
 print("\nAn update that breaks the app")
 
 plant = fake_plant()
-pkg = make_package({"Home.py": 'APP_VERSION = "PT-V3.41"\nHELLO = "broken"\n'})
+pkg = make_package({"VERSION": "PT-V3.41\n",
+                    "Home.py": 'APP_VERSION = "PT-V3.41"\nHELLO = "broken"\n'})
 code = run(pkg, plant, verify=(False, "the application did not start: boom"))
 
 check(code == 1, "it reports failure")
@@ -283,11 +288,11 @@ _mk = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mk)
 
 check(_mk.app_version() == apply_update.read_version(ROOT),
-      "both read the version out of Home.py the same way")
-check(_mk.shippable("crud.py") and _mk.shippable("pages/Home.py"),
+      "both read the version out of the same VERSION file")
+check(_mk.shippable("crud.py") and _mk.shippable("api/main.py"),
       "application files ship")
 for rel in (".env", "backups/x.sql", "venv/lib/thing.py", "logs/app.log",
-            "tests/test_ui.py", "docs/handbook.html", "updates/old.zip"):
+            "tests/test_api_boot.py", "docs/handbook.html", "updates/old.zip"):
     check(not _mk.shippable(rel), f"{rel} does not ship")
 
 check(apply_update.version_tuple("PT-V3.41") > apply_update.version_tuple("PT-V3.40"),

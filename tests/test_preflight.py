@@ -141,8 +141,10 @@ print("  port and firewall OK")
 
 # --- what to give the phones ------------------------------------------------
 addr = pf.judge_addresses("PLANT-LAPTOP", ["192.168.1.42"])
-check("the machine name is offered", "http://PLANT-LAPTOP:8501" in addr["detail"], True)
-check("the address is too", "http://192.168.1.42:8501" in addr["detail"], True)
+check("the machine name is offered",
+      f"http://PLANT-LAPTOP:{pf.APP_PORT}" in addr["detail"], True)
+check("the address is too",
+      f"http://192.168.1.42:{pf.APP_PORT}" in addr["detail"], True)
 check("and the name is the one marked for bookmarking",
       addr["detail"].index("PLANT-LAPTOP") < addr["detail"].index("192.168.1.42"), True)
 check("with the reason spelled out, because it is the whole point",

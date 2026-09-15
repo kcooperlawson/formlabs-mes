@@ -19,11 +19,17 @@ if not exist .env (
     exit /b 1
 )
 
-call venv\Scripts\activate.bat
+rem venv\Scripts\python.exe directly, not "call activate.bat" then a bare
+rem "python" - activate.bat bakes in the ABSOLUTE path the venv was first
+rem created at (its own VIRTUAL_ENV= line), so a venv created before this
+rem project last moved folders silently prepends a PATH entry that no
+rem longer exists, and "python" then resolves to the SYSTEM Python instead -
+rem which fails on "No module named 'dotenv'" the moment it imports utils.py.
+set "VPY=venv\Scripts\python.exe"
 
 echo [1/4] Backing up the database (pg_dump)...
 set BACKUP_LINE=
-for /f "delims=" %%i in ('python _migration_helper.py backup') do set BACKUP_LINE=%%i
+for /f "delims=" %%i in ('"%VPY%" _migration_helper.py backup') do set BACKUP_LINE=%%i
 echo     %BACKUP_LINE%
 echo %BACKUP_LINE% | findstr /b "BACKUP_OK:" >nul
 if errorlevel 1 (
@@ -56,7 +62,7 @@ if errorlevel 2 (
 )
 echo     Downloading packages for offline install...
 if exist wheels rmdir /s /q wheels
-pip download -r requirements.txt -d wheels
+"%VPY%" -m pip download -r requirements.txt -d wheels
 if errorlevel 1 (
     echo.
     echo     [WARNING] Couldn't download some packages - shipping without
@@ -65,7 +71,7 @@ if errorlevel 1 (
     if exist wheels rmdir /s /q wheels
 ) else (
     if exist requirements-device-gateway.txt (
-        pip download -r requirements-device-gateway.txt -d wheels >nul 2>&1
+        "%VPY%" -m pip download -r requirements-device-gateway.txt -d wheels >nul 2>&1
     )
     echo     Done.
 )
@@ -84,7 +90,7 @@ rem PC, not served by the app. Transfer archives in backups\ (*.tgz) are not
 rem database backups and do not ship; the .sql dumps do.
 robocopy "%~dp0." "%STAGE%" /E ^
     /XD venv .git __pycache__ .idea logs _MOVE_PACKAGE tests dev docs ^
-        "Claude outputs" _to_delete ^
+        "Claude outputs" _to_delete pgdata ^
     /XF combined_code.txt mes_production.db *.pyc *.tgz *.bak *.log ^
         formlabs_mes_move_*.zip ^
     /NFL /NDL /NJH >nul

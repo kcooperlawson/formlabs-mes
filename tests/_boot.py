@@ -19,6 +19,13 @@ warnings.filterwarnings("ignore")
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 os.chdir(ROOT)                      # pages/ and assets/ are resolved relative to here
 sys.path.insert(0, str(ROOT))
+# The Streamlit UI itself (Home.py, pages/, ui_shell.py, database.py, ...)
+# moved into streamlit_app/ so it sits apart from api/ and frontend/ - a test
+# that reaches for one of those bare (import ui_shell, from database import
+# ...) needs this on sys.path the same way a running `streamlit run
+# streamlit_app/Home.py` process already gets it for free from that script's
+# own directory.
+sys.path.insert(0, str(ROOT / "streamlit_app"))
 
 TEST_DB_NAME = "formlabs_test"
 

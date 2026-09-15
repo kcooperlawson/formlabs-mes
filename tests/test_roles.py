@@ -93,16 +93,22 @@ check("case and whitespace are not part of the rule",
 check("an unknown role does not", can_view_scada("supervisor"), False)
 check("and neither does a missing one", can_view_scada(None), False)
 
-# The management screens refuse an operator at the door, not only in the menu.
-# Analytics was the exception: it left the menu and the address went on
-# working, so anybody signed in could read the whole plant's figures.
+# The management screens refuse an operator at the door, not only in the
+# menu. Analytics was the exception on the old Streamlit pages: it left the
+# menu and the address went on working, so anybody signed in could read the
+# whole plant's figures. Each router now carries its own door (a FastAPI
+# dependency, not a page-top st.stop()) - checked at the source that
+# actually serves the data, which is a stronger guarantee than the old
+# single-page check: a manager-cockpit sub-feature that forgot the sidebar
+# link would still be caught here, where it never would have been by a menu
+# check alone.
 import pathlib as _pl  # noqa: E402
 _root = _pl.Path(__file__).resolve().parent.parent
-for _page, _ability in (("Manager_Cockpit.py", "view_manager_cockpit"),
-                        ("Analytics_Hub.py", "view_analytics")):
-    _src = (_root / "pages" / _page).read_text(encoding="utf-8")
-    check(f"{_page} turns away anyone without {_ability}, at its own door",
-          f'if not can("{_ability}")' in _src and "st.stop()" in _src, True)
+for _router, _ability in (("batch_history.py", "view_manager_cockpit"),
+                          ("analytics.py", "view_analytics")):
+    _src = (_root / "api" / "routers" / _router).read_text(encoding="utf-8")
+    check(f"{_router} turns away anyone without {_ability}, at its own door",
+          f'require_ability("{_ability}")' in _src, True)
 
 print("\n" + "=" * 62)
 if FAILS:

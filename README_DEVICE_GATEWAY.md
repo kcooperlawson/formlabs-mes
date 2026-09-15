@@ -81,8 +81,8 @@ requirements-device-gateway.txt   # pymodbus, pyserial, opcua, paho-mqtt
 
 Two processes, same as most SCADA/MES setups split this way:
 
-- `streamlit run Home.py` — unchanged, this is the UI including the new Device Registry page. It now also announces the database on the local network (see auto-discovery below) so a gateway running elsewhere can find it.
-- `python run_gateway.py` — new, the background poller. Run it on whatever machine actually has network/USB/COM-port access to the equipment being registered (a floor PC, not necessarily wherever Postgres lives) — see the docstring at the top of `run_gateway.py` for wrapping it as a Windows service or systemd unit so it survives reboots.
+- `run_mes_api.bat` (or `START_HERE.bat`) — the main app, including the Device Registry page in the React frontend. It also announces the database on the local network (see auto-discovery below) so a gateway running elsewhere can find it.
+- `python run_gateway.py` — the background poller. Run it on whatever machine actually has network/USB/COM-port access to the equipment being registered (a floor PC, not necessarily wherever Postgres lives) — see the docstring at the top of `run_gateway.py` for wrapping it as a Windows service or systemd unit so it survives reboots.
 
 ## Auto-discovery — running the gateway on a different PC than Postgres
 
@@ -92,7 +92,7 @@ If it runs on a different floor PC, which is the whole point of the gateway bein
 
 Zip the whole project folder as-is (`.env` included) and unzip it on the other PC. Run it. No file needs editing, even if the app later moves to yet another PC.
 
-`run_gateway.py` always searches the local network first for the main app announcing itself (`service_announcer.py`, running automatically inside `Home.py`), and connects to whatever it finds. It pulls login credentials out of whatever's already in that copied-over `.env` — the username/password embedded in `DB_URL` if that's a real connection string, or `PG_PASS` (the same key the backup/restore tooling already uses) otherwise — so the same `.env` works unmodified whether it's sitting on the PC hosting Postgres or a gateway three rooms away. If nothing answers on the network, it falls back to that PC's own `DB_URL` directly (covers running gateway + Postgres on the same box) before giving up with a clear message about what to check.
+`run_gateway.py` always searches the local network first for the main app announcing itself (`service_announcer.py`, started automatically by `api/main.py`), and connects to whatever it finds. It pulls login credentials out of whatever's already in that copied-over `.env` — the username/password embedded in `DB_URL` if that's a real connection string, or `PG_PASS` (the same key the backup/restore tooling already uses) otherwise — so the same `.env` works unmodified whether it's sitting on the PC hosting Postgres or a gateway three rooms away. If nothing answers on the network, it falls back to that PC's own `DB_URL` directly (covers running gateway + Postgres on the same box) before giving up with a clear message about what to check.
 
 The one thing that has to be done manually, one time, on whichever PC hosts the database:
 

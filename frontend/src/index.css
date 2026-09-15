@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* The default palette (Formlabs Forge) only, statically here so the very
+   first paint - before ThemeRoot.tsx's effect has run - has real values to
+   read instead of a flash of unstyled white. Every OTHER palette, and this
+   same default again under its own [data-theme="formlabs-forge"] for when
+   it's chosen explicitly rather than left as the fallback, are injected at
+   runtime from frontend/src/palettes.ts's single source of truth - see
+   themeCss.ts. Keep this block's values equal to that file's first entry;
+   nothing enforces it, since a plain stylesheet can't import from it. */
+:root {
+  --fl-ground: #0F172A;
+  --fl-surface: #1E293B;
+  --fl-raised: #0F172A;
+  --fl-border: #334155;
+  --fl-ink: #F8FAFC;
+  --fl-body: #CBD5E1;
+  --fl-muted: #94A3B8;
+  --fl-accent: #CD4D0B;
+  --fl-accent-2: #F97316;
+  --fl-accent-wash: rgba(205, 77, 11, 0.15);
+  --fl-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --fl-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --fl-shadow-hover: 0 4px 12px rgba(205, 77, 11, 0.35);
+  --fl-selection: rgba(205, 77, 11, 0.35);
+  --fl-overlay-weak: rgba(255, 255, 255, 0.05);
+  --fl-overlay: rgba(255, 255, 255, 0.1);
+  --fl-overlay-strong: rgba(255, 255, 255, 0.15);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--fl-ground);
+  color: var(--fl-ink);
+}
+
+/* Native form controls (date/number inputs, selects) don't inherit the
+   theme's own colour-scheme from their background, so the browser paints
+   its own light-mode chrome (calendar icon, spinner arrows) on top of a
+   dark field, or vice versa for a light theme. */
+input, select, textarea {
+  color-scheme: inherit;
+}
+
+::selection {
+  background: var(--fl-selection);
+}
+
+/* Armed only for the brief moment a theme switch happens (see
+   ThemeRoot.tsx) - transitioning these globally all the time would make
+   every hover state feel sluggish, which is worse than the plain snap a
+   switch used to be. */
+.fl-theme-transition,
+.fl-theme-transition * {
+  transition: background-color 450ms ease, border-color 450ms ease, color 450ms ease, box-shadow 450ms ease !important;
+}
+
+/* ===================================================================
+   Shared motion keyframes - one definition each, used across the sidebar
+   nav highlight, the Cockpit's card stagger, toasts, the checklist unlock
+   sweep, and the per-theme background flourishes (ThemeFlourish.tsx).
+   =================================================================== */
+@keyframes fl-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fl-toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fl-toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+@keyframes fl-scanline-flicker {
+  0%, 100% { opacity: 0.9; }
+  92% { opacity: 0.9; }
+  93% { opacity: 0.55; }
+  94% { opacity: 0.9; }
+  97% { opacity: 0.75; }
+}
+
+@keyframes fl-grid-scroll {
+  from { background-position-y: 0; }
+  to { background-position-y: 60px; }
+}
+
+@keyframes fl-rain-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A plant floor is exactly the environment where somebody genuinely needs
+   this, not just a courtesy for desktop users - flashing wall displays and
+   sliding UI chrome are a real problem for vestibular sensitivity, and
+   nothing above is load-bearing for actually using the app. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* Named separately and after its own rule above: a class selector beats
+     the universal one on specificity, so .fl-theme-transition's own
+     !important transition-duration would otherwise win even here. */
+  .fl-theme-transition,
+  .fl-theme-transition * {
+    transition-duration: 0.01ms !important;
+  }
+}

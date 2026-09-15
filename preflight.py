@@ -3,7 +3,7 @@
 Written for the two moments where a mistake costs a morning: carrying a
 laptop onto the floor, and standing up the permanent machine afterwards. The
 alternative to this script is finding out that Postgres is not running, or
-that the phones cannot reach port 8501, at the moment an operator is standing
+that the phones cannot reach port 8000, at the moment an operator is standing
 at a pump holding a cartridge.
 
 Every check answers one question and, when the answer is bad, says what to
@@ -26,22 +26,14 @@ a warning is something to know about, not something that stops the plant.
 from __future__ import annotations
 
 import os
-
-# Before anything imports Streamlit. The app's own modules pull it in, and it
-# then logs "missing ScriptRunContext" for every call made outside a page -
-# which is every call made here, and which buries the report under noise.
-# Streamlit reads its log level from the environment at import time, so this
-# has to be set before that happens rather than afterwards.
-os.environ.setdefault("STREAMLIT_LOGGER_LEVEL", "error")
-
-import socket  # noqa: E402
-import subprocess  # noqa: E402
-import sys  # noqa: E402
+import socket
+import subprocess
+import sys
 
 OK, WARN, FAIL, INFO = "ok", "warn", "fail", "info"
 
 MIN_PYTHON = (3, 11)
-APP_PORT = 8501
+APP_PORT = 8000
 FIREWALL_RULE_NAME = "Formlabs MES"
 
 
@@ -140,11 +132,13 @@ def judge_backup(filename, size_bytes, error: str = "") -> dict:
 
 def judge_port(free: bool, ours: bool) -> dict:
     if ours:
-        return check("Port 8501", OK, "The app is already running on this PC.")
+        return check(f"Port {APP_PORT}", OK, "The app is already running on this PC.")
     if not free:
-        return check("Port 8501", FAIL, "Something else on this PC is using port 8501.",
-                     "Close whatever it is, or find it with: netstat -ano | findstr :8501")
-    return check("Port 8501", OK, "Free for the app to use.")
+        return check(f"Port {APP_PORT}", FAIL,
+                     f"Something else on this PC is using port {APP_PORT}.",
+                     f"Close whatever it is, or find it with: "
+                     f"netstat -ano | findstr :{APP_PORT}")
+    return check(f"Port {APP_PORT}", OK, "Free for the app to use.")
 
 
 def judge_firewall(is_windows: bool, rule_found, listening_ok=None) -> dict:
@@ -161,7 +155,7 @@ def judge_firewall(is_windows: bool, rule_found, listening_ok=None) -> dict:
         return check("Firewall", INFO, "Not Windows - nothing checked.")
     if rule_found is None:
         return check("Firewall", WARN,
-                     "Could not tell whether inbound port 8501 is allowed.",
+                     f"Could not tell whether inbound port {APP_PORT} is allowed.",
                      f'If the phones cannot reach this PC, run this in an '
                      f'Administrator command prompt:\n'
                      f'       netsh advfirewall firewall add rule '
@@ -169,13 +163,13 @@ def judge_firewall(is_windows: bool, rule_found, listening_ok=None) -> dict:
                      f'protocol=TCP localport={APP_PORT}')
     if not rule_found:
         return check("Firewall", WARN,
-                     "No rule allowing inbound port 8501. The phones may time out "
-                     "with nothing to explain why.",
+                     f"No rule allowing inbound port {APP_PORT}. The phones may "
+                     "time out with nothing to explain why.",
                      f'In an Administrator command prompt:\n'
                      f'       netsh advfirewall firewall add rule '
                      f'name="{FIREWALL_RULE_NAME}" dir=in action=allow '
                      f'protocol=TCP localport={APP_PORT}')
-    return check("Firewall", OK, "Inbound port 8501 is allowed.")
+    return check("Firewall", OK, f"Inbound port {APP_PORT} is allowed.")
 
 
 def judge_addresses(hostname, ips) -> dict:
@@ -301,18 +295,10 @@ def judge_optional(missing: dict):
 
 
 def _missing_dependencies():
-    """Which of the app's packages will not import.
-
-    stderr is muted for the duration. Streamlit narrates "missing
-    ScriptRunContext" while these load, from a handler it installs partway
-    through, which is why filtering it afterwards catches only some of it -
-    and a page of that above the report is the difference between somebody
-    reading this and somebody skimming it. Nothing is lost by muting: a
-    package that will not import raises, and the exception is caught below.
-    """
+    """Which of the app's packages will not import."""
     import contextlib
-    needed = ["streamlit", "sqlalchemy", "psycopg2", "pandas", "bcrypt", "alembic",
-              "dotenv", "extra_streamlit_components", "PIL", "plotly"]
+    needed = ["fastapi", "uvicorn", "sqlalchemy", "psycopg2", "pandas", "bcrypt",
+              "alembic", "dotenv"]
     missing = []
     with open(os.devnull, "w") as devnull, contextlib.redirect_stderr(devnull):
         for mod in needed:
@@ -393,13 +379,28 @@ def _port_facts(port=APP_PORT):
     s.close()
     if not in_use:
         return True, False
-    try:
-        import urllib.request
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/_stcore/health",
-                                    timeout=2) as r:
-            return False, r.status == 200
-    except Exception:
-        return False, False
+
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    # No dedicated health endpoint - any HTTP response at all (even a 401 from
+    # an auth-gated route) means it's a web server on this port, and nothing
+    # else on a plant PC has a reason to be listening on 8000. Try HTTPS too:
+    # run_mes_api.bat serves TLS whenever certs\ has a certificate, and a
+    # plain-HTTP request to a TLS port gets no response at all, not an error
+    # status - which would otherwise misreport a healthy app as "something
+    # else is using this port".
+    for scheme, ctx in (("http", None), ("https", ssl._create_unverified_context())):
+        try:
+            kwargs = {"timeout": 2, "context": ctx} if ctx else {"timeout": 2}
+            with urllib.request.urlopen(f"{scheme}://127.0.0.1:{port}/", **kwargs) as r:
+                return False, r.status < 500
+        except urllib.error.HTTPError as e:
+            return False, e.code < 500
+        except Exception:
+            continue
+    return False, False
 
 
 def _firewall_facts():
@@ -471,48 +472,10 @@ def _clock_facts():
         return None, None
 
 
-def _quieten_streamlit():
-    """Stop Streamlit narrating that it is not inside a page.
-
-    Importing the app's modules pulls Streamlit in, and it then logs "missing
-    ScriptRunContext" for every call made outside a page - which is every call
-    made here. It configures its own logging on import, so the level has to be
-    set afterwards; setting it beforehand, or through the environment, is
-    overwritten.
-    """
-    import logging
-
-    class _NoBareModeChatter(logging.Filter):
-        def filter(self, record):
-            return "ScriptRunContext" not in record.getMessage()
-
-    # The filter goes on the handler rather than on the loggers, because the
-    # loggers that emit this are created lazily - one per module, as each is
-    # first used - so setting levels only silences the ones that happen to
-    # exist at this moment. Everything propagates up to Streamlit's own
-    # handler, so that is the one place that catches all of them.
-    root = logging.getLogger("streamlit")
-    root.setLevel(logging.ERROR)
-    for handler in root.handlers or logging.getLogger().handlers:
-        handler.addFilter(_NoBareModeChatter())
-
-
 def run_all(quick: bool = False):
     checks = [judge_python(sys.version_info, _in_venv())]
 
-    # Streamlit has to be in before it can be quietened, and it has to be
-    # quietened before anything that touches it - extra_streamlit_components
-    # registers components at import time and each one narrates itself.
-    try:
-        import streamlit  # noqa: F401
-        _quieten_streamlit()
-    except Exception:
-        pass
-
     missing = _missing_dependencies()
-    # Again: Streamlit installs its handler lazily, so the sweep above catches
-    # what existed then and this catches what importing the rest created.
-    _quieten_streamlit()
     checks.append(judge_dependencies(missing))
     if missing:
         # Nothing below can run without them, and a wall of import errors

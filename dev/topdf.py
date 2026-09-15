@@ -37,7 +37,7 @@ OUT = DOCS / DOCUMENTS[name][1]
 
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+        b = await p.chromium.launch()
         pg = await b.new_page()
         await pg.goto(SRC.as_uri(), wait_until="networkidle")
         await pg.wait_for_timeout(2500)
@@ -51,13 +51,15 @@ async def main():
 asyncio.run(main())
 print("written", OUT)
 
-# A copy where the running app can serve it. Streamlit serves static/ and
-# nothing else, and the help links inside the app point at these - so a
-# rebuild that only wrote docs/ would leave the app handing people last
-# month's document with no sign that it had.
-_served = DOCS.parent / "static" / OUT.name
+# A copy where the running app can serve it. Vite copies frontend/public/*
+# into frontend/dist verbatim on every build - api/main.py serves dist/ - and
+# the help links inside the app point at these filenames directly at the
+# served root, so a rebuild that only wrote docs/ would leave the app handing
+# people last month's document with no sign that it had. (Used to be
+# static/, back when Streamlit was the one serving files.)
+_served = DOCS.parent / "frontend" / "public" / OUT.name
 try:
     _served.write_bytes(OUT.read_bytes())
-    print("served copy", _served)
+    print("served copy", _served, "- run `npm run build` in frontend/ to publish it")
 except OSError as exc:
     print("could not write the served copy:", exc)

@@ -1,15 +1,15 @@
 """
 test_gateway_announce.py - Standalone, foreground mDNS announcer for
-testing network discovery in isolation from the full Streamlit app.
+testing network discovery in isolation from the full app.
 
 Run this on the DESKTOP (the PC hosting the database) while testing
 whether another PC on the network can find it. Leave it running in its
 own terminal window, then run test_gateway_discover.py on the other PC.
 
-This does exactly what service_announcer.py does inside Home.py, just as
-a standalone script that's easy to point people at for debugging - if
+This does exactly what service_announcer.py does inside api/main.py, just
+as a standalone script that's easy to point people at for debugging - if
 THIS doesn't get found by test_gateway_discover.py on another PC, the
-problem is network/firewall, not anything in the Streamlit app.
+problem is network/firewall, not anything in the app itself.
 """
 import os
 import sys

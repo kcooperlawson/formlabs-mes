@@ -52,8 +52,6 @@ IMPORT_TO_PACKAGE = {
     "PIL": "pillow",
     "yaml": "pyyaml",
     "sqlalchemy": "sqlalchemy",
-    "streamlit_lottie": "streamlit-lottie",
-    "extra_streamlit_components": "extra-streamlit-components",
     "multipart": "python-multipart",
 }
 
@@ -64,8 +62,9 @@ GATEWAY_ONLY = {"pymodbus", "serial", "opcua", "paho", "asyncua"}
 
 # Ours, or the standard library's.
 LOCAL = ({p.stem for p in ROOT.glob("*.py")}
-         | {p.stem for p in (ROOT / "pages").glob("*.py")}
-         | {"device_gateway", "migrations", "tests", "dev", "setup", "assets"}
+         | {p.stem for p in (ROOT / "api").rglob("*.py")}
+         | {p.stem for p in (ROOT / "setup").glob("*.py")}
+         | {"api", "device_gateway", "migrations", "tests", "dev", "setup", "assets"}
          | set(sys.stdlib_module_names))
 
 
@@ -86,8 +85,7 @@ def parse_requirements(path):
 def app_imports():
     """Every third-party module name the application imports."""
     found = set()
-    files = ([ROOT / "Home.py"] + sorted(ROOT.glob("*.py"))
-             + sorted((ROOT / "pages").glob("*.py")))
+    files = sorted(ROOT.glob("*.py")) + sorted((ROOT / "api").rglob("*.py"))
     for path in files:
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))

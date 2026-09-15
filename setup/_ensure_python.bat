@@ -72,7 +72,7 @@ echo          1. Go to  https://www.python.org/downloads/
 echo          2. Download Python 3.12 and run the installer.
 echo          3. TICK THE BOX "Add python.exe to PATH" on the first
 echo             screen - this is the step people miss, and skipping
-echo             it is why the app "can't find streamlit" later.
+echo             it is why the app can't find its packages later.
 echo          4. Run START_HERE.bat again.
 echo  ---------------------------------------------------------------
 exit /b 1

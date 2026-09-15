@@ -124,50 +124,14 @@ check("and told it is already recorded", "logged" in msg.lower(), True)
 check("they are not shown a traceback", "Traceback" in msg, False)
 print("  the message OK")
 
-# --- installing --------------------------------------------------------------
-# The one that matters: if Streamlit's internals have moved, this returns
-# False. It must not raise, because taking the whole app down over a crash
-# reporter that could not attach is worse than having no crash reporter.
-er._INSTALLED = False
-seen = []
-ok = er.install(recorder=lambda payload: seen.append(payload) or "AAAA",
-                page_name="Analytics_Hub")
-check("it attaches to this Streamlit", ok, True)
-check("attaching twice is a no-op rather than a second patch",
-      er.install(recorder=lambda p: "BBBB"), True)
-
-from streamlit import error_util  # noqa: E402
-try:
-    raise KeyError("shift_count")
-except KeyError as exc:
-    try:
-        error_util.handle_uncaught_app_exception(exc)
-    except Exception:
-        pass
-check("a real exception reaches the recorder", len(seen), 1)
-check("carrying the page it happened on", seen[0]["page"], "Analytics_Hub")
-check("and the type", seen[0]["error_type"], "KeyError")
-
-# A recorder that itself fails must not turn one broken screen into two.
-er._INSTALLED = False
-
-
-def exploding_recorder(payload):
-    raise RuntimeError("the database is the thing that is down")
-
-
-er.install(recorder=exploding_recorder, page_name="X")
-try:
-    raise ValueError("original fault")
-except ValueError as exc:
-    try:
-        error_util.handle_uncaught_app_exception(exc)
-        survived = True
-    except RuntimeError:
-        survived = False
-check("a reporter that fails does not replace the real error with its own",
-      survived, True)
-print("  installing OK")
+# install() - the hook into Streamlit's own uncaught-exception handler -
+# used to be checked here against real streamlit.error_util internals. It
+# retired along with Home.py/ui_shell.py/pages/ when the Streamlit UI did:
+# nothing calls it any more, and the FastAPI app has no equivalent hook to
+# test (a crash there is a 500 response, not a full-page exception screen).
+# describe()/redact()/reference_code()/user_message() above are what
+# crud.record_error_report() actually still calls, and are what this file
+# now exists to check.
 
 print("\n" + "=" * 66)
 if FAILS:

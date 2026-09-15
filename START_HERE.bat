@@ -29,6 +29,7 @@ echo.
 echo   RUN - every day
 echo     3  Start the MES / Logger
 echo     4  Start the Device Gateway
+echo     9  Start the MES with a bundled database ^(no PostgreSQL install needed^)
 echo.
 echo     5  Diagnose this PC ^(what is missing, what is wrong^)
 echo     6  Package this project for another PC
@@ -56,6 +57,7 @@ if /i "%PICK%"=="5" goto :diagnose
 if /i "%PICK%"=="6" goto :package
 if /i "%PICK%"=="7" goto :update
 if /i "%PICK%"=="8" goto :tls_cert
+if /i "%PICK%"=="9" goto :run_mes_portable
 if /i "%PICK%"=="Q" goto :eof
 goto :menu
 
@@ -72,17 +74,15 @@ pause
 goto :menu
 
 :run_mes
-if not exist "venv\Scripts\python.exe" goto :not_setup
-echo.
-echo  Starting the MES. Close this window to stop it.
-echo  Operators open the address printed below on their phones.
-echo.
-set "SSL_ARGS="
-if exist "certs\mes.crt" if exist "certs\mes.key" set "SSL_ARGS=--server.sslCertFile=certs\mes.crt --server.sslKeyFile=certs\mes.key"
-if not defined SSL_ARGS echo  [!] No HTTPS certificate yet - running on plain HTTP. Option 8 sets one up.
-venv\Scripts\python.exe -m streamlit run Home.py --server.address=0.0.0.0 %SSL_ARGS%
-echo.
-pause
+rem run_mes_api.bat does its own venv/frontend-build/certificate checks and
+rem launches uvicorn against this PC's own PostgreSQL (.env's DB_URL) - the
+rem same app option 1 (setup\install_mes.bat) sets up. Option 9 is the other
+rem way to run this: a bundled database, no PostgreSQL install required.
+call "run_mes_api.bat"
+goto :menu
+
+:run_mes_portable
+call "run_mes_portable.bat"
 goto :menu
 
 :run_gw

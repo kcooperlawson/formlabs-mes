@@ -60,16 +60,23 @@ def main():
 
     targets = sys.argv[1:]
     if not targets:
-        targets = sorted(str(p.relative_to(ROOT))
+        # .as_posix(), not str(): relative_to() returns OS-native separators,
+        # and on Windows that's backslashes - the tail filter below compares
+        # against forward-slash literals, so str() here silently never
+        # matched and the reordering it names was never actually happening
+        # on Windows (harmless while it only ever reordered test_ui.py/
+        # test_pages.py to nowhere in particular; not harmless once
+        # test_fill_weight.py's own ordering requirement depends on it).
+        targets = sorted(p.relative_to(ROOT).as_posix()
                          for p in (ROOT / "tests").glob("test_*.py"))
-        # test_ui and test_pages deliberately reuse the shift test_workflow
+        # test_fill_weight deliberately reuses the shift test_workflow
         # simulates, and with TEST_DB_URL set every script shares one scratch
-        # database, so alphabetical order wipes that fixture before they read
-        # it. Both then fail on an empty table with an index error that says
-        # nothing about ordering. Run them last, and workflow immediately
-        # before them.
-        tail = [t for t in ("tests/test_workflow.py", "tests/test_ui.py",
-                            "tests/test_pages.py") if t in targets]
+        # database, so alphabetical order ("test_fill_weight" before
+        # "test_workflow") would run it before that fixture exists. It then
+        # fails on an empty table with an index error that says nothing
+        # about ordering. Run it last, and workflow immediately before it.
+        tail = [t for t in ("tests/test_workflow.py", "tests/test_fill_weight.py")
+                if t in targets]
         targets = [t for t in targets if t not in tail] + tail
 
     failed = []

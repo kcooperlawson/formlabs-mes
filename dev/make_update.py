@@ -2,7 +2,7 @@
 
     python dev/make_update.py --init-keys                 once, ever
     python dev/make_update.py --from PT-V3.40
-    python dev/make_update.py --from PT-V3.40 --files crud.py pages/Home.py
+    python dev/make_update.py --from PT-V3.40 --files crud.py api/main.py
     python dev/make_update.py --from PT-V3.40 --since <git rev> --notes "..."
 
 It writes  dist/mes_update_<to version>.zip  and prints what went in it.
@@ -34,7 +34,6 @@ import hashlib
 import json
 import os
 import pathlib
-import re
 import subprocess
 import sys
 import zipfile
@@ -49,15 +48,18 @@ import update_signing  # noqa: E402
 # Not the machine's, not needed on the floor, or simply large.
 SKIP_DIRS = {"venv", "backups", "logs", "uploads", "updates", "rollback",
              ".git", "__pycache__", "_to_delete", "dist", "tests", "dev",
-             "docs", "wheels", "assets_src"}
+             "docs", "wheels", "assets_src", "pgdata", "certs"}
 SKIP_NAMES = {".env", ".env.local", "combined_code.txt"}
 SKIP_SUFFIX = {".pyc", ".zip", ".tgz", ".log", ".bak", ".sql"}
 
 
 def app_version() -> str:
-    text = (ROOT / "Home.py").read_text(encoding="utf-8")
-    m = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', text)
-    return m.group(1) if m else ""
+    # Used to be read out of Home.py's own APP_VERSION line - moved to a
+    # plain VERSION file at the root once Home.py (and the rest of the
+    # Streamlit UI) was retired, so this stays meaningful for whichever app
+    # is actually shipping (crud.py, api/, frontend/) rather than a file
+    # that no longer exists.
+    return (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
 def shippable(rel: str) -> bool:

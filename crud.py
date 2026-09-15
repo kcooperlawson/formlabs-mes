@@ -7,7 +7,7 @@ import re
 import uuid
 import calendar
 import subprocess
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import secrets
 import pandas as pd
 import bcrypt
@@ -447,7 +447,21 @@ def get_assigned_runs_df(auto_sync: bool = True) -> pd.DataFrame:
         df = pd.read_sql(query.statement, session.bind)
 
         if not df.empty and auto_sync:
+            # A "Done" run is archived history, not a live counter - skip it.
+            # Recomputing it here unconditionally is what silently erased
+            # complete_run_with_custom_total()'s whole reason to exist: a
+            # manager types a corrected final count, "Set Final Count & Close
+            # Work Order" saves it, and the very next fetch (the st.rerun()
+            # immediately after, or just anyone loading the page) recomputed
+            # it straight back to whatever calculate_logged_units_for_resin
+            # sums from raw logs, discarding the correction with no trace it
+            # ever happened. Every other reader of this dataframe (pouring's
+            # reactor-lookup, the TV board's work-order tile) already filters
+            # to Active/Pouring only, so a finished run never needed to stay
+            # live-synced in the first place.
             for idx, row in df.iterrows():
+                if row["status"] == "Done":
+                    continue
                 actual_units = calculate_logged_units_for_resin(
                     str(row.get("resin_type", "")), str(row.get("cartridge_type", "")),
                     str(row.get("pump_station", "")), str(row.get("lot_number", ""))
@@ -1953,6 +1967,20 @@ def add_downtime_log(operator_name: str, pump_station: str, shift: str, reason: 
 # never disagree about what gets kept.
 MAX_AUDIT_PHOTOS = 4
 
+# The old-pump checklist override's audit_type (see has_completed_daily_
+# checklist's docstring and the 3.47 changelog). This used to be typed
+# inline as "Startup Checklist — marked already done (pump not yet
+# labeled)" - 62 characters against a column that is String(50), so the
+# insert always failed. add_cleanliness_audit() catches that and returns
+# False, and the one caller this existed for (the checklist gate's "mark
+# already done" button) never checked the return value before unlocking
+# the terminal anyway - so the operator saw "Terminal unlocked", the
+# terminal actually unlocked, and the audit trail this feature exists to
+# leave on Mgr_Cleanliness was silently never written. One short constant,
+# used by both the Streamlit page and the API, so there is only one string
+# to get right.
+ALREADY_DONE_CHECKLIST_AUDIT_TYPE = "Startup Checklist (Marked Already Done)"
+
 
 def _audit_photo_name(uploaded_file) -> str:
     """Filename for one uploaded audit photo.
@@ -3395,6 +3423,16 @@ def backfill_batches(by="System") -> int:
                     ProductionLog.resin_type == resin).order_by(
                     ProductionLog.timestamp.asc()).first()
                 started = first_log.timestamp if first_log else None
+            # ProductionLog.timestamp is stored naive UTC (datetime.utcnow);
+            # ReactorBatch.filled_at is naive LOCAL everywhere else it is set
+            # (open_batch's datetime.now()) and is what get_batches/_hours
+            # compares against datetime.now() to get hours_in_reactor. Storing
+            # the UTC value here unconverted made a freshly-backfilled vessel
+            # look like it was filled hours in the future - a negative dwell
+            # time on the very first read.
+            if started is not None:
+                from shift_clock import PLANT_TZ
+                started = started.replace(tzinfo=timezone.utc).astimezone(PLANT_TZ).replace(tzinfo=None)
             session.add(ReactorBatch(
                 reactor_name=name, resin_type=resin, pump_station=pump or None,
                 filled_at=started, opened_by=by,

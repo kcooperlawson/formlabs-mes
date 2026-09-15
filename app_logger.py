@@ -14,9 +14,9 @@ Usage: `from app_logger import logger` and call `logger.exception("...")`
 inside an except block (it logs the current traceback automatically), or
 `logger.error("...")` / `logger.warning("...")` elsewhere.
 
-Writes to both the console (visible wherever `streamlit run` is running)
-and a rotating file under logs/, so history survives past terminal
-scrollback. Logs live in the same directory as backups/uploads.
+Writes to both the console (visible wherever uvicorn is running) and a
+rotating file under logs/, so history survives past terminal scrollback.
+Logs live in the same directory as backups/uploads.
 """
 import logging
 import os
@@ -29,11 +29,11 @@ os.makedirs(LOG_DIR, exist_ok=True)
 logger = logging.getLogger("formlabs_mes")
 logger.setLevel(logging.INFO)
 
-# Streamlit re-executes each page script on every rerun (including the
-# app's own 10s auto-refresh fragments), so this module gets imported many
-# times per session. Without this guard, every rerun would add another set
-# of handlers — duplicate log lines, and file handles accumulating for the
-# life of the server process.
+# A module-level guard, not just Python's own import cache: uvicorn's
+# --reload watches for file changes and re-executes modules, and this file
+# is imported from enough places (crud.py, api/, the gateway) that without
+# this check a reload could add a second set of handlers — duplicate log
+# lines, and file handles accumulating for the life of the server process.
 if not logger.handlers:
     formatter = logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"

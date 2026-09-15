@@ -69,7 +69,7 @@ def audit_with_notes(notes):
 
 
 def add_audit(notes, photos):
-    crud.add_cleanliness_audit(
+    return crud.add_cleanliness_audit(
         audit_type="Start Of Shift (Cleanliness Check)", operator_name="Photo Tester",
         pump_station="Pump 1", shift="Shift 1", resin_type="",
         notes=notes, is_spill=False, uploaded_files=photos)
@@ -155,12 +155,13 @@ def broken(name="bad.jpg"):
     return f
 
 before = photos_on_disk()
-raised = False
-try:
-    add_audit("should fail", [fake("ok.jpg", b"photo-a"), broken()])
-except ValueError:
-    raised = True
-check(raised, "the failure still reaches the caller")
+# add_cleanliness_audit catches broadly and returns False rather than
+# raising - see its own docstring and app_logger.py's: a shop-floor kiosk
+# app shouldn't take a page down over a bad upload, the exception is logged
+# instead (app_logger writes it to logs/), and the caller is told through
+# the return value, the same as every other write in crud.py.
+ok = add_audit("should fail", [fake("ok.jpg", b"photo-a"), broken()])
+check(ok is False, "the failure is reported to the caller, not raised")
 check(photos_on_disk() == before, "the one file that made it to disk was removed again")
 session = ScopedSession()
 try:

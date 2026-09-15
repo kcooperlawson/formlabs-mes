@@ -176,11 +176,14 @@ check("manage_qc" in crud.role_abilities("manager"), "a manager has it")
 check("manage_qc" not in crud.role_abilities("operator"),
       "an operator does not, until somebody gives it to them")
 
-src = (ROOT / "pages" / "Live_Reactors.py").read_text(encoding="utf-8")
-check('can("manage_qc")' in src, "the reactor page asks for it before showing the panel")
-form = (ROOT / "pages" / "Operator_Form.py").read_text(encoding="utf-8")
-check("current_batch" in form, "the pouring form reads the batch behind the tank")
-check("st.stop()" not in form.split("failed QC")[0][-400:],
+bh_src = (ROOT / "api" / "routers" / "batch_history.py").read_text(encoding="utf-8")
+check('"manage_qc"' in bh_src, "the batch history API asks for it before recording QC")
+bh_page = (ROOT / "frontend" / "src" / "batchHistory" / "BatchHistoryPage.tsx").read_text(encoding="utf-8")
+check("can_manage_qc" in bh_page, "and the QC entry form is gated on the same flag in the UI")
+pouring_src = (ROOT / "api" / "routers" / "pouring.py").read_text(encoding="utf-8")
+check("current_batch" in pouring_src or "batch[" in pouring_src or "BatchInfo" in pouring_src,
+      "the pouring endpoint reads the batch behind the tank")
+check("HTTPException" not in pouring_src.split("qc_result")[0][-400:],
       "and a failed QC does not stop the operator logging")
 
 wipe()
