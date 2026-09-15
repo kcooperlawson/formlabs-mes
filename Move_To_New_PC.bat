@@ -87,10 +87,13 @@ rem screenshot and document tooling, docs\ is the handbook sources and their
 rem figures - none of it is needed on the floor PC, and together they are most
 rem of the folder by size. The finished PDFs are printed from docs\ on this
 rem PC, not served by the app. Transfer archives in backups\ (*.tgz) are not
-rem database backups and do not ship; the .sql dumps do.
+rem database backups and do not ship; the .sql dumps do. node_modules is
+rem npm's own cache of frontend\'s build tooling - the work PC runs the
+rem already-built frontend\dist, never `npm run build` itself, so shipping
+rem it is dozens of megabytes for something never opened.
 robocopy "%~dp0." "%STAGE%" /E ^
     /XD venv .git __pycache__ .idea logs _MOVE_PACKAGE tests dev docs ^
-        "Claude outputs" _to_delete pgdata ^
+        "Claude outputs" _to_delete pgdata node_modules ^
     /XF combined_code.txt mes_production.db *.pyc *.tgz *.bak *.log ^
         formlabs_mes_move_*.zip ^
     /NFL /NDL /NJH >nul
