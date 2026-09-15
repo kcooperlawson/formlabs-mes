@@ -44,7 +44,7 @@ print("=" * 66)
 # --- everything here requires a session, at minimum -------------------------
 for path in ("/api/reference/pumps", "/api/reference/resins", "/api/reference/resin-lookup",
              "/api/reference/downtime-reasons", "/api/reference/plant-settings",
-             "/api/user/last-picks"):
+             "/api/reference/user/last-picks"):
     r = client.get(path)
     check(r.status_code == 401, f"{path} refuses an anonymous request (got {r.status_code})")
 
@@ -96,7 +96,7 @@ check(set(r.json()) == {"simple_mode", "enable_bulk_pour", "enable_packing",
       f"only floor-relevant settings are exposed, never the full admin row (got keys {sorted(r.json())})")
 
 # --- last picks: empty for an operator who has never logged -----------------
-r = client.get("/api/user/last-picks")
+r = client.get("/api/reference/user/last-picks")
 check(r.status_code == 200, f"last-picks loads even with no history (got {r.status_code})")
 check(r.json() == {"station": "", "cartridge": "", "resin": ""},
       "a first-time operator gets empty defaults, not an error")

@@ -85,6 +85,7 @@ def batch_history(days: int = 30, user: dict = Depends(require_ability("view_man
     batches = [
         BatchRow(
             id=b["id"], reactor_name=b["reactor_name"], resin_type=b["resin_type"],
+            lot_number=b["lot_number"] or "",
             filled_at=_iso(b["filled_at"]), emptied_at=_iso(b["emptied_at"]),
             hours_in_reactor=b["hours_in_reactor"],
             qc_sent_at=_iso(b["qc_sent_at"]), qc_result_at=_iso(b["qc_result_at"]),

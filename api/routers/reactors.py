@@ -24,6 +24,8 @@ nicety that doesn't translate to a page that polls every 10s - re-animating
 every poll would look broken - so vessel_svg is always called with
 reveal=False here.
 """
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 
 import crud
@@ -33,7 +35,7 @@ from resin_palette import resin_color, stored_color_map
 from api.deps import require_ability
 from api.schemas.reactors import (
     AddReactorRequest, BatchInfo, BulkCandidate, BulkPourRequest, DrawInfo,
-    ManageOptionsOut, ManageReactorRow, MarkEmptyOut, ReactorCard,
+    ManageOptionsOut, ManageReactorRow, MarkEmptyOut, MarkFilledRequest, ReactorCard,
     UpdateReactorRequest, VesselTypeOption,
 )
 
@@ -222,4 +224,27 @@ def mark_empty(reactor_id: int, user: dict = Depends(require_ability("manage_rea
     if row.empty:
         raise HTTPException(status_code=404, detail="No such reactor.")
     ok = crud.close_batch(row.iloc[0]["reactor_name"], by=user["full_name"])
+    return MarkEmptyOut(ok=ok)
+
+
+@router.post("/{reactor_id}/mark-filled", response_model=MarkEmptyOut)
+def mark_filled(reactor_id: int, body: MarkFilledRequest, user: dict = Depends(require_ability("manage_reactors"))):
+    if not body.resin_type.strip():
+        raise HTTPException(status_code=400, detail="Pick a resin.")
+    df = crud.get_all_reactors_df()
+    row = df[df["id"] == reactor_id]
+    if row.empty:
+        raise HTTPException(status_code=404, detail="No such reactor.")
+    filled_at = None
+    if body.filled_at:
+        try:
+            filled_at = datetime.fromisoformat(body.filled_at)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="filled_at must be ISO 8601.")
+    ok = crud.mark_reactor_filled(
+        row.iloc[0]["reactor_name"], body.resin_type, lot_number=body.lot_number,
+        filled_at=filled_at, by=user["full_name"], note=body.note,
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail="Could not mark that reactor filled.")
     return MarkEmptyOut(ok=ok)

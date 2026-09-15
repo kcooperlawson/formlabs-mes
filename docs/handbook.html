@@ -956,7 +956,7 @@ td.k{font-weight:600; color:var(--ink);}
   <p class="lead" style="margin-bottom:13pt;">Before a release the system is exercised end to end against a
   throwaway database built from nothing each time. It refuses to run against the production connection.</p>
   <div class="grid3" style="margin-bottom:15pt;">
-    <div class="stat"><span class="n">1,543</span><span class="l">assertions across twenty suites &mdash; workflow, interface, roles, colour, fill weight, shifts, vessel levels and drawings, backups and the stopped record, the shift build, measured pours, export destinations and their round trip, crash reporting, links, boot paths, plant switches</span></div>
+    <div class="stat"><span class="n">1,715</span><span class="l">assertions across forty-nine suites &mdash; every API route now exercised through a real request/response cycle, on top of the original coverage of workflow, interface, roles, colour, fill weight, shifts, vessel levels and drawings, backups and the stopped record, the shift build, measured pours, export destinations and their round trip, crash reporting, links, boot paths and plant switches</span></div>
     <div class="stat"><span class="n">58</span><span class="l">checks driving a real browser through an operator’s shift, on a desktop and a phone</span></div>
     <div class="stat"><span class="n">18</span><span class="l">screens rendered and checked for errors on every pass</span></div>
   </div>
@@ -1021,9 +1021,11 @@ td.k{font-weight:600; color:var(--ink);}
       <p style="font-size:9.2pt;">A protocol-agnostic gateway for reading floor equipment directly, so counts
       and weights would not have to be typed. Each machine is a row in a registry and the polling logic sits
       behind one shared interface, with adapters written for Modbus TCP, Modbus RTU, OPC-UA, MQTT, Serial
-      ASCII and HTTP. Readings would write through the same logging path the operator screen uses, so analytics and
+      ASCII and HTTP, plus a Simulator needing no equipment at all &mdash; a fake pump or scale on a
+      timer, proof the registry-to-record path works before any real machine exists to connect to.
+      Readings would write through the same logging path the operator screen uses, so analytics and
 run tracking would need no changes. A registry screen for it is written &mdash; add a machine, point it at the pump station it sits on, map its raw tags &mdash; and it sits behind a plant setting that is off unless somebody turns it on, so it appears in the manager&rsquo;s console only for a plant that has asked for it.</p>
-      <p style="font-size:9.2pt;"><strong>None of it has been tested against real equipment.</strong> The adapters were written to cover whatever the scales or pump controllers turn out to speak; which of them is correct is unknown until someone connects one. The switch is how that is said: nothing shows for a plant that has not decided, and nobody has to be told a hidden address.</p>
+      <p style="font-size:9.2pt;"><strong>None of the real protocols has been tested against real equipment.</strong> Those adapters were written to cover whatever the scales or pump controllers turn out to speak; which of them is correct is unknown until someone connects one. The switch is how that is said: nothing shows for a plant that has not decided, and nobody has to be told a hidden address.</p>
     </div>
   </div>
   <figure><img class="sml" src="figs_print/22_packing.png" alt="Pack-out logging" style="max-height:1.6in;">

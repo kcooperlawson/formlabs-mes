@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { referenceApi } from '../api/reference'
 import { pouringApi } from '../api/pouring'
 import { useLotGate } from '../hooks/useLotGate'
 import { useSubmitLock } from '../hooks/useSubmitLock'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
+import { enqueue, isConnectivityError } from '../offline/queue'
 import { useToast } from '../toast/ToastProvider'
 import { ChangeoverBanner } from './ChangeoverBanner'
 import { EMPTY_BULK, ProductionOutputFields, type BulkState } from './ProductionOutputFields'
@@ -28,13 +29,18 @@ interface UndoState {
 // from pages/operator_form/pouring_tab.py's render(ctx) end to end - see
 // that file's own section comments (1. Station & Material, 2. Lot
 // Verification, 3. Production Output) for the parts this mirrors.
-export function PouringTab({ shift }: { shift: string }) {
+export function PouringTab({ shift, myStation }: { shift: string; myStation: string }) {
   const queryClient = useQueryClient()
   const submitLock = useSubmitLock()
   const asOperator = useDebugOperator()
   const toast = useToast()
 
-  const [station, setStation] = useState('')
+  // myStation already came out of the checklist gate this same session -
+  // asking again here would be the exact redundancy operators complained
+  // about. cartLabel/resin have no such earlier answer to reuse, so those
+  // come from get_last_picks instead (see the effect below) - "what did
+  // this operator log last time" - rather than starting blank every hour.
+  const [station, setStation] = useState(myStation)
   const [cartLabel, setCartLabel] = useState('')
   const [resin, setResin] = useState('')
   const [bottlesFilled, setBottlesFilled] = useState(250)
@@ -62,6 +68,28 @@ export function PouringTab({ shift }: { shift: string }) {
     queryFn: () => referenceApi.containerFormats(bulkEnabled),
     enabled: plantSettingsQuery.isSuccess,
   })
+  const lastPicksQuery = useQuery({
+    queryKey: ['reference', 'last-picks', asOperator],
+    queryFn: () => referenceApi.lastPicks(asOperator),
+  })
+
+  // Applied once, the moment both queries are in: cartridge/resin have no
+  // earlier answer this session to reuse (unlike station, seeded above from
+  // the checklist), so this is the one source for them - last_cartridge is
+  // stored as a code (e.g. "V2"), so it has to be turned back into whichever
+  // label maps to that code before it can go in cartLabel.
+  const appliedLastPicks = useRef(false)
+  useEffect(() => {
+    if (appliedLastPicks.current || !lastPicksQuery.data || !formatsQuery.data) return
+    appliedLastPicks.current = true
+    const picks = lastPicksQuery.data
+    setStation((current) => current || picks.station)
+    if (picks.resin) setResin(picks.resin)
+    if (picks.cartridge) {
+      const label = Object.entries(formatsQuery.data.codes).find(([, code]) => code === picks.cartridge)?.[0]
+      if (label) setCartLabel(label)
+    }
+  }, [lastPicksQuery.data, formatsQuery.data])
 
   const cartCode = formatsQuery.data?.codes[cartLabel] ?? ''
   const isBulk = cartCode === 'Bulk'
@@ -95,6 +123,20 @@ export function PouringTab({ shift }: { shift: string }) {
       submitLock.lock()
       invalidateAfterWrite()
       toast.show(resp.landed || 'Logged.')
+    },
+    onError: (err, formData) => {
+      // A dropped connection, not a rejection - see offline/queue.ts. Queue
+      // it and tell the operator it's handled rather than showing an error
+      // for something that was never their fault; there is no log_id to
+      // offer an undo on, and lot verification/changeover already happened
+      // against whatever the page had cached before it went offline.
+      if (!isConnectivityError(err)) return
+      void enqueue('pouring', Array.from(formData.entries()) as Array<[string, string | File]>)
+      setResult({ landed: '', messages: ['Recorded offline — will send once the connection is back.'] })
+      setLot(EMPTY_LOT_FIELDS)
+      submitLock.lock()
+      toast.show('Recorded offline — queued to send.')
+      submitMutation.reset() // clear isError - queued is not a failure worth showing red text over
     },
   })
 

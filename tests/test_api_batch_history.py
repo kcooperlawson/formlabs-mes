@@ -66,7 +66,7 @@ check(body["can_manage_qc"] is True, "the seeded admin/manager account can manag
 now = datetime.now()
 
 # Reactor 1: still sitting, no QC ever recorded on it.
-id_open = crud.open_batch("Reactor 1", "Standard Clear V5", filled_at=now - timedelta(hours=10))
+id_open = crud.open_batch("Reactor 1", "Standard Clear V5", lot_number="L-100", filled_at=now - timedelta(hours=10))
 
 # Reactor 2: closed, 20 hours in the vessel, never sent to QC.
 crud.open_batch("Reactor 2", "Standard Black V5", filled_at=now - timedelta(hours=40))
@@ -112,6 +112,10 @@ check(len(body["batches"]) == 4, "every filling appears in the full table, not j
 r1 = next(b for b in body["batches"] if b["reactor_name"] == "Reactor 1")
 check(r1["open"] is True and r1["hours_in_reactor"] == 10.0,
       f"an open filling still reports hours-so-far (got {r1})")
+check(r1["lot_number"] == "L-100", f"the lot a batch was opened with round-trips through the API (got {r1})")
+
+r4 = next(b for b in body["batches"] if b["reactor_name"] == "Reactor 4")
+check(r4["lot_number"] == "", f"a batch opened with no lot reads back as an empty string, not null/None (got {r4})")
 
 # --- saving QC is gated behind manage_qc, separately from the read ----------
 client.post("/api/auth/logout", headers=CSRF)

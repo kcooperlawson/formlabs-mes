@@ -29,6 +29,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 import bulk_pour
 import crud
 import fill_weight
+from api import realtime
 from api.shared import _vessel_label, bulk_vessel_state
 from api.deps import get_current_user, require_ability, resolve_operator_name
 from api.schemas.pouring import (
@@ -412,6 +413,7 @@ async def submit(
         landed = f"{units_for_log} units of {resin} at {station}"
 
     weight_icon, weight_message = fill_weight.describe(weight_reading) if weight_reading else ("", "")
+    realtime.notify()
     return PourSubmitResponse(ok=True, log_id=log_id, matched_run=matched_run,
                               weight_icon=weight_icon, weight_message=weight_message,
                               messages=messages, landed=landed)
@@ -420,4 +422,6 @@ async def submit(
 @router.post("/undo", response_model=UndoResponse)
 def undo(body: UndoRequest, user: dict = Depends(get_current_user)):
     ok, message = crud.undo_own_log(body.log_id, resolve_operator_name(user, body.as_operator))
+    if ok:
+        realtime.notify()
     return UndoResponse(ok=ok, message=message)

@@ -74,12 +74,14 @@ async def submit_cleanliness(
     station: str = Form(...),
     shift: str = Form(...),
     notes: str = Form(""),
+    skip_photo: bool = Form(False),
     photos: list[UploadFile] = File(default=[]),
     user: dict = Depends(get_current_user),
 ):
     saved = await to_streamlit_like_many(photos)
-    if not saved:
-        raise HTTPException(status_code=400, detail="A photo is required for the pre-shift audit.")
+    if not saved and not skip_photo:
+        raise HTTPException(status_code=400,
+                            detail='A photo is required, or check "station is clean" to skip it.')
     ok = crud.add_cleanliness_audit(
         audit_type=CLEANLINESS_AUDIT_TYPE,
         operator_name=user["full_name"],

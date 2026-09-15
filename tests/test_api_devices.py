@@ -177,6 +177,63 @@ check(r.status_code == 200 and isinstance(r.json(), list), f"a tiny, fast scan o
 r = client.get("/api/devices/discovery/scan?subnet=not-a-subnet")
 check(r.status_code == 400, f"a malformed subnet is refused with a real error, not a crash (got {r.status_code})")
 
+# --- simulator: the no-hardware protocol, and its tag map auto-seed --------
+r = client.post("/api/devices", json={
+    "device_name": "Sim Pump", "device_role": "filling_station", "protocol": "simulator",
+    "connection": {"sim_profile": "pump", "cycle_seconds": 1.0, "target_weight_g": 400, "noise_pct": 0},
+    "poll_interval_s": 1.0,
+}, headers=CSRF)
+check(r.status_code == 201, f"registering a simulator device succeeds like any other protocol (got {r.status_code})")
+sim_device = r.json()
+
+tags = client.get(f"/api/devices/{sim_device['id']}/tags").json()
+tag_names = {t["canonical_metric"] for t in tags}
+check({"units_poured_delta", "weight_g", "machine_state", "fault_code"} <= tag_names,
+      f"a pump-profile simulator gets a full tag map for free, no manual mapping needed (got {tag_names})")
+
+r = client.post("/api/devices", json={
+    "device_name": "Sim Scale", "device_role": "scale", "protocol": "simulator",
+    "connection": {"sim_profile": "scale", "target_weight_g": 120}, "poll_interval_s": 1.0,
+}, headers=CSRF)
+check(r.status_code == 201, f"a scale-profile simulator device saves too (got {r.status_code})")
+sim_scale = r.json()
+scale_tags = {t["canonical_metric"] for t in client.get(f"/api/devices/{sim_scale['id']}/tags").json()}
+check(scale_tags == {"weight_g"}, f"a scale profile only auto-maps weight_g, not the pump-only metrics (got {scale_tags})")
+
+# The API's own test-connection endpoint builds an adapter straight from a
+# plain connection dict (device_crud.test_device_connection -> build_adapter)
+# and never touches connection_json's Fernet encryption at all - so it can't
+# prove the actual background gateway (service.py) can read a SAVED device
+# back. build_adapter_from_device is the one real code path that does that,
+# and it has to go through decrypt_connection(), not a bare json.loads() -
+# exercised directly here against the real ORM row this API call produced,
+# which is the only way to catch that class of bug at all.
+from device_gateway.registry import build_adapter_from_device  # noqa: E402
+from db_core import ScopedSession  # noqa: E402
+from device_models import Device, DeviceTagMap  # noqa: E402
+
+session = ScopedSession()
+device_row = session.get(Device, sim_device["id"])
+tag_rows = session.query(DeviceTagMap).filter(DeviceTagMap.device_id == sim_device["id"]).all()
+_ = (device_row.connection_json, device_row.protocol)  # force-load before the session below closes it
+for t in tag_rows:
+    _ = (t.raw_tag, t.canonical_metric, t.data_type, t.scale_factor)
+session.close()
+
+try:
+    adapter = build_adapter_from_device(device_row, tag_rows)
+    adapter.connect()
+    mapped = adapter.poll()
+    adapter.close()
+    poll_ok, poll_err = True, None
+except Exception as exc:
+    poll_ok, poll_err = False, str(exc)
+check(poll_ok, f"a saved device's ENCRYPTED connection_json decrypts and polls through the real gateway code path (got error: {poll_err})")
+check(poll_ok and "weight_g" in mapped, f"...and comes back with the mapped canonical metrics (got {mapped if poll_ok else None})")
+
+client.delete(f"/api/devices/{sim_device['id']}", headers=CSRF)
+client.delete(f"/api/devices/{sim_scale['id']}", headers=CSRF)
+
 # --- everything here requires a session ------------------------------------
 client.post("/api/auth/logout", headers=CSRF)
 r = client.get("/api/devices/meta")

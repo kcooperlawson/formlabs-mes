@@ -22,6 +22,12 @@ export interface ContainerFormats {
   codes: Record<string, string> // label -> code, e.g. "V2 (1L Cartridge)" -> "V2"
 }
 
+export interface LastPicks {
+  station: string
+  cartridge: string
+  resin: string
+}
+
 export interface PlantSettings {
   simple_mode: boolean
   enable_bulk_pour: boolean
@@ -38,6 +44,8 @@ export const referenceApi = {
     api.get<ContainerFormats>(`/reference/container-formats?bulk_enabled=${bulkEnabled}`),
   plantSettings: () => api.get<PlantSettings>('/reference/plant-settings'),
   downtimeReasons: () => api.get<string[]>('/reference/downtime-reasons'),
+  lastPicks: (asOperator?: string) =>
+    api.get<LastPicks>(`/reference/user/last-picks${asOperator ? `?as_operator=${encodeURIComponent(asOperator)}` : ''}`),
   activeOperators: () => api.get<string[]>('/reference/active-operators'),
   appVersion: () => api.get<{ version: string }>('/reference/app-version'),
 }

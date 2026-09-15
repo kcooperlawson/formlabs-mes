@@ -78,6 +78,31 @@ function ConnectionFields({ protocol, connection, setField }: { protocol: string
           </div>
         </div>
       )
+    case 'simulator': {
+      const profile = str('sim_profile') || 'pump'
+      return (
+        <div className="flex flex-col gap-2">
+          <p className={`text-xs ${fl.muted}`}>
+            No real hardware — generates a repeating fill cycle so you can try out the gateway, Analytics, and the
+            TV Dashboard before any machine is actually wired up. The tag map is filled in for you when you save.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <select className={select} value={profile} onChange={(e) => setField('sim_profile', e.target.value)}>
+              <option value="pump">Pump / filling station</option>
+              <option value="scale">Scale (weight only)</option>
+            </select>
+            <input className={input} type="number" step={0.5} min={1} placeholder="Cycle length (seconds)" value={num('cycle_seconds', 8)} onChange={(e) => setField('cycle_seconds', Number(e.target.value))} />
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input className={input} type="number" placeholder="Target fill weight (g)" value={num('target_weight_g', 850)} onChange={(e) => setField('target_weight_g', Number(e.target.value))} />
+            <input className={input} type="number" step={0.1} placeholder="Noise (%)" value={num('noise_pct', 1.5)} onChange={(e) => setField('noise_pct', Number(e.target.value))} />
+            {profile !== 'scale' && (
+              <input className={input} type="number" step={0.1} placeholder="Fault rate (%)" value={num('fault_rate_pct', 0)} onChange={(e) => setField('fault_rate_pct', Number(e.target.value))} />
+            )}
+          </div>
+        </div>
+      )
+    }
     default:
       return null
   }

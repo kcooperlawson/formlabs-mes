@@ -53,6 +53,7 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
 
   const [notes, setNotes] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
+  const [skipPhoto, setSkipPhoto] = useState(false)
   const [vesselPick, setVesselPick] = useState('')
   const [qrChecked, setQrChecked] = useState(false)
   const [materialsChecked, setMaterialsChecked] = useState(false)
@@ -69,6 +70,7 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
       fd.set('station', effectiveStation)
       fd.set('shift', shift)
       fd.set('notes', notes)
+      fd.set('skip_photo', String(skipPhoto))
       if (photo) fd.set('photos', photo)
       return checklistApi.submitCleanliness(fd)
     },
@@ -192,16 +194,26 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
-          <input
-            className="mt-2 block text-sm text-[var(--fl-body)]"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-          />
+          <label className="mt-2 flex items-center gap-2 text-sm text-[var(--fl-body)]">
+            <input
+              type="checkbox"
+              checked={skipPhoto}
+              onChange={(e) => { setSkipPhoto(e.target.checked); if (e.target.checked) setPhoto(null) }}
+            />
+            ✅ Station is clean — skip the photo
+          </label>
+          {!skipPhoto && (
+            <input
+              className="mt-2 block text-sm text-[var(--fl-body)]"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            />
+          )}
           <button
             className={`${btn} mt-2`}
-            disabled={!photo || cleanlinessMutation.isPending}
+            disabled={(!skipPhoto && !photo) || cleanlinessMutation.isPending}
             onClick={() => cleanlinessMutation.mutate()}
           >
             💾 Submit Cleanliness Report

@@ -1,10 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import {
+  AlertTriangle, BarChart3, Camera, ClipboardList, FlaskConical, HelpCircle, Package, Radio,
+  Settings, Wrench, type LucideIcon,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { accountApi } from './api/account'
 import { referenceApi } from './api/reference'
 import { useAuth } from './auth/AuthProvider'
 import { ChecklistGate } from './checklist/ChecklistGate'
+import { useOfflineQueueCount } from './hooks/useOfflineQueueCount'
+import { startOfflineQueue } from './offline/queue'
 import { DebugOperatorProvider } from './operatorForm/DebugOperatorContext'
 import { AccountPanel } from './shell/AccountPanel'
 import { fl } from './theme'
@@ -16,6 +22,21 @@ import { PouringTab } from './pouring/PouringTab'
 import { SummaryTab } from './pouring/SummaryTab'
 
 type TabKey = 'pouring' | 'packing' | 'downtime' | 'audit' | 'notes' | 'summary'
+
+// Visible on every tab, not just Pouring: a packing or downtime submit can
+// queue exactly the same way, and whoever is standing at this screen needs
+// to see "this is still going to send" regardless of which tab they're on
+// when connectivity actually comes back.
+function OfflineQueueBanner() {
+  const count = useOfflineQueueCount()
+  if (!count) return null
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-amber-600 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
+      <Radio size={15} className="shrink-0" />
+      {count} {count === 1 ? 'entry' : 'entries'} queued offline — will send the moment the connection is back.
+    </div>
+  )
+}
 
 // Manager_Cockpit.py-style superuser debug block, ported from
 // Operator_Form.py lines ~271-286: a manager/admin keeps their own role and
@@ -31,7 +52,7 @@ function DebugModeBar({ asOperator, onChange }: { asOperator: string; onChange: 
 
   return (
     <div className="rounded-lg border border-amber-600 bg-amber-950/40 p-3">
-      <p className="text-sm font-bold text-amber-400">🛠️ Superuser Debug Mode Active</p>
+      <p className="flex items-center gap-1.5 text-sm font-bold text-amber-400"><Wrench size={15} /> Superuser Debug Mode Active</p>
       <p className={`mb-2 text-xs ${fl.muted}`}>
         Signed in as Management/Admin. Select an operator to submit logs for system testing, or on their behalf.
       </p>
@@ -57,17 +78,24 @@ export function OperatorFormPage() {
   const isPacker = role === 'packer'
   const isManagement = role === 'manager' || role === 'admin'
 
-  const tabs: { key: TabKey; label: string }[] = [
-    isPacker ? { key: 'packing', label: '📦 Packing' } : { key: 'pouring', label: '🧪 Pouring' },
-    { key: 'downtime', label: '⚠️ Downtime' },
-    { key: 'audit', label: '📸 Audit' },
-    { key: 'notes', label: '📋 Notes' },
-    { key: 'summary', label: '📊 Summary' },
+  const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
+    isPacker ? { key: 'packing', label: 'Packing', icon: Package } : { key: 'pouring', label: 'Pouring', icon: FlaskConical },
+    { key: 'downtime', label: 'Downtime', icon: AlertTriangle },
+    { key: 'audit', label: 'Audit', icon: Camera },
+    { key: 'notes', label: 'Notes', icon: ClipboardList },
+    { key: 'summary', label: 'Summary', icon: BarChart3 },
   ]
   const [tab, setTab] = useState<TabKey>(tabs[0].key)
   const [myStation, setMyStation] = useState('')
   const [showAccount, setShowAccount] = useState(false)
   const [debugAsOperator, setDebugAsOperator] = useState('')
+
+  // Idempotent (see startOfflineQueue's own guard) - safe to call on every
+  // mount rather than threading a "did this already happen" flag through
+  // the app shell just for this.
+  useEffect(() => {
+    startOfflineQueue()
+  }, [])
 
   return (
     <div className="min-h-svh bg-[var(--fl-ground)] p-4">
@@ -97,13 +125,13 @@ export function OperatorFormPage() {
             <a
               href="/Formlabs_MES_Operator_Guide.pdf" target="_blank" rel="noopener noreferrer"
               title="Operator guide — how to log an hour, and what to do when something is not right"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current text-sm font-extrabold text-[var(--fl-muted)] opacity-70 hover:opacity-100"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current text-[var(--fl-muted)] opacity-70 hover:opacity-100"
             >
-              ?
+              <HelpCircle size={16} />
             </a>
             <div className="relative">
               <button onClick={() => setShowAccount((v) => !v)} title="Account & Preferences" className={`${fl.btnSecondary} px-2.5`}>
-                ⚙️
+                <Settings size={15} />
               </button>
               {showAccount && <AccountPanel onClose={() => setShowAccount(false)} />}
             </div>
@@ -112,6 +140,8 @@ export function OperatorFormPage() {
             </button>
           </div>
         </div>
+
+        <OfflineQueueBanner />
 
         {isManagement && <DebugModeBar asOperator={debugAsOperator} onChange={setDebugAsOperator} />}
 
@@ -124,13 +154,13 @@ export function OperatorFormPage() {
           >
             <div className={fl.tabStrip}>
               {tabs.map((t) => (
-                <button key={t.key} onClick={() => setTab(t.key)} className={tab === t.key ? fl.tabActive : fl.tabInactive}>
-                  {t.label}
+                <button key={t.key} onClick={() => setTab(t.key)} className={`flex items-center gap-1.5 ${tab === t.key ? fl.tabActive : fl.tabInactive}`}>
+                  <t.icon size={14} className="shrink-0" strokeWidth={2.25} /> {t.label}
                 </button>
               ))}
             </div>
 
-            {tab === 'pouring' && <PouringTab shift={user?.shift ?? 'Shift 1'} />}
+            {tab === 'pouring' && <PouringTab shift={user?.shift ?? 'Shift 1'} myStation={myStation} />}
             {tab === 'packing' && <PackingTab />}
             {tab === 'downtime' && <DowntimeTab myStation={myStation} />}
             {tab === 'audit' && <AuditTab myStation={myStation} />}

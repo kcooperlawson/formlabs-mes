@@ -54,7 +54,7 @@ async def main():
 
     bad = 0
     async with async_playwright() as p:
-        b = await p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+        b = await p.chromium.launch()
         pg = await b.new_page()
         for name in wanted:
             src = DOCS / f"{name}.html"

@@ -79,6 +79,24 @@ def get_device_dict(device_id: int) -> dict | None:
         session.close()
 
 
+# The simulator adapter (device_gateway/adapters/simulator.py) always
+# reports raw tags already named after the canonical metric they mean, so
+# a demo device can go live with zero manual tag-mapping - this is what
+# fills that in automatically the moment one is created, keyed by the same
+# "sim_profile" the adapter itself reads out of connection_json.
+_SIMULATOR_TAGS = {
+    "pump": [
+        ("units_poured_delta", "units_poured_delta", "float"),
+        ("weight_g", "weight_g", "float"),
+        ("machine_state", "machine_state", "string"),
+        ("fault_code", "fault_code", "string"),
+    ],
+    "scale": [
+        ("weight_g", "weight_g", "float"),
+    ],
+}
+
+
 def create_device(device_name: str, device_role: str, protocol: str, connection: dict,
                    poll_interval_s: float = 5.0, pump_station_id: int | None = None,
                    reactor_id: int | None = None, notes: str = "", is_enabled: bool = True) -> int | None:
@@ -93,6 +111,14 @@ def create_device(device_name: str, device_role: str, protocol: str, connection:
             is_enabled=is_enabled, status="Unknown",
         )
         session.add(device)
+
+        if protocol == "simulator":
+            session.flush()  # need device.id before the tag map rows below can reference it
+            profile = str((connection or {}).get("sim_profile") or "pump").lower()
+            for raw_tag, canonical_metric, data_type in _SIMULATOR_TAGS.get(profile, _SIMULATOR_TAGS["pump"]):
+                session.add(DeviceTagMap(device_id=device.id, raw_tag=raw_tag, canonical_metric=canonical_metric,
+                                         data_type=data_type, scale_factor=1.0))
+
         session.commit()
         return device.id
     except Exception:

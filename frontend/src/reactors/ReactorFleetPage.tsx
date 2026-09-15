@@ -3,6 +3,7 @@ import { reactorsApi } from '../api/reactors'
 import { fl } from '../theme'
 import { BulkPourPanel } from './BulkPourPanel'
 import { ManageFleetPanel } from './ManageFleetPanel'
+import { MarkFilledPanel } from './MarkFilledPanel'
 
 const card = fl.card
 
@@ -32,6 +33,7 @@ export function ReactorFleetPage() {
       </div>
 
       <ManageFleetPanel />
+      <MarkFilledPanel reactors={fleet} />
       <BulkPourPanel />
 
       {fleet.length === 0 ? (

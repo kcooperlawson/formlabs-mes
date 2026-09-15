@@ -3276,6 +3276,62 @@ def close_batch(reactor_name, emptied_at=None, by="") -> bool:
         session.close()
 
 
+def mark_reactor_filled(reactor_name: str, resin_type: str, lot_number: str = "",
+                        filled_at=None, by: str = "", note: str = "") -> bool:
+    """Management's own counterpart to "mark empty" - a vessel is filled
+    because whoever just filled it said so, not because an operator happened
+    to confirm a resin swap at the pump. That inference has two blind spots
+    this closes: a vessel filled for the first time has no earlier resin to
+    swap FROM, and topping off with the same resin is not a swap at all - in
+    both cases a changeover confirmation never fires, so the batch that
+    should have opened never did.
+
+    Closes whatever filling was already open on this vessel at the same
+    moment the new one starts - a vessel is never two fillings at once - and
+    opens the next one: the same close-then-open shape record_changeover
+    already uses for the floor's own confirmation, because this is that same
+    event, just started from the other side. Unlike a changeover, this also
+    takes a lot number: nobody asks an operator confirming a changeover at
+    the pump to read a lot off a tank they cannot see into, but whoever is
+    physically filling the vessel is looking straight at it.
+    """
+    name = str(reactor_name or "").strip()
+    resin = str(resin_type or "").strip()
+    if not name or not resin:
+        return False
+    session = ScopedSession()
+    try:
+        r = session.query(Reactor).filter(Reactor.reactor_name == name).first()
+        if r is None:
+            return False
+        old = str(r.current_resin or "").strip() or "nothing recorded"
+        pump = str(r.assigned_pump or "")
+        r.current_resin = resin
+        r.current_resin_id = _resolve_resin_id(session, resin)
+        session.commit()
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+    stamp = filled_at or datetime.now()
+    lot_note = f", lot {lot_number.strip()}" if lot_number and lot_number.strip() else ""
+    try:
+        add_hourly_log(
+            by or "System", pump, "", "", resin, "",
+            0, 0, 0,
+            notes=f"{name} marked filled with {resin}{lot_note} by {by or 'System'} "
+                  f"(was {old}).",
+            log_type="Resin Changeover")
+    except Exception:
+        pass
+
+    close_batch(name, emptied_at=stamp, by=by or "System")
+    return bool(open_batch(name, resin, lot_number=lot_number, pump_station=pump,
+                           filled_at=stamp, by=by or "System", note=note))
+
+
 def set_batch_qc(batch_id, sent_at=None, result_at=None, result="", note="",
                  by="") -> tuple:
     """Record the QC round trip for one filling. Returns (ok, message).

@@ -136,6 +136,70 @@ check(r.status_code == 200 and r.json()["ok"] is True, f"marking it empty succee
 r = client.get("/api/reactors/fleet")
 check(r.json()[0]["batch"] is None, "the batch clears after marking empty")
 
+# --- mark filled: management's own counterpart, not inferred from a changeover
+r = client.post(f"/api/reactors/{reactor_id}/mark-filled",
+                 json={"resin_type": "Standard Clear V5", "lot_number": "L-9001", "filled_at": None, "note": "first fill"},
+                 headers=CSRF)
+check(r.status_code == 200 and r.json()["ok"] is True, f"marking a tank filled succeeds (got {r.status_code}, {r.text[:200]})")
+
+r = client.get("/api/reactors/fleet")
+card = r.json()[0]
+check(card["is_idle"] is False and card["current_resin"] == "Standard Clear V5",
+      f"the reactor itself now shows the resin, with no operator changeover involved (got {card})")
+check(card["batch"] is not None, "...and a filling opened for it")
+
+batches = crud.get_batches(reactor_name="Tank A")
+check(batches[0]["resin_type"] == "Standard Clear V5" and batches[0]["lot_number"] == "L-9001",
+      f"the new batch carries the lot number - dead on every changeover-opened batch until now (got {batches[0]})")
+check(batches[0]["opened_by"] == "Plant Lead", f"attributed to the manager who marked it, not 'System' (got {batches[0]})")
+
+# --- marking filled again closes the open batch first, rather than stacking -
+first_batch_id = batches[0]["id"]
+count_before = len(batches)
+r = client.post(f"/api/reactors/{reactor_id}/mark-filled",
+                 json={"resin_type": "Standard Clear V5", "lot_number": "L-9002", "filled_at": None, "note": ""},
+                 headers=CSRF)
+check(r.status_code == 200, f"topping off with the SAME resin succeeds (got {r.status_code}, {r.text[:200]}) - "
+                            f"a resin changeover would never have fired for this, since nothing changed")
+batches = crud.get_batches(reactor_name="Tank A")
+check(len(batches) == count_before + 1,
+      f"exactly one new filling opened, not one stacked on top of the still-open old one (got {count_before} -> {len(batches)})")
+old = next(b for b in batches if b["id"] == first_batch_id)
+check(old["open"] is False and old["emptied_at"] is not None, f"the first filling is now closed (got {old})")
+check(batches[0]["lot_number"] == "L-9002", f"the new filling carries the new lot (got {batches[0]})")
+
+# --- a back-dated fill time is honoured, for catching the record up after the fact
+from datetime import datetime, timedelta  # noqa: E402
+back_dated = (datetime.now() - timedelta(hours=5)).isoformat()
+r = client.post(f"/api/reactors/{reactor_id}/mark-filled",
+                 json={"resin_type": "Standard Black V5", "lot_number": "", "filled_at": back_dated, "note": ""},
+                 headers=CSRF)
+check(r.status_code == 200, f"a back-dated filled_at is accepted (got {r.status_code})")
+r = client.get("/api/reactors/fleet")
+check(r.json()[0]["batch"]["hours_in_reactor"] >= 4.9,
+      f"...and the dwell clock reflects that back-dated time, not 'now' (got {r.json()[0]['batch']})")
+
+r = client.post(f"/api/reactors/{reactor_id}/mark-filled",
+                 json={"resin_type": "", "lot_number": "", "filled_at": None, "note": ""}, headers=CSRF)
+check(r.status_code == 400, f"a blank resin is refused, not silently opened (got {r.status_code})")
+
+r = client.post(f"/api/reactors/{reactor_id}/mark-filled",
+                 json={"resin_type": "Standard Clear V5", "lot_number": "", "filled_at": "not-a-date", "note": ""},
+                 headers=CSRF)
+check(r.status_code == 422, f"an unparseable filled_at is refused, not silently treated as now (got {r.status_code})")
+
+r = client.post("/api/reactors/999999/mark-filled",
+                 json={"resin_type": "Standard Clear V5", "lot_number": "", "filled_at": None, "note": ""}, headers=CSRF)
+check(r.status_code == 404, f"marking a reactor that doesn't exist filled 404s (got {r.status_code})")
+
+client.post("/api/auth/logout", headers=CSRF)
+client.post("/api/auth/login", json={"username": "operator", "pin": "1234"}, headers=CSRF)
+r = client.post(f"/api/reactors/{reactor_id}/mark-filled",
+                 json={"resin_type": "Standard Clear V5", "lot_number": "", "filled_at": None, "note": ""}, headers=CSRF)
+check(r.status_code == 403, f"an operator (no manage_reactors) cannot mark a tank filled (got {r.status_code})")
+client.post("/api/auth/logout", headers=CSRF)
+client.post("/api/auth/login", json={"username": "manager", "pin": "admin123"}, headers=CSRF)
+
 # --- bulk pour from the reactor page, attributed to the MANAGER -------------
 r = client.get("/api/reactors/manage-options")
 check(r.status_code == 200, f"manage-options loads (got {r.status_code})")

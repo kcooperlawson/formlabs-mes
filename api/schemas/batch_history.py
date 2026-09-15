@@ -33,6 +33,7 @@ class BatchRow(BaseModel):
     id: int
     reactor_name: str
     resin_type: str
+    lot_number: str
     filled_at: str | None
     emptied_at: str | None
     hours_in_reactor: float | None

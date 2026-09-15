@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { FlaskConical } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import {
+  Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts'
 import { batchHistoryApi, type BatchRow } from '../api/batchHistory'
+import { StatCardSkeleton } from '../shell/Skeleton'
 import { fl } from '../theme'
 
 const tile = fl.tile
@@ -19,6 +24,22 @@ function fmt(iso: string | null): string {
   return new Date(iso).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+// Recharts' own default tooltip is a plain white box - jarring against
+// every dark theme this app ships. One shared dark tooltip rather than
+// restyling per chart.
+function ChartTooltip({ active, payload, label, suffix = ' h' }: {
+  active?: boolean; label?: string; suffix?: string
+  payload?: Array<{ value: number; color?: string }>
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded border border-[var(--fl-border)] bg-[var(--fl-surface)] px-2.5 py-1.5 text-xs shadow-lg">
+      <p className="font-semibold text-white">{label}</p>
+      <p style={{ color: payload[0].color }}>{payload[0].value}{suffix}</p>
+    </div>
+  )
+}
+
 // Round-trips a Date/ISO string through the value <input type="datetime-local">
 // wants ("YYYY-MM-DDTHH:mm") and back to a full ISO string the API can parse -
 // the original split this into separate date_input/time_input widgets purely
@@ -35,10 +56,10 @@ function fromLocalInput(value: string): string {
 }
 
 function downloadCsv(batches: BatchRow[]) {
-  const header = ['Vessel', 'Resin', 'Filled', 'Emptied', 'In vessel (h)', 'Sent to QC',
+  const header = ['Vessel', 'Resin', 'Lot', 'Filled', 'Emptied', 'In vessel (h)', 'Sent to QC',
     'Back from QC', 'At QC (h)', 'Result', 'Recorded by']
   const rows = batches.map((b) => [
-    b.reactor_name, b.resin_type, fmt(b.filled_at), fmt(b.emptied_at),
+    b.reactor_name, b.resin_type, b.lot_number, fmt(b.filled_at), fmt(b.emptied_at),
     b.hours_in_reactor ?? '', fmt(b.qc_sent_at), fmt(b.qc_result_at), b.hours_at_qc ?? '',
     b.qc_result || '—', b.qc_by,
   ])
@@ -161,9 +182,6 @@ export function BatchHistoryPage() {
   const query = useQuery({ queryKey: ['batch-history', days], queryFn: () => batchHistoryApi.get(days) })
   const data = query.data
 
-  const maxDwell = Math.max(...(data?.dwell_by_vessel.map((d) => d.avg_hours) ?? [1]), 1)
-  const maxTrend = Math.max(...(data?.qc_trend.map((t) => t.avg_hours) ?? [1]), 1)
-
   return (
     <div className="flex flex-col gap-4">
       <h1 className={fl.heading}>🧪 Batch History — reactor dwell and QC turnaround</h1>
@@ -178,9 +196,14 @@ export function BatchHistoryPage() {
         ))}
       </select>
 
-      {!data || data.totals.fillings_in_window === 0 ? (
-        <p className={`${card} py-6 text-center text-sm ${fl.muted}`}>
-          🧪 No batches recorded yet. A filling is opened when a vessel is changed over to a resin, so the first
+      {!data ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+      ) : data.totals.fillings_in_window === 0 ? (
+        <p className={`${card} flex flex-col items-center gap-2 py-8 text-center text-sm ${fl.muted}`}>
+          <FlaskConical size={28} className="opacity-50" />
+          No batches recorded yet. A filling is opened when a vessel is changed over to a resin, so the first
           one appears here after the next changeover is confirmed at a pump.
         </p>
       ) : (
@@ -232,17 +255,18 @@ export function BatchHistoryPage() {
               {data.dwell_by_vessel.length === 0 ? (
                 <p className={`text-sm ${fl.muted}`}>No emptied fillings in this window yet.</p>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {data.dwell_by_vessel.map((d) => (
-                    <div key={d.reactor_name} className="flex items-center gap-2 text-xs">
-                      <span className="w-24 shrink-0 truncate text-[#CBD5E1]">{d.reactor_name}</span>
-                      <div className="h-4 flex-1 overflow-hidden rounded bg-[#0F172A]">
-                        <div className="h-full rounded" style={{ width: `${(d.avg_hours / maxDwell) * 100}%`, backgroundColor: C_DWELL }} />
-                      </div>
-                      <span className="w-14 shrink-0 text-right font-medium text-white">{d.avg_hours} h</span>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={Math.max(120, data.dwell_by_vessel.length * 32)}>
+                  <BarChart data={data.dwell_by_vessel} layout="vertical" margin={{ left: 4, right: 12 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--fl-border)" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: 'var(--fl-muted-rgb, #94A3B8)', fontSize: 11 }} unit="h" />
+                    <YAxis
+                      type="category" dataKey="reactor_name" width={90}
+                      tick={{ fill: '#CBD5E1', fontSize: 11 }} tickLine={false} axisLine={false}
+                    />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Bar dataKey="avg_hours" fill={C_DWELL} radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive animationDuration={500} />
+                  </BarChart>
+                </ResponsiveContainer>
               )}
             </div>
 
@@ -251,17 +275,25 @@ export function BatchHistoryPage() {
               {data.qc_trend.length === 0 ? (
                 <p className={`text-sm ${fl.muted}`}>No completed QC round trips in this window yet.</p>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {data.qc_trend.map((t) => (
-                    <div key={t.day} className="flex items-center gap-2 text-xs">
-                      <span className="w-20 shrink-0 text-[#CBD5E1]">{t.day}</span>
-                      <div className="h-4 flex-1 overflow-hidden rounded bg-[#0F172A]">
-                        <div className="h-full rounded" style={{ width: `${(t.avg_hours / maxTrend) * 100}%`, backgroundColor: C_QC }} />
-                      </div>
-                      <span className="w-14 shrink-0 text-right font-medium text-white">{t.avg_hours} h</span>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={Math.max(120, data.dwell_by_vessel.length * 32)}>
+                  <AreaChart data={data.qc_trend} margin={{ left: -20, right: 12, top: 8 }}>
+                    <defs>
+                      <linearGradient id="qcTrendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={C_QC} stopOpacity={0.35} />
+                        <stop offset="100%" stopColor={C_QC} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--fl-border)" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fill: '#CBD5E1', fontSize: 11 }} tickLine={false} />
+                    <YAxis tick={{ fill: '#CBD5E1', fontSize: 11 }} unit="h" tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: C_QC, strokeWidth: 1 }} />
+                    <Area
+                      type="monotone" dataKey="avg_hours" stroke={C_QC} strokeWidth={2}
+                      fill="url(#qcTrendFill)" isAnimationActive animationDuration={500}
+                      dot={{ r: 3, fill: C_QC, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               )}
             </div>
           </div>
@@ -303,6 +335,7 @@ export function BatchHistoryPage() {
                 <thead className={fl.tableHead}>
                   <tr>
                     <th className="py-1 pr-2">Vessel</th><th className="py-1 pr-2">Resin</th>
+                    <th className="py-1 pr-2">Lot</th>
                     <th className="py-1 pr-2">Filled</th><th className="py-1 pr-2">Emptied</th>
                     <th className="py-1 pr-2">In vessel (h)</th><th className="py-1 pr-2">Sent to QC</th>
                     <th className="py-1 pr-2">Back from QC</th><th className="py-1 pr-2">At QC (h)</th>
@@ -314,6 +347,7 @@ export function BatchHistoryPage() {
                     <tr key={b.id} className={fl.tableRow}>
                       <td className="py-1 pr-2">{b.reactor_name}</td>
                       <td className="py-1 pr-2">{b.resin_type}</td>
+                      <td className="py-1 pr-2">{b.lot_number || '—'}</td>
                       <td className="py-1 pr-2 whitespace-nowrap">{fmt(b.filled_at)}</td>
                       <td className="py-1 pr-2 whitespace-nowrap">{b.emptied_at ? fmt(b.emptied_at) : 'still in use'}</td>
                       <td className="py-1 pr-2">{b.hours_in_reactor ?? ''}</td>

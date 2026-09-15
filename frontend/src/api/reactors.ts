@@ -78,4 +78,6 @@ export const reactorsApi = {
   bulkPour: (id: number, body: { containers: number; amount_each: number; unit: string; note: string }) =>
     api.post<{ ok: boolean; litres: number }>(`/reactors/${id}/bulk-pour`, body),
   markEmpty: (id: number) => api.post<{ ok: boolean }>(`/reactors/${id}/mark-empty`),
+  markFilled: (id: number, body: { resin_type: string; lot_number: string; filled_at: string | null; note: string }) =>
+    api.post<{ ok: boolean }>(`/reactors/${id}/mark-filled`, body),
 }

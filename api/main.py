@@ -11,12 +11,16 @@ thread pool, which is the model this DB layer already assumes (the same way
 Streamlit runs each script on a worker thread). An async route would run
 psycopg2's blocking calls on the single event-loop thread instead.
 """
+import asyncio
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+import crud
+from api import realtime
+from api.deps import SESSION_COOKIE
 from api.security import CSRFHeaderMiddleware
 from api.routers import account as account_router
 from api.routers import admin as admin_router
@@ -55,8 +59,57 @@ def _announce_on_lan():
     # Ported from Home.py's own @st.cache_resource-wrapped startup call -
     # see service_announcer.py. Safe to call unconditionally: it no-ops when
     # the device gateway is off, DB_URL is unset, or zeroconf isn't installed.
+    #
+    # Has to run off the event loop, in a plain thread of its own - a sync
+    # `def` startup handler like this one still runs directly ON uvicorn's
+    # event loop (Starlette only hands route handlers to its thread pool,
+    # not startup/shutdown events), and zeroconf's client detects "a loop is
+    # already running on this thread" and tries to attach to it instead of
+    # starting its own. It then hands its registration handshake back to
+    # that same loop and waits on the result - which can never arrive while
+    # this call is the thing blocking that loop - and gives up with
+    # zeroconf._exceptions.EventLoopBlocked. A background thread has no
+    # loop of its own to be detected, so zeroconf falls back to running
+    # independently instead, which is what actually lets this succeed.
+    import threading
     import service_announcer
-    service_announcer.start_announcing()
+    threading.Thread(target=service_announcer.start_announcing, daemon=True, name="mdns-announce").start()
+
+
+@app.on_event("startup")
+async def _capture_event_loop():
+    # api/realtime.py's notify() gets called from the sync route handlers
+    # that make up most of this app (worker threads), but the WebSocket
+    # connections it wakes up live on this loop - the one uvicorn actually
+    # runs. Async, so `asyncio.get_running_loop()` returns the real thing
+    # rather than creating a throwaway one.
+    realtime.set_loop(asyncio.get_running_loop())
+
+
+@app.websocket("/ws/updates")
+async def ws_updates(websocket: WebSocket):
+    """Wakes a live dashboard (SCADA, TV) the moment a pour/pack/downtime
+    lands, instead of leaving it to that screen's own poll interval. Carries
+    no data of its own - a client that gets a message just re-runs the same
+    query it already had, so the REST endpoint stays the one place the
+    actual shape of the data is decided.
+    """
+    token = websocket.cookies.get(SESSION_COOKIE)
+    user = crud.get_user_by_session_token(token) if token else None
+    if not user:
+        await websocket.close(code=4401)
+        return
+    await websocket.accept()
+    queue = realtime.subscribe()
+    try:
+        while True:
+            event = await queue.get()
+            await websocket.send_json({"event": event})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        realtime.unsubscribe(queue)
+
 
 for _router in (auth_router, reference_router, checklist_router, pouring_router,
                 packing_router, downtime_router, audit_router, notes_router, summary_router,

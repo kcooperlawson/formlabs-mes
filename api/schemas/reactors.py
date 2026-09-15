@@ -90,3 +90,10 @@ class BulkPourRequest(BaseModel):
 
 class MarkEmptyOut(BaseModel):
     ok: bool
+
+
+class MarkFilledRequest(BaseModel):
+    resin_type: str
+    lot_number: str = ""
+    filled_at: str | None = None   # ISO 8601; omitted means "now"
+    note: str = ""

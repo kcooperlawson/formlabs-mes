@@ -97,10 +97,17 @@ r = client.post("/api/checklist/submit", json={
 }, headers=CSRF)
 check(r.status_code == 400, f"submit still refused with only one manual box checked (got {r.status_code})")
 
-# --- a photo-less cleanliness submission is refused -------------------------
+# --- a photo-less cleanliness submission is refused, unless skip_photo -----
 r = client.post("/api/checklist/cleanliness", data={"station": "New Pump #2", "shift": SHIFT},
                  headers=CSRF)
 check(r.status_code == 400, f"a cleanliness submission with no photo is refused (got {r.status_code})")
+
+r = client.post("/api/checklist/cleanliness",
+                 data={"station": "New Pump #2", "shift": SHIFT, "notes": "Clean, nothing to show.", "skip_photo": "true"},
+                 headers=CSRF)
+check(r.status_code == 200, f"...but checking skip_photo lets a clean station through with no photo (got {r.status_code}, {r.text[:200]})")
+r = checklist_status("New Pump #2", SHIFT)
+check(r.json()["cleanliness_done_today"] is True, "...and it counts as today's cleanliness check, same as a photo would")
 
 # --- now the full submit succeeds, and links the vessel on the way through -
 r = client.post("/api/checklist/submit", json={

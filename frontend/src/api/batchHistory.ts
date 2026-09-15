@@ -32,6 +32,7 @@ export interface BatchRow {
   id: number
   reactor_name: string
   resin_type: string
+  lot_number: string
   filled_at: string | null
   emptied_at: string | null
   hours_in_reactor: number | null

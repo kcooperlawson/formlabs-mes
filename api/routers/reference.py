@@ -98,7 +98,7 @@ def plant_settings(user: dict = Depends(get_current_user)):
     )
 
 
-@router.get("/user/last-picks", response_model=LastPicksOut)
+@router.get("/reference/user/last-picks", response_model=LastPicksOut)
 def last_picks(as_operator: str | None = None, user: dict = Depends(get_current_user)):
     return crud.get_last_picks(resolve_operator_name(user, as_operator))
 

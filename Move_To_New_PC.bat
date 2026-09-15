@@ -27,7 +27,7 @@ rem longer exists, and "python" then resolves to the SYSTEM Python instead -
 rem which fails on "No module named 'dotenv'" the moment it imports utils.py.
 set "VPY=venv\Scripts\python.exe"
 
-echo [1/4] Backing up the database (pg_dump)...
+echo [1/6] Backing up the database (pg_dump)...
 set BACKUP_LINE=
 for /f "delims=" %%i in ('"%VPY%" _migration_helper.py backup') do set BACKUP_LINE=%%i
 echo     %BACKUP_LINE%
@@ -47,7 +47,7 @@ for /f "tokens=2 delims=:" %%f in ("%BACKUP_LINE%") do set DUMP_NAME=%%f
 set STAMP=%DUMP_NAME:mes_backup_=%
 set STAMP=%STAMP:.sql=%
 
-echo [2/5] Offline packages...
+echo [2/6] Offline packages...
 echo.
 echo     A work PC often can't reach PyPI - locked-down network, or a proxy
 echo     pip doesn't know about. Including the packages in the move package
@@ -85,7 +85,7 @@ if errorlevel 1 (
 )
 
 :stage
-echo [3/5] Staging a clean copy of the project...
+echo [3/6] Staging a clean copy of the project...
 set STAGE=%~dp0_MOVE_PACKAGE
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%STAGE%"
@@ -103,7 +103,7 @@ robocopy "%~dp0." "%STAGE%" /E ^
     /XD venv .git __pycache__ .idea logs _MOVE_PACKAGE tests dev docs ^
         "Claude outputs" _to_delete pgdata node_modules ^
     /XF combined_code.txt mes_production.db *.pyc *.tgz *.bak *.log ^
-        formlabs_mes_move_*.zip ^
+        formlabs_mes_move_*.zip Unlock_Move_Package.bat Unlock_Move_Package.ps1 ^
     /NFL /NDL /NJH >nul
 if %ERRORLEVEL% GEQ 8 (
     echo.
@@ -112,7 +112,7 @@ if %ERRORLEVEL% GEQ 8 (
     exit /b 1
 )
 
-echo [4/5] Compressing to a single zip file...
+echo [4/6] Compressing to a single zip file...
 set ZIPNAME=%~dp0formlabs_mes_move_%STAMP%.zip
 if exist "%ZIPNAME%" del "%ZIPNAME%"
 powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationPath '%ZIPNAME%' -Force"
@@ -126,19 +126,46 @@ if not exist "%ZIPNAME%" (
     exit /b 1
 )
 
-echo [5/5] Cleaning up...
+rem The zip at this point holds the FULL database backup - resin specs
+rem (sku/resin_code included - the app's own manage_resins gating means
+rem nothing once it's a raw pg_dump file), production logs, everything.
+rem Compress-Archive has no password/encryption option at all, so left
+rem as a plain .zip it would travel completely unprotected to wherever
+rem this file goes next (USB drive, cloud upload, ...). Encrypting it
+rem here, unconditionally, means there is never a build of this package
+rem that skips that step.
+echo [5/6] Password-protecting the package (AES-256)...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Unlock_Move_Package.ps1" -Mode Encrypt -Path "%ZIPNAME%"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Encrypting the package failed or was cancelled - see the
+    echo         message above. The plain, UNPROTECTED zip is still at:
+    echo             %ZIPNAME%
+    echo         Do not copy that file anywhere as-is. Re-run this script
+    echo         to try again.
+    rmdir /s /q "%STAGE%"
+    pause
+    exit /b 1
+)
+set "ZIPNAME=%ZIPNAME%.enc"
+
+echo [6/6] Cleaning up...
 rmdir /s /q "%STAGE%"
 
 echo.
 echo ===================================================
 echo  DONE.
 echo.
-echo  Copy this ONE file to your work PC (USB drive, cloud
-echo  drive, network share - however you'd normally move a file):
+echo  Copy BOTH of these files, together in the same folder,
+echo  to your work PC (USB drive, cloud drive, network share -
+echo  however you'd normally move files):
 echo.
 echo     %ZIPNAME%
+echo     Unlock_Move_Package.bat
 echo.
-echo  On the work PC: unzip it anywhere, then run
+echo  On the work PC: run Unlock_Move_Package.bat first and
+echo  enter the password you just set - it produces the real
+echo  .zip. Extract THAT ^(right-click -^> Extract All^), then run
 echo  START_HERE.bat from inside that folder and choose 1
 echo  ^(MES / Logger^) or 2 ^(Device Gateway^).
 echo ===================================================

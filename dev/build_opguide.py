@@ -87,6 +87,12 @@ GUIDE_CSS = """
   .callout.ok{border-left-color:var(--good);} .callout.ok .lab{color:var(--good);}
 
   .fix{border-top:.7pt solid var(--line-soft); padding:9pt 0 0; margin-bottom:9pt;}
+  /* Same reasoning as .callout above: nth-last-child(2) is the last fix on
+     the sheet (the folio is the true last child), and its trailing margin is
+     empty space in front of an invisible element rather than breathing room
+     between two visible ones - the difference between page 10 fitting and
+     clipping its own last line by five pixels. */
+  .page > .fix:nth-last-child(2){margin-bottom:0;}
   .fix h4{font-size:11pt; font-weight:800; margin:0 0 3pt;}
   .fix p{margin:0; font-size:10.2pt; line-height:1.55; color:var(--body);}
 
@@ -224,9 +230,10 @@ PAGES.append(page(
     + step(1, "Pick the pump you are starting at",
            "Choose it at the top of the lock screen. Whatever you pick here carries through to "
            "your logging screen, so you only answer this once.")
-    + step(2, "Submit the start-of-shift cleanliness photo",
-           "Take it on the phone. Add a note if there is anything worth saying about the state "
-           "of the station; otherwise the default note is fine.")
+    + step(2, "Submit the start-of-shift cleanliness check",
+           "Take a photo of the station, or tick <em>Station is clean &mdash; skip the photo</em> "
+           "when there is nothing to show. Add a note either way if there is anything worth saying "
+           "about the state of the station; otherwise the default note is fine.")
     + step(3, "Confirm the two checks",
            "That you have scanned the daily station QR code and submitted that checksheet, and "
            "that your bins of empty cartridges and your receiving carts are staged for the run. "
@@ -427,8 +434,8 @@ PAGES.append(page(
           "are light themes for bright shop lighting. Both are remembered.")
     + fix("I keep losing my place while pouring",
           "If there is a <em>Focus mode</em> toggle at the top of the logging tab, turn it on: it "
-          "strips the screen down to the four things you need mid-run &mdash; resin, lot, count "
-          "so far, how many left &mdash; big enough to read from across the station.")
+          "strips the screen to the four things you need mid-run &mdash; resin, lot, count so far, "
+          "how many left &mdash; big enough to read across the station.")
 , 10))
 
 # ------------------------------------------------------------- what else -----
