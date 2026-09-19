@@ -120,6 +120,21 @@ def _get_pg_bin(binary_name: str) -> str:
     if resolved:
         return resolved
 
+    # Portable mode (run_mes_portable.bat / api/portable_launcher.py) never
+    # installs a system PostgreSQL at all - it runs on the pgserver package's
+    # own bundled binaries instead, in a folder neither PATH nor the
+    # Program Files scan below would ever find. Try that next: pgserver
+    # exposes its bundled bin\ directory as POSTGRES_BIN_PATH, the same
+    # binaries api/portable_launcher.py already trusts to run this exact
+    # database (see its own pgserver.pg_ctl(...) call).
+    try:
+        import pgserver
+        candidate = os.path.join(pgserver.POSTGRES_BIN_PATH, exe_name)
+        if os.path.isfile(candidate):
+            return candidate
+    except Exception:
+        pass
+
     if os.name == "nt":
         candidates = sorted(
             glob.glob(os.path.join("C:\\Program Files\\PostgreSQL", "*", "bin", exe_name)),
@@ -153,21 +168,57 @@ def _get_db_connection_params():
     variable db_core.py already uses to connect the app itself — instead of
     the previous hardcoded 'localhost' / 'postgres' / 'formlabs_mes', which
     would silently back up (or restore into!) the wrong database the moment
-    DB_URL pointed anywhere other than the original default setup."""
+    DB_URL pointed anywhere other than the original default setup.
+
+    Falls back to the portable/bundled database (pgdata\\, see
+    api/portable_launcher.py) when DB_URL doesn't resolve to a real
+    connection - by design, run_mes_portable.bat "ignores DB_URL entirely"
+    and never writes the port it actually picked back to .env, so a
+    standalone script started fresh (this one; not the already-running app
+    process, which has the real URI in memory) had no way to find a
+    portable-mode database at all until now."""
     db_url = os.getenv("DB_URL")
-    if not db_url:
-        return None
-    try:
-        url = make_url(db_url)
-    except Exception:
-        return None
-    return {
-        "user": url.username or "postgres",
-        "host": url.host or "localhost",
-        "port": str(url.port or 5432),
-        "dbname": url.database or "",
-        "password": url.password,
-    }
+    if db_url:
+        try:
+            url = make_url(db_url)
+            if url.host and url.database:
+                return {
+                    "user": url.username or "postgres",
+                    "host": url.host,
+                    "port": str(url.port or 5432),
+                    "dbname": url.database,
+                    "password": url.password,
+                }
+        except Exception:
+            pass
+
+    pgdata = os.path.join(BASE_DIR, "pgdata")
+    if os.path.isdir(pgdata):
+        try:
+            import pgserver
+            # get_server() on a pgdata\ that's already running (the normal
+            # case - this is called from a short-lived helper script while
+            # the real app is up and being used) attaches to that same
+            # instance rather than starting a second one; pgserver only
+            # actually stops it once every process holding a handle has
+            # exited ("wait for last one"), so this script finishing does
+            # not stop the database out from under anyone using the app.
+            uri = pgserver.get_server(pgdata).get_uri()
+            url = make_url(uri)
+            return {
+                "user": url.username or "postgres",
+                "host": url.host or "127.0.0.1",
+                "port": str(url.port or 5432),
+                "dbname": "formlabs_mes",  # get_uri()'s own db is the admin "postgres" one
+                "password": url.password or "",
+            }
+        except Exception:
+            logger.exception(
+                "_get_db_connection_params() found a pgdata\\ folder but "
+                "could not attach to the portable database in it"
+            )
+
+    return None
 
 
 def create_database_backup() -> str:

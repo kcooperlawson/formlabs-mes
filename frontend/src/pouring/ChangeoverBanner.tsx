@@ -9,6 +9,10 @@ interface Props {
   station: string
   resin: string
   shift: string
+  /** Bumped by the parent on every successful submit, so the tank icon
+   * below can "gulp" once right when a pour actually lands - see
+   * PouringTab.tsx's pourTick. */
+  pourTick?: number
 }
 
 const banner = 'rounded-lg border px-3 py-2 text-sm'
@@ -21,7 +25,7 @@ const btn = `mt-2 ${fl.btn}`
 // full-page Streamlit rerun to recompute this exact panel before anything
 // else repainted. Here it's a plain onChange -> fetch (see
 // useReactorLookup): only this component re-renders.
-export function ChangeoverBanner({ station, resin, shift }: Props) {
+export function ChangeoverBanner({ station, resin, shift, pourTick }: Props) {
   const { data, isLoading } = useReactorLookup(station, resin)
   const invalidate = useInvalidateReactorLookup()
   const asOperator = useDebugOperator()
@@ -124,7 +128,7 @@ export function ChangeoverBanner({ station, resin, shift }: Props) {
   return (
     <div className={info}>
       <p>
-        🛢️ Drawing from <strong>{v.tag}</strong>
+        <span key={pourTick || 0} className={pourTick ? 'fl-gulp' : ''}>🛢️</span> Drawing from <strong>{v.tag}</strong>
         {v.bay_marker ? ` · bay ${v.bay_marker}` : ''}
       </p>
       {batch?.qc_result === 'fail' && (

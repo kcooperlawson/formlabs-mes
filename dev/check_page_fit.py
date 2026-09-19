@@ -26,7 +26,7 @@ import sys
 from playwright.async_api import async_playwright
 
 DOCS = pathlib.Path(__file__).resolve().parent.parent / "docs"
-DOCUMENTS = ("handbook", "operator_guide", "onepager", "update_guide")
+DOCUMENTS = ("handbook", "operator_guide", "onepager", "update_guide", "history")
 
 # A page is called over only when it is over by more than this. Sub-pixel
 # rounding in the layout engine puts a page a fraction over all the time, and a

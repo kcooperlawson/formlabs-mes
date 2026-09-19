@@ -45,6 +45,14 @@ export function ScadaPage() {
 
   const patch = (p: Partial<ScadaQuery>) => setQuery((prev) => ({ ...prev, ...p }))
 
+  // The same "notice the update, not just have it be correct" treatment the
+  // KPI cards above already get (see useFlashOnChange) - only meaningful
+  // when the newest row is actually sorted to the top, so a row logged
+  // while someone's sorted by units or resin doesn't flash something that
+  // isn't visually "new" to them.
+  const newestTimestamp = query.sort === 'newest' ? data?.log_stream[0]?.timestamp : undefined
+  const newestFlash = useFlashOnChange(newestTimestamp)
+
   return (
     <div className="flex flex-col gap-4">
         {data?.health && (data.health.is_alarm || data.health.is_warning) && (
@@ -248,7 +256,7 @@ export function ScadaPage() {
                   </thead>
                   <tbody>
                     {data.log_stream.slice(0, 100).map((row, i) => (
-                      <tr key={i} className={fl.tableRow}>
+                      <tr key={i} className={`${fl.tableRow} ${i === 0 && newestFlash ? 'fl-flash' : ''}`}>
                         <td className="py-1 pr-2 whitespace-nowrap text-[#CBD5E1]">{new Date(row.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
                         <td className="py-1 pr-2 text-[#CBD5E1]">{row.log_type}</td>
                         <td className="py-1 pr-2 text-[#CBD5E1]">{row.operator_name}</td>

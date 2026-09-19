@@ -84,9 +84,28 @@ input, select, textarea {
   97% { opacity: 0.75; }
 }
 
+/* One full tile (ThemeFlourish.tsx's GridHorizon draws it at 48px squares) -
+   any other distance leaves a visible jump/stutter once per loop, where the
+   pattern snaps back from wherever it ended to 0 instead of continuing
+   smoothly through the same point it started at. */
 @keyframes fl-grid-scroll {
   from { background-position-y: 0; }
-  to { background-position-y: 60px; }
+  to { background-position-y: 48px; }
+}
+
+/* ThemeFlourish.tsx's GlitchScan (Neon Cyberpunk) - a bar drifts the full
+   height of its container while flickering rather than holding one flat
+   opacity the whole way down, which is what actually reads as "glitching"
+   instead of just "a line sliding by". */
+@keyframes fl-glitch-scan {
+  0% { top: -2%; opacity: 0; }
+  6% { opacity: 0.55; }
+  9% { opacity: 0.15; }
+  12% { opacity: 0.5; }
+  50% { opacity: 0.25; }
+  88% { opacity: 0.5; }
+  94% { opacity: 0.1; }
+  100% { top: 102%; opacity: 0; }
 }
 
 @keyframes fl-rain-fade {
@@ -108,6 +127,70 @@ input, select, textarea {
   animation: fl-value-flash 900ms ease-out;
 }
 
+/* Every real button gets a small press-down on touch - cheap, and it's the
+   difference between a screen that just displays buttons and one that
+   feels like it's actually being pressed, which matters most exactly where
+   this app is used: a touchscreen or a phone, often with gloves on. */
+button:not(:disabled) {
+  transition: transform 80ms ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* The operator tab strip (Pouring/Downtime/Audit/Notes/Summary) swaps its
+   whole panel instantly otherwise - this plays once on every mount, keyed
+   by whichever tab just became active, so switching tabs reads as content
+   sliding into place rather than snapping. */
+@keyframes fl-tab-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.fl-tab-enter {
+  animation: fl-tab-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* The lot verification gate's own two outcomes, each felt as much as read -
+   see LotVerificationGate.tsx. A mismatch shakes the way a wrong password
+   field does; a match pulses once, the same accent-free green the rest of
+   the app already uses for "this is fine." */
+@keyframes fl-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.fl-shake {
+  animation: fl-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes fl-pulse-good {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+  70% { box-shadow: 0 0 0 9px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.fl-pulse-good {
+  animation: fl-pulse-good 700ms ease-out;
+}
+
+/* A stand-in for showing the real tank actually draining on submit, which
+   would need the reactor's live SVG (server-rendered, reactor_vessel.py)
+   piped into the pouring form's own lookup response - a bigger change than
+   this pass covers. This gives the "your pour just did something" feedback
+   on the tank icon itself, on the one screen operators actually submit
+   from, without that plumbing. */
+@keyframes fl-gulp {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35, 0.75); }
+  55% { transform: scale(0.85, 1.2); }
+  75% { transform: scale(1.08, 0.95); }
+  100% { transform: scale(1); }
+}
+.fl-gulp {
+  display: inline-block;
+  animation: fl-gulp 500ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
 /* A plant floor is exactly the environment where somebody genuinely needs
    this, not just a courtesy for desktop users - flashing wall displays and
    sliding UI chrome are a real problem for vestibular sensitivity, and
@@ -125,4 +208,37 @@ input, select, textarea {
   .fl-theme-transition * {
     transition-duration: 0.01ms !important;
   }
+}
+
+/* A pour landing. One piece of confetti: falls the height of the screen,
+   drifts sideways and spins, both set per-piece from JS (see
+   shell/Celebrate.tsx) so no two look alike. Nothing here runs unless that
+   component decides to draw - it is already gated on reduced-motion and on
+   the app's own "background animations off" switch. */
+@keyframes fl-confetti {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% { opacity: 0.95; }
+  100% {
+    transform: translate3d(var(--fl-drift, 0px), 105vh, 0) rotate(var(--fl-spin, 360deg));
+    opacity: 0;
+  }
+}
+
+/* The badge that names a milestone - in fast, held, then gone. */
+@keyframes fl-milestone {
+  0% { transform: scale(0.6) translateY(12px); opacity: 0; }
+  18% { transform: scale(1.08) translateY(0); opacity: 1; }
+  30% { transform: scale(1); }
+  78% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.96) translateY(-10px); opacity: 0; }
+}
+
+/* The shift ring's own pulse when it crosses a milestone. */
+@keyframes fl-ring-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.06); }
+  100% { transform: scale(1); }
 }

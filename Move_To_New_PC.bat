@@ -158,7 +158,9 @@ echo  DONE.
 echo.
 echo  Copy BOTH of these files, together in the same folder,
 echo  to your work PC (USB drive, cloud drive, network share -
-echo  however you'd normally move files):
+echo  however you'd normally move files). Unlock_Move_Package.bat
+echo  carries everything it needs to unlock the package on its own -
+echo  there is no third file to remember:
 echo.
 echo     %ZIPNAME%
 echo     Unlock_Move_Package.bat

@@ -4,6 +4,7 @@ import { fl } from '../theme'
 import { BulkPourPanel } from './BulkPourPanel'
 import { ManageFleetPanel } from './ManageFleetPanel'
 import { MarkFilledPanel } from './MarkFilledPanel'
+import { ReconcileControl } from './ReconcileControl'
 
 const card = fl.card
 
@@ -105,6 +106,7 @@ export function ReactorFleetPage() {
                   Mark {r.reactor_name} empty
                 </button>
               )}
+              <ReconcileControl reactor={r} />
             </div>
           ))}
         </div>

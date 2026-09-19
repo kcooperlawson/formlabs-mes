@@ -5,6 +5,7 @@ import { packingApi } from '../api/packing'
 import { useSubmitLock } from '../hooks/useSubmitLock'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { enqueue, isConnectivityError } from '../offline/queue'
+import { playLogged } from '../sound/chimes'
 import { useToast } from '../toast/ToastProvider'
 import { fl } from '../theme'
 
@@ -51,6 +52,7 @@ export function PackingTab() {
       setNotes('')
       submitLock.lock()
       toast.show(resp.message)
+      playLogged()
     },
     onError: (err) => {
       if (!isConnectivityError(err)) return
@@ -106,7 +108,7 @@ export function PackingTab() {
           type="number"
           min={1}
           step={50}
-          value={unitsPacked}
+          value={unitsPacked || ''}
           onChange={(e) => setUnitsPacked(Number(e.target.value))}
         />
         <p className={`mt-1 text-xs ${fl.muted}`}>

@@ -2,21 +2,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { devicesApi, type DeviceMeta, type DeviceRow } from '../api/devices'
 import { fl } from '../theme'
+import { ago } from './gateways'
 
 const card = fl.card
 const input = fl.input
 const select = fl.select
 
-const STATUS_COLORS: Record<string, string> = { Online: '#10B981', Offline: '#F59E0B', Error: '#EF4444', Unknown: '#64748B' }
+const STATUS_COLORS: Record<string, string> = {
+  Online: '#10B981', 'No data': '#F59E0B', 'Not reporting': '#F97316', Offline: '#F59E0B', Error: '#EF4444', Unknown: '#64748B',
+}
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return 'never'
-  const seconds = (Date.now() - new Date(iso).getTime()) / 1000
-  if (seconds < 0) return 'just now'
-  if (seconds < 60) return `${Math.floor(seconds)}s ago`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  return `${Math.floor(seconds / 86400)}d ago`
+// "Last seen" comes from the server as seconds, measured on the database's
+// own clock - not from comparing a timestamp with this browser's clock, which
+// is a third machine that can be minutes out.
+function lastSeen(d: DeviceRow): string {
+  if (d.seconds_since_seen != null) return ago(d.seconds_since_seen)
+  if (!d.last_seen_at) return 'never'
+  return ago((Date.now() - new Date(d.last_seen_at).getTime()) / 1000)
 }
 
 function TagMapPanel({ device, meta }: { device: DeviceRow; meta: DeviceMeta }) {
@@ -109,9 +111,9 @@ export function DevicesTab({ meta }: { meta: DeviceMeta }) {
               <b className="text-base text-white">{d.device_name}</b>{' '}
               <span className="text-sm font-bold" style={{ color: STATUS_COLORS[d.status] ?? STATUS_COLORS.Unknown }}>● {d.status}</span>
               <p className={`text-sm ${fl.muted}`}>
-                {meta.protocol_labels[d.protocol] ?? d.protocol} · role: {d.device_role} · pump: {d.assigned_pump} · reactor: {d.assigned_reactor} · last seen {timeAgo(d.last_seen_at)}
+                {meta.protocol_labels[d.protocol] ?? d.protocol} · role: {d.device_role} · pump: {d.assigned_pump} · reactor: {d.assigned_reactor} · last seen {lastSeen(d)}
               </p>
-              {d.last_error && <p className="text-xs text-red-400">{d.last_error}</p>}
+              {d.last_error && <p className={`text-xs ${d.status === 'Error' ? 'text-red-400' : 'text-amber-400'}`}>{d.last_error}</p>}
             </div>
             <div className="flex shrink-0 gap-2">
               <button className={fl.btnSecondary} disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate({ id: d.id, enabled: !d.is_enabled })}>

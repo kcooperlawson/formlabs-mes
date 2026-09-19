@@ -80,7 +80,7 @@ def login(body: LoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=401, detail=error)
     token = crud.create_session(user["id"])
     _set_session_cookie(request, response, token, body.remember)
-    return user
+    return {**user, "abilities": crud.effective_abilities(user["id"], user["role"])}
 
 
 @router.post("/logout", status_code=204)
@@ -93,4 +93,4 @@ def logout(request: Request, response: Response):
 
 @router.get("/me", response_model=UserOut)
 def me(user: dict = Depends(get_current_user)):
-    return user
+    return {**user, "abilities": crud.effective_abilities(user["id"], user["role"])}

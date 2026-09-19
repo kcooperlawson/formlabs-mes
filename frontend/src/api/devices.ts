@@ -11,6 +11,7 @@ export interface DeviceRow {
   is_enabled: boolean
   status: string
   last_seen_at: string | null
+  seconds_since_seen: number | null
   last_error: string | null
 }
 
@@ -67,11 +68,50 @@ export interface DeviceOption {
 
 export interface DeviceMeta {
   gateway_enabled: boolean
+  server_hostname: string
   protocol_labels: Record<string, string>
   canonical_metrics: string[]
   role_options: string[]
   pumps: DeviceOption[]
   reactors: DeviceOption[]
+}
+
+export interface GatewayNode {
+  hostname: string
+  ip_address: string | null
+  app_version: string | null
+  started_at: string | null
+  last_heartbeat_at: string | null
+  seconds_since_heartbeat: number | null
+  online: boolean
+}
+
+export type GatewayJobKind = 'serial_ports' | 'subnet' | 'scan' | 'test_connection'
+
+export interface GatewayJob {
+  id: number
+  target_host: string
+  kind: GatewayJobKind
+  status: 'pending' | 'running' | 'done' | 'error'
+  result: unknown
+  error: string | null
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Leaves a job for the gateway on `hostname` and waits for its answer. The
+// server gives up on a job nobody picks up within a minute and says so, so
+// this only needs its own ceiling for a gateway that dies mid-job.
+async function runOnGateway<T>(hostname: string, kind: GatewayJobKind, params: Record<string, unknown> = {}): Promise<T> {
+  const { id } = await api.post<{ id: number }>(`/devices/gateways/${encodeURIComponent(hostname)}/jobs`, { kind, params })
+  const deadline = Date.now() + 5 * 60 * 1000
+  while (Date.now() < deadline) {
+    await sleep(1000)
+    const job = await api.get<GatewayJob>(`/devices/gateway-jobs/${id}`)
+    if (job.status === 'done') return job.result as T
+    if (job.status === 'error') throw new Error(job.error ?? `The gateway on ${hostname} couldn't run this.`)
+  }
+  throw new Error(`The gateway on ${hostname} didn't finish in time.`)
 }
 
 export const devicesApi = {
@@ -90,6 +130,13 @@ export const devicesApi = {
 
   testConnection: (protocol: string, connection: Record<string, unknown>, probeTags: string[]) =>
     api.post<TestConnectionResult>('/devices/test-connection', { protocol, connection, probe_tags: probeTags }),
+
+  gateways: () => api.get<GatewayNode[]>('/devices/gateways'),
+  gatewaySerialPorts: (hostname: string) => runOnGateway<SerialPort[]>(hostname, 'serial_ports'),
+  gatewaySubnet: (hostname: string) => runOnGateway<{ subnet: string }>(hostname, 'subnet'),
+  gatewayScan: (hostname: string, subnet: string) => runOnGateway<NetworkHost[]>(hostname, 'scan', { subnet }),
+  gatewayTestConnection: (hostname: string, protocol: string, connection: Record<string, unknown>, probeTags: string[]) =>
+    runOnGateway<TestConnectionResult>(hostname, 'test_connection', { protocol, connection, probe_tags: probeTags }),
 
   serialPorts: () => api.get<SerialPort[]>('/devices/discovery/serial-ports'),
   guessSubnet: () => api.get<{ subnet: string }>('/devices/discovery/subnet'),

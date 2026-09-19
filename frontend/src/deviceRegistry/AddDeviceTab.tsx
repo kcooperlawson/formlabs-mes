@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { devicesApi, type DeviceMeta } from '../api/devices'
 import { fl } from '../theme'
 import type { Prefill } from './FindDevicesTab'
+import { defaultLookFrom, gatewayHost, lookFromName, useGateways, type LookFrom } from './gateways'
+import { LookFromPicker } from './LookFromPicker'
 
 const input = fl.input
 const select = fl.select
@@ -119,6 +121,9 @@ export function AddDeviceTab({ meta, prefill, onSaved }: { meta: DeviceMeta; pre
   const [connection, setConnection] = useState<Record<string, unknown>>({})
   const [notes, setNotes] = useState('')
   const [probeText, setProbeText] = useState('')
+  const gatewaysQuery = useGateways()
+  const [chosen, setChosen] = useState<LookFrom | null>(null)
+  const testFrom = chosen ?? defaultLookFrom(gatewaysQuery.data)
 
   useEffect(() => {
     if (prefill) {
@@ -126,13 +131,21 @@ export function AddDeviceTab({ meta, prefill, onSaved }: { meta: DeviceMeta; pre
       setDeviceRole(prefill.device_role)
       setProtocol(prefill.protocol)
       setConnection(prefill.connection)
+      // Test from the same PC that found it - that's the one known to reach it.
+      if (prefill.look_from) setChosen(prefill.look_from)
     }
   }, [prefill])
 
   const setField = (k: string, v: unknown) => setConnection((c) => ({ ...c, [k]: v }))
 
   const testMutation = useMutation({
-    mutationFn: () => devicesApi.testConnection(protocol, connection, probeText.split('\n').map((l) => l.trim()).filter(Boolean)),
+    mutationFn: () => {
+      const probes = probeText.split('\n').map((l) => l.trim()).filter(Boolean)
+      const host = gatewayHost(testFrom)
+      return host
+        ? devicesApi.gatewayTestConnection(host, protocol, connection, probes)
+        : devicesApi.testConnection(protocol, connection, probes)
+    },
   })
 
   const saveMutation = useMutation({
@@ -185,20 +198,25 @@ export function AddDeviceTab({ meta, prefill, onSaved }: { meta: DeviceMeta; pre
         <p className="mb-1 text-sm font-semibold text-white">Probe Tags (optional — see what the machine actually reports before saving)</p>
         <textarea
           className={`${input} h-24`}
-          placeholder={'Modbus: register addresses (e.g. 40001)\nOPC-UA: node ids\nMQTT: topics\nserial_ascii: a regex with a (?P<value>...) group\nhttp_poll: dotted JSON paths'}
+          placeholder={'Modbus: register addresses (e.g. 40001, or 40002:float for a two-register float)\nOPC-UA: node ids\nMQTT: topics\nserial_ascii: a regex with a (?P<value>...) group\nhttp_poll: dotted JSON paths'}
           value={probeText} onChange={(e) => setProbeText(e.target.value)}
         />
+        <div className="mt-2">
+          <LookFromPicker label="Test from" value={testFrom} onChange={setChosen}
+                          serverHostname={meta.server_hostname} gateways={gatewaysQuery.data ?? []} />
+        </div>
         <button className={`${fl.btnSecondary} mt-2`} disabled={testMutation.isPending} onClick={() => testMutation.mutate()}>
-          {testMutation.isPending ? 'Connecting…' : '🔎 Test Connection'}
+          {testMutation.isPending ? (gatewayHost(testFrom) ? `Asking ${gatewayHost(testFrom)}…` : 'Connecting…') : '🔎 Test Connection'}
         </button>
+        {testMutation.isError && <p className="mt-2 text-sm text-red-400">{(testMutation.error as Error).message}</p>}
         {testMutation.data && (
           testMutation.data.ok ? (
             <div className="mt-2">
-              <p className="text-sm text-emerald-400">Connected successfully.</p>
+              <p className="text-sm text-emerald-400">Connected successfully from {lookFromName(testFrom, meta.server_hostname)}.</p>
               <pre className="mt-1 max-h-40 overflow-auto rounded bg-[#0F172A] p-2 text-xs text-[#94A3B8]">{JSON.stringify(testMutation.data.raw, null, 2)}</pre>
             </div>
           ) : (
-            <p className="mt-2 text-sm text-red-400">Connection failed: {testMutation.data.error}</p>
+            <p className="mt-2 text-sm text-red-400">Connection failed from {lookFromName(testFrom, meta.server_hostname)}: {testMutation.data.error}</p>
           )
         )}
       </div>

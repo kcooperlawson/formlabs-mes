@@ -160,28 +160,43 @@ function PlantConfigForm() {
   )
 }
 
+const PUMP_TYPES = [
+  { value: '', label: '— type not set —' },
+  { value: 'piston_diaphragm', label: 'Piston diaphragm' },
+  { value: 'electric_motor', label: 'Electric motor' },
+]
+
 function PumpsPanel() {
   const queryClient = useQueryClient()
   const query = useQuery({ queryKey: ['admin-pumps'], queryFn: adminApi.pumps })
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-pumps'] })
   const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('')
   const [rates, setRates] = useState<Record<number, number>>({})
 
-  const addMutation = useMutation({ mutationFn: () => adminApi.addPump(newName), onSuccess: () => { setNewName(''); invalidate() } })
+  const addMutation = useMutation({ mutationFn: () => adminApi.addPump(newName.trim(), newType), onSuccess: () => { setNewName(''); setNewType(''); invalidate() } })
   const rateMutation = useMutation({ mutationFn: ({ id, rate }: { id: number; rate: number }) => adminApi.setPumpRate(id, rate), onSuccess: invalidate })
   const deleteMutation = useMutation({ mutationFn: (id: number) => adminApi.deletePump(id), onSuccess: invalidate })
 
   const pumps = query.data ?? []
+  const typeMutation = useMutation({
+    mutationFn: ({ id, pumpType }: { id: number; pumpType: string }) => adminApi.setPumpType(id, pumpType),
+    onSuccess: invalidate,
+  })
 
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-semibold text-white">🏷️ Pump Stations</p>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <input className={`${input} flex-1`} placeholder="e.g. Station A" value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <select className={`${fl.select} sm:w-52`} value={newType} onChange={(e) => setNewType(e.target.value)}>
+          {PUMP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
         <button className={fl.btn} disabled={!newName.trim() || addMutation.isPending} onClick={() => addMutation.mutate()}>➕ Add</button>
       </div>
       <p className={`text-xs ${fl.muted}`}>
-        The expected rate lives on the pump. A pump left blank uses the plant fallback figure.
+        The expected rate lives on the pump. A pump with no rate of its own uses what its own shifts measure;
+        pumps with neither share the plant fallback figure between them, rather than each claiming all of it.
       </p>
       <div className="flex flex-col gap-2">
         {pumps.map((p) => (
@@ -190,8 +205,22 @@ function PumpsPanel() {
               <b className="text-white">{p.station_name}</b>
               <span className={`text-xs font-bold ${p.status === 'Active' ? 'text-emerald-400' : 'text-amber-400'}`}>● {p.status}</span>
             </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className={`text-xs ${fl.muted}`}>Type</span>
+              <select
+                className={`${fl.select} w-52`}
+                value={p.pump_type ?? ''}
+                onChange={(e) => typeMutation.mutate({ id: p.id, pumpType: e.target.value })}
+              >
+                {PUMP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
             <p className={`text-xs ${fl.muted}`}>
-              expects {p.target_lph ? `${p.target_lph.toLocaleString()} L/h` : `${p.effective_lph.toLocaleString()} L/h (plant default)`}
+              expects {p.target_lph
+                ? `${p.target_lph.toLocaleString()} L/h`
+                : p.measured_median_lph
+                  ? `${p.measured_median_lph.toLocaleString()} L/h (measured from its own shifts)`
+                  : `a share of the plant figure — no rate set and not enough shifts to measure one`}
             </p>
             <p className={`text-xs ${fl.muted}`}>
               {p.measured_median_lph

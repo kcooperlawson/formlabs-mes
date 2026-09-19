@@ -36,7 +36,7 @@ from api.schemas.admin import (AbilityHistoryEntry, AbilityInfo, AddDowntimeReas
                                ResolveErrorRequest, RestoreBackupRequest, SetPumpRateRequest,
                                SuggestionOut, UpdatePlantSettingsRequest, UpdatePlantSettingsResult,
                                UpdateRoleShiftRequest, UpdateSuggestionRequest, UserAbilitiesOut,
-                               UserOut, WipStatusOut)
+                               UserOut, WipStatusOut, SetPumpTypeRequest)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -397,19 +397,28 @@ def list_pumps(user: dict = Depends(require_admin_console)):
     for _, p in df.iterrows():
         set_rate = float(p["target_lph"]) if pd.notna(p.get("target_lph")) and float(p.get("target_lph") or 0) > 0 else None
         m = measured.get(str(p["station_name"]))
+        ptype = _opt(p.get("pump_type"))
         out.append(PumpOut(
             id=int(p["id"]), station_name=p["station_name"], status=p.get("status") or "Active",
+            pump_type=ptype, pump_type_label=crud.PUMP_TYPE_LABELS.get(ptype or ""),
             target_lph=set_rate, effective_lph=set_rate or plant_lph,
             measured_median_lph=m["median_lph"] if m else None, measured_samples=m["samples"] if m else None,
         ))
     return out
 
 
+@router.put("/pumps/{pump_id}/type")
+def set_pump_type(pump_id: int, body: SetPumpTypeRequest, user: dict = Depends(require_admin_console)):
+    if not crud.set_pump_type(pump_id, body.pump_type):
+        raise HTTPException(status_code=404, detail="Pump not found.")
+    return {"ok": True}
+
+
 @router.post("/pumps", status_code=201)
 def add_pump(body: AddPumpRequest, user: dict = Depends(require_admin_console)):
     if not body.station_name.strip():
         raise HTTPException(status_code=400, detail="Station name is required.")
-    crud.add_pump_station(body.station_name)
+    crud.add_pump_station(body.station_name, pump_type=body.pump_type)
     return {"ok": True}
 
 

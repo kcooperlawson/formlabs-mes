@@ -20,13 +20,17 @@ risk class as a firewall rule silently dropping packets rather than
 rejecting them.
 """
 import concurrent.futures
+import ipaddress
+import socket
+from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
 import crud
 import device_crud
 from api.deps import require_admin_console, require_device_gateway
-from api.schemas.devices import (CreateDeviceRequest, DeviceMetaOut, DeviceOut, NetworkHostOut,
+from api.schemas.devices import (CreateDeviceRequest, DeviceMetaOut, DeviceOut, GatewayJobCreated,
+                                 GatewayJobOut, GatewayJobRequest, GatewayNodeOut, NetworkHostOut,
                                  OptionOut, ReadingRow, SerialPortOut, TagMapRow,
                                  TestConnectionRequest, TestConnectionResult, UpsertTagMapRequest)
 from device_gateway.discovery import guess_local_subnet, list_serial_ports, scan_network
@@ -51,12 +55,38 @@ def _opt(value):
     return str(value)
 
 
+def _utc_iso(value):
+    """A stored timestamp as ISO-8601 with its UTC offset.
+
+    Everything here is stored as naive UTC. Sent without an offset, the
+    browser reads it as LOCAL time - on Eastern time that put every
+    timestamp four hours in the future, so "last seen" said "just now" for
+    four hours after a gateway stopped, and Recent Readings showed the wrong
+    hour. With the offset the browser converts it properly."""
+    if value is None or str(value) in ("NaT", "nan"):
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
+
+def _num(value):
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if value != value else value
+
+
 @router.get("/meta", response_model=DeviceMetaOut)
 def meta(user: dict = Depends(require_admin_console)):
     pumps = crud.get_all_pumps_df()
     reactors = crud.get_all_reactors_df()
     return DeviceMetaOut(
         gateway_enabled=bool(crud.get_plant_settings().get("enable_device_gateway", False)),
+        server_hostname=socket.gethostname(),
         protocol_labels=PROTOCOL_LABELS, canonical_metrics=list(CANONICAL_METRICS), role_options=ROLE_OPTIONS,
         pumps=[OptionOut(id=int(r["id"]), name=r["station_name"]) for _, r in pumps.iterrows()] if not pumps.empty else [],
         reactors=[OptionOut(id=int(r["id"]), name=r["reactor_name"]) for _, r in reactors.iterrows()] if not reactors.empty else [],
@@ -66,16 +96,67 @@ def meta(user: dict = Depends(require_admin_console)):
 @router.get("", response_model=list[DeviceOut])
 def list_devices(user: dict = Depends(require_device_gateway)):
     df = device_crud.get_devices_df()
+    gateways = device_crud.get_gateway_nodes()
     out = []
     for _, r in df.iterrows():
+        stored = {
+            "status": r["status"], "is_enabled": bool(r["is_enabled"]),
+            "poll_interval_s": float(r["poll_interval_s"] or 5.0),
+            "seconds_since_seen": _num(r["seconds_since_seen"]),
+            "last_error": r["last_error"] if r["last_error"] and str(r["last_error"]) != "nan" else None,
+        }
+        status, error = device_crud.effective_status(stored, gateways)
         out.append(DeviceOut(
             id=int(r["id"]), device_name=r["device_name"], device_role=r["device_role"], protocol=r["protocol"],
             assigned_pump=r["assigned_pump"], assigned_reactor=r["assigned_reactor"],
-            poll_interval_s=float(r["poll_interval_s"]), is_enabled=bool(r["is_enabled"]), status=r["status"],
-            last_seen_at=r["last_seen_at"].isoformat() if r["last_seen_at"] is not None and str(r["last_seen_at"]) != "NaT" else None,
-            last_error=r["last_error"] if r["last_error"] and str(r["last_error"]) != "nan" else None,
+            poll_interval_s=stored["poll_interval_s"], is_enabled=stored["is_enabled"], status=status,
+            last_seen_at=_utc_iso(r["last_seen_at"]), seconds_since_seen=stored["seconds_since_seen"],
+            last_error=error,
         ))
     return out
+
+
+@router.get("/gateways", response_model=list[GatewayNodeOut])
+def gateways(user: dict = Depends(require_device_gateway)):
+    """Every PC running run_gateway.py that has checked in, newest first."""
+    return [
+        GatewayNodeOut(
+            hostname=g["hostname"], ip_address=g["ip_address"], app_version=g["app_version"],
+            started_at=_utc_iso(g["started_at"]), last_heartbeat_at=_utc_iso(g["last_heartbeat_at"]),
+            seconds_since_heartbeat=g["seconds_since_heartbeat"], online=g["online"],
+        )
+        for g in device_crud.get_gateway_nodes()
+    ]
+
+
+@router.post("/gateways/{hostname}/jobs", response_model=GatewayJobCreated, status_code=201)
+def create_gateway_job(hostname: str, body: GatewayJobRequest, user: dict = Depends(require_device_gateway)):
+    """Ask the gateway on `hostname` to run Find Devices / Test Connection
+    where the hardware is, instead of on this server. The page polls
+    /gateway-jobs/{id} for the answer."""
+    if body.kind not in device_crud.GATEWAY_JOB_KINDS:
+        raise HTTPException(status_code=400, detail=f"Unknown job {body.kind!r}.")
+    if not any(g["hostname"] == hostname for g in device_crud.get_gateway_nodes()):
+        raise HTTPException(status_code=404, detail=f"No gateway called {hostname!r} has ever checked in.")
+    params = dict(body.params or {})
+    if body.kind == "scan":
+        try:
+            ipaddress.ip_network(str(params.get("subnet") or ""), strict=False)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"{params.get('subnet')!r} isn't a subnet like 192.168.0.0/24.")
+    if body.kind == "test_connection":
+        params = {"protocol": str(params.get("protocol") or ""), "connection": params.get("connection") or {},
+                  "probe_tags": [str(t) for t in (params.get("probe_tags") or [])]}
+    job_id = device_crud.create_gateway_job(hostname, body.kind, params, created_by=user.get("username", ""))
+    return GatewayJobCreated(id=job_id)
+
+
+@router.get("/gateway-jobs/{job_id}", response_model=GatewayJobOut)
+def gateway_job(job_id: int, user: dict = Depends(require_device_gateway)):
+    job = device_crud.get_gateway_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return GatewayJobOut(**job)
 
 
 @router.post("", response_model=DeviceOut, status_code=201)
@@ -142,7 +223,7 @@ def readings(device_id: int, hours: int = 4, user: dict = Depends(require_device
     df = device_crud.get_recent_readings_df(device_id, hours=hours)
     return [
         ReadingRow(
-            timestamp=r["timestamp"].isoformat(), metric=r["metric"],
+            timestamp=_utc_iso(r["timestamp"]), metric=r["metric"],
             value_numeric=float(r["value_numeric"]) if r["value_numeric"] is not None and str(r["value_numeric"]) != "nan" else None,
             value_text=r["value_text"] if r["value_text"] and str(r["value_text"]) != "nan" else None,
         )
@@ -152,8 +233,7 @@ def readings(device_id: int, hours: int = 4, user: dict = Depends(require_device
 
 @router.post("/test-connection", response_model=TestConnectionResult)
 def test_connection(body: TestConnectionRequest, user: dict = Depends(require_device_gateway)):
-    temp_tag_map = [{"raw_tag": t, "canonical_metric": t, "data_type": "float", "scale_factor": 1.0}
-                    for t in body.probe_tags]
+    temp_tag_map = device_crud.probe_tag_map(body.protocol, body.probe_tags)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(device_crud.test_device_connection, body.protocol, body.connection, temp_tag_map)
         try:

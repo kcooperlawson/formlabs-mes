@@ -46,6 +46,11 @@ class SerialASCIIAdapter(DeviceAdapter):
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread = None
+        # Set by the reader thread when the port itself fails (USB cable
+        # pulled, adapter lost power). _read_raw raises it, so the gateway
+        # reconnects and the device shows Error instead of repeating the
+        # last weight it ever saw as if the scale were still there.
+        self._port_error = None
         self._compiled = [
             (t["raw_tag"], re.compile(t["raw_tag"])) for t in self.tag_map
         ]
@@ -66,9 +71,14 @@ class SerialASCIIAdapter(DeviceAdapter):
             self._thread.start()
 
     def _reader_loop(self):
+        import serial
         while not self._stop.is_set():
             try:
                 line = self.serial.readline().decode(errors="ignore").strip()
+            except (serial.SerialException, OSError) as exc:
+                if not self._stop.is_set():
+                    self._port_error = exc
+                return
             except Exception:
                 time.sleep(0.5)
                 continue
@@ -90,6 +100,10 @@ class SerialASCIIAdapter(DeviceAdapter):
                         self._latest[raw_tag] = match.group(0)
 
     def _read_raw(self) -> dict:
+        if self._port_error is not None:
+            raise ConnectionError(
+                f"Serial: lost {self.connection.get('port')} ({self._port_error}) - "
+                f"is the cable or USB adapter still plugged in?")
         request_command = self.connection.get("request_command")
         if request_command:
             self.serial.reset_input_buffer()

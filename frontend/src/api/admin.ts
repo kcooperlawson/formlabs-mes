@@ -146,6 +146,8 @@ export interface AdminPump {
   id: number
   station_name: string
   status: string
+  pump_type: string | null
+  pump_type_label: string | null
   target_lph: number | null
   effective_lph: number
   measured_median_lph: number | null
@@ -196,7 +198,10 @@ export const adminApi = {
   updateSettings: (body: UpdatePlantSettingsRequest) => api.put<UpdatePlantSettingsResult>('/admin/settings', body),
 
   pumps: () => api.get<AdminPump[]>('/admin/pumps'),
-  addPump: (stationName: string) => api.post('/admin/pumps', { station_name: stationName }),
+  addPump: (stationName: string, pumpType: string) =>
+    api.post('/admin/pumps', { station_name: stationName, pump_type: pumpType }),
+  setPumpType: (id: number, pumpType: string) =>
+    api.put(`/admin/pumps/${id}/type`, { pump_type: pumpType }),
   setPumpRate: (id: number, targetLph: number) => api.put(`/admin/pumps/${id}/rate`, { target_lph: targetLph }),
   deletePump: (id: number) => api.del(`/admin/pumps/${id}`),
 

@@ -23,6 +23,7 @@ export interface ReactorCard {
   svg: string
   batch: BatchInfo | null
   can_mark_empty: boolean
+  can_manage: boolean
 }
 
 export interface VesselTypeOption {
@@ -80,4 +81,6 @@ export const reactorsApi = {
   markEmpty: (id: number) => api.post<{ ok: boolean }>(`/reactors/${id}/mark-empty`),
   markFilled: (id: number, body: { resin_type: string; lot_number: string; filled_at: string | null; note: string }) =>
     api.post<{ ok: boolean }>(`/reactors/${id}/mark-filled`, body),
+  reconcile: (id: number, body: { mode: 'percent' | 'liters'; value: number; notes: string }) =>
+    api.post<{ ok: boolean }>(`/reactors/${id}/reconcile`, body),
 }

@@ -17,16 +17,27 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from datetime import timezone
+
 import crud
 from db_core import ScopedSession
 from models import CleanlinessAudit
 from api.shared import _vessel_label
-from api.deps import get_current_user
+from api.deps import get_current_user, resolve_operator_name
 from api.schemas.checklist import (
-    ChecklistStatus, ChecklistSubmitRequest, MarkAlreadyDoneRequest,
-    VesselOption, VesselOptionsOut,
-)
+    ChecklistStatus, ChecklistSubmitRequest, ComplianceOut, ComplianceRow,
+    MarkAlreadyDoneRequest, VesselOption, VesselOptionsOut)
 from api.uploads import to_streamlit_like_many
+
+def _utc_iso(value):
+    """Stored naive UTC -> ISO with its offset, so a browser shows the right
+    time rather than one read as local (see api/routers/devices.py)."""
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
 
 router = APIRouter(prefix="/checklist", tags=["checklist"])
 
@@ -133,3 +144,51 @@ def mark_already_done(body: MarkAlreadyDoneRequest, user: dict = Depends(get_cur
         raise HTTPException(status_code=500, detail="Could not record the audit trail for this override.")
     crud.submit_daily_checklist(user["full_name"], body.shift, body.station)
     return {"ok": True}
+
+
+@router.get("/compliance", response_model=ComplianceOut)
+def compliance(on_date: str = "", shift: str = "", user: dict = Depends(get_current_user),
+               as_operator: str = ""):
+    """Which checks are on record, for a day. An operator sees their own row;
+    a manager or admin sees everyone's, which is the same query with the
+    filter left off rather than a second implementation.
+
+    on_date is what makes this a history: any past date can be asked for, so
+    "did that get done last Tuesday" is a question the screen can answer
+    instead of a trip through the log tables.
+    """
+    from datetime import date as _date
+
+    try:
+        when = _date.fromisoformat(on_date) if on_date else _date.today()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{on_date!r} isn't a date (YYYY-MM-DD).")
+
+    settings = crud.get_plant_settings()
+    is_management = (user.get("role", "") == "manager"
+                     or crud.can_administer(user.get("role", ""), settings.get("simple_mode", True)))
+    if is_management and not as_operator:
+        who = ""  # everyone
+        scope = "everyone"
+    else:
+        # Standing in for a named operator narrows this the same way it
+        # narrows every other screen - the point of that mode is to see what
+        # they see, and a plant-wide table on their form isn't it.
+        who = resolve_operator_name(user, as_operator)
+        scope = "self"
+
+    rows = crud.checklist_compliance(on_date=when, shift=shift, operator_name=who)
+    return ComplianceOut(
+        date=when.isoformat(), scope=scope,
+        rows=[ComplianceRow(
+            operator_name=r["operator_name"], pump_station=r["pump_station"] or "—",
+            shift=r["shift"], poured=r["poured"],
+            checklist_at=_utc_iso(r["checklist_at"]),
+            start_audit_at=_utc_iso(r["start_audit_at"]),
+            transfer_audit_at=_utc_iso(r["transfer_audit_at"]),
+            end_audit_at=_utc_iso(r["end_audit_at"]),
+            start_expected=r["start_expected"], transfer_expected=r["transfer_expected"],
+            end_expected=r["end_expected"],
+            complete=r["complete"],
+        ) for r in rows],
+    )

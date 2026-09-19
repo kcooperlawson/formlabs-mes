@@ -29,9 +29,16 @@ function paletteDeclarations(p: Palette): string {
   // that same white wash would be nearly invisible on Daylight or Paper
   // White, so every spot that used to hardcode white/N reads this instead.
   const overlayBase = p.light ? p.ink : '#FFFFFF'
+  // 72% opaque + a light backdrop-blur (see OperatorFormPage's card) is what
+  // lets a glow theme's flourish actually read behind a card tall enough to
+  // fill the whole page. Went through 86% first - technically translucent,
+  // but the flourish's own lines are already thin and low-alpha (deliberately
+  // subtle at full opacity against the plain ground colour), and blurring
+  // them further behind a nearly-opaque card diluted them to invisible.
   return `
     --fl-ground: ${p.ground};
     --fl-surface: ${p.surface};
+    --fl-surface-glass: ${hexToRgba(p.surface, 0.72)};
     --fl-raised: ${p.raised};
     --fl-border: ${p.line};
     --fl-ink: ${p.ink};

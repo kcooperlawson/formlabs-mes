@@ -8,11 +8,15 @@ import { useNavigate } from 'react-router-dom'
 import { accountApi } from './api/account'
 import { referenceApi } from './api/reference'
 import { useAuth } from './auth/AuthProvider'
+import { CelebrationLayer } from './shell/Celebrate'
 import { ChecklistGate } from './checklist/ChecklistGate'
 import { useOfflineQueueCount } from './hooks/useOfflineQueueCount'
 import { startOfflineQueue } from './offline/queue'
 import { DebugOperatorProvider } from './operatorForm/DebugOperatorContext'
 import { AccountPanel } from './shell/AccountPanel'
+import { ThemeFlourish, useFlourishVisible } from './shell/ThemeFlourish'
+import { hasAnyManagerAbility } from './ManagerShell'
+import { paletteByName } from './palettes'
 import { fl } from './theme'
 import { AuditTab } from './pouring/AuditTab'
 import { DowntimeTab } from './pouring/DowntimeTab'
@@ -77,6 +81,12 @@ export function OperatorFormPage() {
   const role = user?.role ?? 'operator'
   const isPacker = role === 'packer'
   const isManagement = role === 'manager' || role === 'admin'
+  // Debug Mode (impersonating another operator's logs) stays manager/admin
+  // only - isManagement, unchanged, still gates that. This is broader: an
+  // operator or packer granted a screen like view_scada from IT Admin has
+  // nowhere else to reach it from, so the same button managers see now also
+  // shows for them, into the same shell filtered down to just what they hold.
+  const canSeeManagerShell = isManagement || hasAnyManagerAbility(user)
 
   const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
     isPacker ? { key: 'packing', label: 'Packing', icon: Package } : { key: 'pouring', label: 'Pouring', icon: FlaskConical },
@@ -97,15 +107,30 @@ export function OperatorFormPage() {
     startOfflineQueue()
   }, [])
 
+  const themeSlug = paletteByName(user?.preferred_theme).slug
+  // The card is tall enough on the Pouring tab to fill (and outscroll) the
+  // whole phone screen, so a fully opaque card hides the flourish behind it
+  // the moment there's real content - only the short "just logged in" state
+  // ever left a gap for it to peek through. Going slightly translucent (+ a
+  // blur so the glow reads as backdrop, not as illegible text underneath)
+  // keeps it visible at any scroll depth instead. Skipped entirely for
+  // themes with no flourish to show - no reason to blur a card over nothing.
+  const showFlourish = useFlourishVisible(themeSlug)
+
   return (
-    <div className="min-h-svh bg-[var(--fl-ground)] p-4">
+    <div className="relative min-h-svh overflow-hidden bg-[var(--fl-ground)] p-4">
+      {/* Operators are exactly who this whole feature was described as
+          being for ("I want them to be like this is cool to use") - this
+          page just never actually got the flourish ManagerShell's had all
+          along, on a theme that had one to show. */}
+      <ThemeFlourish slug={themeSlug} />
       <div
-        className="mx-auto flex max-w-lg flex-col gap-4 rounded-lg border border-[var(--fl-border)] bg-[var(--fl-surface)] p-4 shadow-[0_4px_10px_rgba(0,0,0,0.3)] sm:p-6"
+        className={`relative z-10 mx-auto flex max-w-lg flex-col gap-4 rounded-lg border border-[var(--fl-border)] p-4 shadow-[0_4px_10px_rgba(0,0,0,0.3)] sm:p-6 ${showFlourish ? 'bg-[var(--fl-surface-glass)] backdrop-blur-[3px]' : 'bg-[var(--fl-surface)]'}`}
         style={{ borderBottomColor: 'var(--fl-accent)', borderBottomWidth: 3 }}
       >
-        {isManagement && (
+        {canSeeManagerShell && (
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/cockpit')}
             className="self-start text-sm font-semibold text-[var(--fl-accent-2)] hover:underline"
           >
             ← Manager Cockpit
@@ -141,6 +166,8 @@ export function OperatorFormPage() {
           </div>
         </div>
 
+        <CelebrationLayer />
+
         <OfflineQueueBanner />
 
         {isManagement && <DebugModeBar asOperator={debugAsOperator} onChange={setDebugAsOperator} />}
@@ -160,12 +187,16 @@ export function OperatorFormPage() {
               ))}
             </div>
 
-            {tab === 'pouring' && <PouringTab shift={user?.shift ?? 'Shift 1'} myStation={myStation} />}
-            {tab === 'packing' && <PackingTab />}
-            {tab === 'downtime' && <DowntimeTab myStation={myStation} />}
-            {tab === 'audit' && <AuditTab myStation={myStation} />}
-            {tab === 'notes' && <NotesTab />}
-            {tab === 'summary' && <SummaryTab />}
+            {/* key={tab} forces a fresh mount per tab so fl-tab-enter's
+                animation replays on every switch, not just the first. */}
+            <div key={tab} className="fl-tab-enter">
+              {tab === 'pouring' && <PouringTab shift={user?.shift ?? 'Shift 1'} myStation={myStation} />}
+              {tab === 'packing' && <PackingTab />}
+              {tab === 'downtime' && <DowntimeTab myStation={myStation} />}
+              {tab === 'audit' && <AuditTab myStation={myStation} />}
+              {tab === 'notes' && <NotesTab />}
+              {tab === 'summary' && <SummaryTab />}
+            </div>
           </ChecklistGate>
         </DebugOperatorProvider>
       </div>

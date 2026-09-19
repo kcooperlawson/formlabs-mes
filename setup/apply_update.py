@@ -233,7 +233,7 @@ def install_packages(manifest, root):
         # A locked-down PC with no wheels folder is a real case, and the
         # honest thing is to say which packages could not be installed rather
         # than leaving an import error for later.
-        return False, (out.stderr or out.stdout or "")[-400:]
+        return False, (out.stderr or out.stdout or "")[-1000:]
     except Exception as exc:
         return False, str(exc)[:200]
 
@@ -254,16 +254,16 @@ def verify(root, written):
                              capture_output=True, text=True, timeout=600)
         if out.returncode != 0:
             return False, "a file that was copied does not compile:\n" + \
-                   (out.stderr or "")[-600:]
+                   (out.stderr or "")[-1500:]
     out = subprocess.run([py, "-c", "import crud; crud.init_db()"], cwd=root,
                          capture_output=True, text=True, timeout=1800)
     if out.returncode != 0:
-        return False, "the application did not start:\n" + (out.stderr or "")[-600:]
+        return False, "the application did not start:\n" + (out.stderr or "")[-1500:]
     return True, "compiled and started"
 
 
 # ------------------------------------------------------------------- main --
-def apply(package_path, root=ROOT, assume_yes=False):
+def apply(package_path, root=ROOT, assume_yes=False, allow_older=False):
     say()
     say("  ===================================================")
     say("   APPLY UPDATE")
@@ -311,11 +311,19 @@ def apply(package_path, root=ROOT, assume_yes=False):
             say("        Nothing has been changed. Apply the packages in order,")
             say("        or ask for one built against this version.")
             return 1
-        if here and target and version_tuple(target) <= version_tuple(here):
+        if here and target and version_tuple(target) <= version_tuple(here) and not allow_older:
             say(BAD + f"This PC is already on {here}, which is not older than "
                       f"{target}.")
             say("        Nothing has been changed.")
             return 1
+        if allow_older and here and target and version_tuple(target) < version_tuple(here):
+            # Asked for deliberately, from the Updates tab's own list of older
+            # releases. Worth saying out loud in the log: the FILES go back,
+            # and the database does not - migrations have no reverse here, so
+            # a schema change made by the newer version stays made.
+            say(WARN + f"Going BACK from {here} to {target}. The files go back; the")
+            say("        database does not - anything a newer version changed in the")
+            say("        schema stays changed. The backup below is the way out.")
         say(OK, f"version {here or '?'} -> {target}")
 
         if manifest.get("notes"):

@@ -234,6 +234,176 @@ check(poll_ok and "weight_g" in mapped, f"...and comes back with the mapped cano
 client.delete(f"/api/devices/{sim_device['id']}", headers=CSRF)
 client.delete(f"/api/devices/{sim_scale['id']}", headers=CSRF)
 
+# --- 4.07: gateway check-ins, honest status, UTC timestamps -----------------
+import os  # noqa: E402
+from datetime import datetime  # noqa: E402
+
+import device_crud  # noqa: E402
+from device_models import DeviceReading, GatewayJob  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+
+check("server_hostname" in client.get("/api/devices/meta").json(), "meta names the server, so the page can say where a scan runs")
+
+r = client.get("/api/devices/gateways")
+check(r.status_code == 200 and r.json() == [], f"no gateway has checked in on a fresh plant (got {r.json() if r.status_code == 200 else r.status_code})")
+
+r = client.post("/api/devices", json={
+    "device_name": "Status PLC", "device_role": "filling_station", "protocol": "modbus_tcp",
+    "connection": {"host": "10.0.0.60", "port": 502, "unit_id": 1}, "poll_interval_s": 2.0,
+}, headers=CSRF)
+status_id = r.json()["id"]
+
+
+def set_device(sql_fragment, **params):
+    session = ScopedSession()
+    try:
+        session.execute(text(f"UPDATE devices SET {sql_fragment} WHERE id = :id"), {"id": status_id, **params})
+        session.commit()
+    finally:
+        session.close()
+
+
+def status_row():
+    return next(d for d in client.get("/api/devices").json() if d["id"] == status_id)
+
+
+row = status_row()
+check(row["status"] == "Not reporting" and "No gateway PC has checked in yet" in (row["last_error"] or ""),
+      f"a device nothing is polling says so, instead of a bare Unknown (got {row})")
+
+# A device the gateway last marked Online, freshly seen - Online, whatever the
+# check-ins say, so a pre-4.07 gateway that doesn't check in still reads right.
+set_device("status = 'Online', last_error = NULL, last_seen_at = timezone('utc', now())")
+row = status_row()
+check(row["status"] == "Online", f"a freshly seen device is Online even with no check-ins (got {row})")
+check(row["last_seen_at"].endswith("+00:00"), f"last_seen_at carries its UTC offset for the browser (got {row['last_seen_at']})")
+check(row["seconds_since_seen"] is not None and row["seconds_since_seen"] < 5, f"...and the age comes from the database clock (got {row['seconds_since_seen']})")
+
+# The gateway died ten minutes ago: that same stored Online must not show.
+set_device("last_seen_at = timezone('utc', now()) - interval '10 minutes'")
+row = status_row()
+check(row["status"] == "Not reporting", f"a device the gateway last called Online, unseen for 10 min, is Not reporting (got {row})")
+
+device_crud.record_gateway_heartbeat("TEST-GATEWAY", "10.0.0.5", "PT-V4.07", datetime.utcnow())
+nodes = client.get("/api/devices/gateways").json()
+check(len(nodes) == 1 and nodes[0]["hostname"] == "TEST-GATEWAY" and nodes[0]["online"],
+      f"a check-in shows the gateway as running (got {nodes})")
+check(nodes[0]["last_heartbeat_at"].endswith("+00:00"), f"check-in times carry their UTC offset (got {nodes[0]['last_heartbeat_at']})")
+row = status_row()
+check(row["status"] == "Not reporting" and "stuck waiting on this device" in (row["last_error"] or ""),
+      f"with the gateway running, a silent device is blamed on the device (got {row})")
+
+session = ScopedSession()
+session.execute(text("UPDATE gateway_nodes SET last_heartbeat_at = timezone('utc', now()) - interval '30 seconds'"))
+session.commit()
+session.close()
+row = status_row()
+check("hasn't checked in for" in (row["last_error"] or ""),
+      f"a gateway that has just missed check-ins is suspected before the device is (got {row['last_error']!r})")
+
+session = ScopedSession()
+session.execute(text("UPDATE gateway_nodes SET last_heartbeat_at = timezone('utc', now()) - interval '2 hours'"))
+session.commit()
+session.close()
+row = status_row()
+check(row["status"] == "Not reporting" and "No gateway PC has checked in for 2 h" in (row["last_error"] or ""),
+      f"a gateway gone for 2 h is named as the reason (got {row['last_error']!r})")
+check(client.get("/api/devices/gateways").json()[0]["online"] is False, "...and the gateway list shows it offline")
+
+set_device("status = 'Error', last_error = 'Modbus TCP: no response from 10.0.0.60:502'")
+row = status_row()
+check(row["status"] == "Not reporting" and "Last error before it stopped: Modbus TCP: no response" in (row["last_error"] or ""),
+      f"an Error left behind by a gateway that has since stopped points at the gateway, keeping the old error (got {row})")
+device_crud.record_gateway_heartbeat("TEST-GATEWAY", "10.0.0.5", "PT-V4.07", datetime.utcnow())
+row = status_row()
+check(row["status"] == "Error" and row["last_error"].startswith("Modbus TCP: no response"),
+      f"with the gateway running, a device error is shown as it is (got {row})")
+
+client.put(f"/api/devices/{status_id}/enabled?enabled=false", headers=CSRF)
+set_device("status = 'Online', last_seen_at = timezone('utc', now()) - interval '1 day'")
+check(status_row()["status"] == "Online", "a disabled device isn't relabelled - nothing is expected of it")
+
+device_crud.record_gateway_heartbeat("TEST-GATEWAY", "10.0.0.5", "PT-V4.07", datetime.utcnow())
+
+# --- readings carry a UTC offset too ------------------------------------------
+session = ScopedSession()
+session.add(DeviceReading(device_id=status_id, timestamp=datetime.utcnow(), metric="weight_g", value_numeric=851.5))
+session.commit()
+session.close()
+r = client.get(f"/api/devices/{status_id}/readings?hours=1")
+check(r.status_code == 200 and r.json() and r.json()[0]["timestamp"].endswith("+00:00"),
+      f"reading timestamps carry their UTC offset (got {r.json() if r.status_code == 200 else r.status_code})")
+client.delete(f"/api/devices/{status_id}", headers=CSRF)
+
+# --- probe tags: Modbus reads one raw register unless told otherwise --------
+probes = device_crud.probe_tag_map("modbus_tcp", ["40001", "40002:float", " 40010 : int32 ", ""])
+check([(t["raw_tag"], t["data_type"]) for t in probes] == [("40001", "int"), ("40002", "float"), ("40010", "int32")],
+      f"Modbus probes default to a single register, with :float / :int32 overrides (got {probes})")
+probes = device_crud.probe_tag_map("opcua", ["ns=2;s=Machine:Weight"])
+check(probes[0]["raw_tag"] == "ns=2;s=Machine:Weight", f"a colon in a non-Modbus tag is left alone (got {probes})")
+
+# --- gateway jobs --------------------------------------------------------------
+from device_gateway.jobs import run_job  # noqa: E402
+from gateway_crypto import KeyMismatchError  # noqa: E402
+
+r = client.post("/api/devices/gateways/NO-SUCH-PC/jobs", json={"kind": "serial_ports", "params": {}}, headers=CSRF)
+check(r.status_code == 404, f"a job for a gateway that never checked in is refused (got {r.status_code})")
+r = client.post("/api/devices/gateways/TEST-GATEWAY/jobs", json={"kind": "format_disk", "params": {}}, headers=CSRF)
+check(r.status_code == 400, f"an unknown job kind is refused (got {r.status_code})")
+r = client.post("/api/devices/gateways/TEST-GATEWAY/jobs", json={"kind": "scan", "params": {"subnet": "not-a-subnet"}}, headers=CSRF)
+check(r.status_code == 400, f"a malformed subnet is refused before it ever reaches the gateway (got {r.status_code})")
+
+r = client.post("/api/devices/gateways/TEST-GATEWAY/jobs", json={"kind": "serial_ports", "params": {}}, headers=CSRF)
+check(r.status_code == 201, f"a serial-port job for a known gateway is accepted (got {r.status_code})")
+job_id = r.json()["id"]
+check(client.get(f"/api/devices/gateway-jobs/{job_id}").json()["status"] == "pending", "...and waits as pending")
+check(device_crud.claim_next_gateway_job("SOME-OTHER-PC") is None, "a different gateway doesn't take a job addressed to someone else")
+job = device_crud.claim_next_gateway_job("TEST-GATEWAY")
+check(job is not None and job["id"] == job_id, f"the addressed gateway claims it (got {job})")
+check(device_crud.claim_next_gateway_job("TEST-GATEWAY") is None, "...only once")
+check(client.get(f"/api/devices/gateway-jobs/{job_id}").json()["status"] == "running", "...and it shows as running")
+device_crud.finish_gateway_job(job_id, result=run_job(job["kind"], device_crud.decode_gateway_job_params(job)))
+done = client.get(f"/api/devices/gateway-jobs/{job_id}").json()
+check(done["status"] == "done" and isinstance(done["result"], list), f"the gateway's answer comes back to the page (got {done})")
+
+r = client.post("/api/devices/gateways/TEST-GATEWAY/jobs", json={"kind": "test_connection", "params": {
+    "protocol": "mqtt", "connection": {"host": "10.0.0.9", "password": "s3cret-broker-pw"}, "probe_tags": []}}, headers=CSRF)
+job_id = r.json()["id"]
+session = ScopedSession()
+stored = session.get(GatewayJob, job_id).request_json
+session.close()
+check("s3cret-broker-pw" not in stored, "a Test Connection job's password is encrypted while it waits in the database")
+job = device_crud.claim_next_gateway_job("TEST-GATEWAY")
+check(device_crud.decode_gateway_job_params(job)["connection"]["password"] == "s3cret-broker-pw", "...and the gateway can read it back")
+
+real_key = os.environ.get("GATEWAY_ENCRYPTION_KEY")
+from cryptography.fernet import Fernet  # noqa: E402
+os.environ["GATEWAY_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+try:
+    device_crud.decode_gateway_job_params(job)
+    mismatch = None
+except KeyMismatchError as exc:
+    mismatch = str(exc)
+finally:
+    os.environ["GATEWAY_ENCRYPTION_KEY"] = real_key
+check(mismatch is not None and "GATEWAY_ENCRYPTION_KEY" in mismatch and "MES PC" in mismatch,
+      f"a gateway with a different key gets a sentence saying what to copy where (got {mismatch!r})")
+device_crud.finish_gateway_job(job_id, error=mismatch)
+session = ScopedSession()
+check(session.get(GatewayJob, job_id).request_json is None, "a finished job's request - password included - is cleared")
+session.close()
+
+r = client.post("/api/devices/gateways/TEST-GATEWAY/jobs", json={"kind": "subnet", "params": {}}, headers=CSRF)
+job_id = r.json()["id"]
+session = ScopedSession()
+session.execute(text("UPDATE gateway_jobs SET created_at = timezone('utc', now()) - interval '5 minutes' WHERE id = :id"), {"id": job_id})
+session.commit()
+session.close()
+job = client.get(f"/api/devices/gateway-jobs/{job_id}").json()
+check(job["status"] == "error" and "didn't pick this up" in (job["error"] or ""),
+      f"a job no gateway picks up ends with a reason instead of spinning forever (got {job})")
+check(device_crud.claim_next_gateway_job("TEST-GATEWAY") is None, "...and a gateway that turns up late doesn't run it")
+
 # --- everything here requires a session ------------------------------------
 client.post("/api/auth/logout", headers=CSRF)
 r = client.get("/api/devices/meta")

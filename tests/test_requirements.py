@@ -71,6 +71,9 @@ PORTABLE_ONLY = {"pgserver"}
 LOCAL = ({p.stem for p in ROOT.glob("*.py")}
          | {p.stem for p in (ROOT / "api").rglob("*.py")}
          | {p.stem for p in (ROOT / "setup").glob("*.py")}
+         # dev/ is ours too - the release tooling (make_update, update_publish)
+         # is imported by name from the Updates tab's publish endpoint.
+         | {p.stem for p in (ROOT / "dev").glob("*.py")}
          | {"api", "device_gateway", "migrations", "tests", "dev", "setup", "assets"}
          | set(sys.stdlib_module_names))
 

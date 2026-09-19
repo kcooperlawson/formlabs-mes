@@ -179,6 +179,9 @@ class PumpOut(BaseModel):
     id: int
     station_name: str
     status: str
+    # "piston_diaphragm" | "electric_motor" | None for one nobody has labelled
+    pump_type: str | None
+    pump_type_label: str | None
     target_lph: float | None
     effective_lph: float
     measured_median_lph: float | None
@@ -187,6 +190,11 @@ class PumpOut(BaseModel):
 
 class AddPumpRequest(BaseModel):
     station_name: str
+    pump_type: str = ""
+
+
+class SetPumpTypeRequest(BaseModel):
+    pump_type: str = ""
 
 
 class SetPumpRateRequest(BaseModel):

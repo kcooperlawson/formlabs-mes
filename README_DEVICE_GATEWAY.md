@@ -41,7 +41,11 @@ device_gateway/
   discovery.py                    # "find devices" - serial port enumeration + local-subnet TCP scan for the admin page
   writer.py                       # normalized reading -> DeviceReading row + (if it's a fill cycle) add_hourly_log()
   service.py                      # the background poller: one thread per enabled device, hot-reloads the devices table
+  jobs.py                         # Find Devices / Test Connection requests, run on the gateway PC for the admin page
+  field_check.py                  # `run_gateway.py --check`: can THIS PC reach the database and every machine?
+migrations/versions/0024_gateway_nodes_and_jobs.py  # gateway check-ins + the job table (4.07)
 run_gateway.py                    # `python run_gateway.py` — standalone entrypoint, run as its own process/service
+dev/simulate_gateway_network.py   # fake PLC + pullable network cables: proves the gateway rides out outages
 service_announcer.py              # advertises this PC's database on the local network (mDNS) - runs inside Home.py
 service_discovery.py              # finds that announcement - used by run_gateway.py
 pages/Device_Registry.py          # the admin UI: find, add, assign, test-connect, tag-map, watch recent readings
@@ -81,8 +85,31 @@ requirements-device-gateway.txt   # pymodbus, pyserial, opcua, paho-mqtt
 
 Two processes, same as most SCADA/MES setups split this way:
 
-- `run_mes_api.bat` (or `START_HERE.bat`) — the main app, including the Device Registry page in the React frontend. It also announces the database on the local network (see auto-discovery below) so a gateway running elsewhere can find it.
-- `python run_gateway.py` — the background poller. Run it on whatever machine actually has network/USB/COM-port access to the equipment being registered (a floor PC, not necessarily wherever Postgres lives) — see the docstring at the top of `run_gateway.py` for wrapping it as a Windows service or systemd unit so it survives reboots.
+- `START_HERE.bat`, option 3 — the main app, including the Device Registry page in the React frontend. It also announces the database on the local network (see auto-discovery below) so a gateway running elsewhere can find it.
+- `python run_gateway.py` (`START_HERE.bat`, option 4) — the background poller. Run it on whatever machine actually has network/USB/COM-port access to the equipment being registered (a floor PC, not necessarily wherever Postgres lives) — see the docstring at the top of `run_gateway.py` for wrapping it as a Windows service or systemd unit so it survives reboots.
+
+Run it on **one** PC. Every gateway polls every enabled device, so two running at once read each machine twice and log its production twice — the Device Registry shows a red warning if it sees that.
+
+### Before trusting a floor PC: `run_gateway.py --check`
+
+`START_HERE.bat`, option 12, on the floor PC itself. It logs in to the database the same way the gateway does, then checks that this PC's `GATEWAY_ENCRYPTION_KEY` can open every saved device, that every network device's address answers from *this* PC, that every serial device's COM port is present on *this* PC, and does one real read from each. It prints `[ok]` / `[X]` per item with the reason, and exits 1 if anything failed. Nothing on the MES side can test this for you — whether a PLC is reachable depends entirely on which network and which cables the floor PC has.
+
+### When the network drops
+
+The gateway waits out a database outage instead of exiting: it logs `can't reach the MES database` once (and a reminder every minute), retries every few seconds, and carries on as soon as the database answers. Machines that report a running total (`units_poured_total`) lose no counts over an outage — the first reading afterwards is compared with the last one saved. At startup it does the same: if the MES PC isn't up yet, it explains why it can't connect and keeps trying, so a floor PC that boots first still ends up connected.
+
+Before 4.07 the first failed query ended the process, and nothing was read again until someone restarted it by hand.
+
+### What the statuses mean
+
+| Status | Meaning |
+|---|---|
+| Online | Real readings are arriving. |
+| No data | Connected, but none of the mapped tags returned a value (or no tags are mapped yet). Reconnected after a minute of this. |
+| Error | The machine can't be reached or refused the read — the message says which. |
+| Not reporting | Nothing is reading this device: no gateway has checked in recently, or the gateway is running but hasn't produced a reading for this device in three polls. Worked out by the MES when the page loads, never stored. |
+
+A gateway on 4.06 or older doesn't check in, so apply an update on the gateway PC as well as the MES PC.
 
 ## Auto-discovery — running the gateway on a different PC than Postgres
 
@@ -105,6 +132,25 @@ This is plant-network exposure, not internet exposure — nothing here opens Pos
 
 **Escape hatch:** if a floor PC's network genuinely can't pass mDNS traffic (managed switch doing client isolation, a separate VLAN, etc.), set `GATEWAY_DB_URL` in that one PC's `.env` to a full, manually-typed connection string. Skips discovery entirely for that machine only — everything else keeps auto-discovering as normal.
 
+**If the MES PC uses the bundled database** (the normal setup from 4.08 on — `pgdata\` next to the project, no PostgreSQL install), it is private to that PC by default: it listens on 127.0.0.1 only, on a port picked fresh at every start, with no password. A gateway PC can't reach that, and no `.env` line will make it.
+
+On the MES PC, run **`START_HERE.bat` option 15** once. It gives the database a fixed port (5433 by default) and a real password, allows the postgres login from the plant's subnet with `scram-sha-256`, and prints the two things left to do: one Windows Firewall rule on that PC, and one line for the gateway PC's `.env`:
+
+```
+GATEWAY_DB_URL=postgresql://postgres:PASSWORD@MES-PC-IP:5433/formlabs_mes
+```
+
+Then check it from the gateway PC with `START_HERE.bat` option 12. Turning it off again (option 15, then D) puts the database back to being private on the next start.
+
+**On a corporate network, plan on the escape hatch.** mDNS is multicast, and multicast rarely crosses from one VLAN or subnet to another, which is exactly the layout of a plant network next to a corporate one. What the floor PC needs instead:
+
+- `GATEWAY_DB_URL=postgresql://USER:PASSWORD@MES-PC-NAME-OR-IP:5432/formlabs_mes` in its `.env`
+- a `pg_hba.conf` line on the MES PC for the floor PC's address (`host formlabs_mes postgres 10.x.x.x/32 scram-sha-256`)
+- TCP 5432 allowed from the floor PC to the MES PC — Windows Firewall on the MES PC, and any firewall between the two networks
+- the same `GATEWAY_ENCRYPTION_KEY` line as the MES PC's `.env`. The MES PC creates that key the first time a device is saved, so a floor PC set up before that has none; copy the line across by hand.
+
+If any of those is missing, `run_gateway.py` says which one in plain words at startup (a `pg_hba.conf` rejection prints the exact line to add; a timeout points at the firewall; a `localhost` address points out the `.env` was copied from the MES PC), and `--check` reports it too.
+
 ## Find Devices — a Wi-Fi-picker-style scan instead of typing in connection details
 
 The **🔍 Find Devices** tab on `pages/Device_Registry.py` (`device_gateway/discovery.py`) turns "I need this machine's IP address or COM port" into a list to click, the same way connecting to Wi-Fi does:
@@ -112,7 +158,11 @@ The **🔍 Find Devices** tab on `pages/Device_Registry.py` (`device_gateway/dis
 - **Serial / COM ports** — enumerates every port Windows currently sees plugged in (via `pyserial`, already a dependency for `modbus_rtu`/`serial_ascii`), so a scale or an RS-485 USB dongle appears the moment it's plugged in. Click **Use →** and it prefills COM port + a `serial_ascii` starting point in the Add tab.
 - **Network scan** — a fast, read-only TCP connect-sweep of one subnet (defaulted from this PC's own LAN IP, editable for VLANs/other ranges) against the ports the network protocols conventionally use: 502 (Modbus TCP), 4840 (OPC-UA), 1883 (MQTT), 80/443 (HTTP). A host with one of those open shows up as a candidate with a guessed protocol; click **Use →** to prefill it. An open port is a hint, not a confirmed identification — always run **Test Connection** afterward (same probe the Add tab already used) before saving.
 
-This only opens plain outbound TCP connections on the local network and closes them immediately, or reads OS-level serial port metadata — nothing is written to any machine, and nothing leaves the subnet you type in. It runs from wherever `pages/Device_Registry.py` itself is being viewed from (same process as the rest of the admin page); if `run_gateway.py` ends up running on a separate floor PC from the Streamlit app, scan from whichever PC actually has network/USB access to the equipment being added, and use the discovered IP/COM port to register the device from there.
+This only opens plain outbound TCP connections on the local network and closes them immediately, or reads OS-level serial port metadata — nothing is written to any machine, and nothing leaves the subnet you type in.
+
+**Where it runs.** Both Find Devices and Test Connection have a **Look for machines from / Test from** picker listing every gateway PC that has checked in, plus the MES server itself. It defaults to the running gateway. Picking a gateway leaves a job in the `gateway_jobs` table; that gateway picks it up within a couple of seconds, runs the scan or the test on its own PC — its COM ports, its network — and writes the result back for the page (`device_gateway/jobs.py`). Before 4.07 these always ran inside the API process on the MES server, so from a corporate PC they listed the server's COM ports and scanned the server's subnet, not the floor's. A Test Connection password is encrypted while the job waits and cleared once it finishes.
+
+For Modbus, a probe tag reads one raw register (`40001`); add `:float` or `:int32` for a two-register value (`40002:float`).
 
 ## Rollout plan — start with what's easiest to test
 

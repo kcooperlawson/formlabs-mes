@@ -82,6 +82,51 @@ def pump_rates(default_lph=None):
         session.close()
 
 
+def rates_for(stations, fallback):
+    """station -> {"rate", "source"} for the pumps running this shift.
+
+    The plant figure is a figure for the PLANT - one number describing the
+    whole floor. Giving every unset pump that same number each, which is
+    what this used to do, expected three uncharacterised pumps to pour three
+    times the plant's own target, and every pace and estimated total on
+    every screen read high because of it. The harder anyone pushed, the
+    further behind the numbers said they were.
+
+    So, per pump, in order:
+      set      - somebody typed a rate for this pump. Believe it.
+      measured - it has enough history to say what it actually does
+                 (pace.measured_rates), which is the right answer for a
+                 pump nobody has got round to characterising.
+      plant    - no rate and no history: the pumps in this position SHARE
+                 the plant figure rather than each claiming all of it.
+    """
+    session = ScopedSession()
+    try:
+        explicit = {str(p.station_name): float(p.target_lph)
+                    for p in session.query(PumpStation).all()
+                    if p.target_lph and float(p.target_lph) > 0}
+    except Exception:
+        explicit = {}
+    finally:
+        session.close()
+
+    measured = measured_rates()
+    out, unknown = {}, []
+    for st in stations:
+        if st in explicit:
+            out[st] = {"rate": explicit[st], "source": "set"}
+        elif measured.get(st):
+            out[st] = {"rate": float(measured[st]["median_lph"]), "source": "measured"}
+        else:
+            unknown.append(st)
+
+    if unknown:
+        share = float(fallback) / len(unknown)
+        for st in unknown:
+            out[st] = {"rate": share, "source": "plant"}
+    return out
+
+
 def set_pump_rate(pump_id, target_lph):
     """Clearing it (0 or None) puts that pump back on the plant figure."""
     session = ScopedSession()
@@ -176,12 +221,13 @@ def expected_for_shift(settings, shift_name, shift_start, now=None, on_date=None
         return {"expected_l": fallback * elapsed_net, "rate_lph": fallback,
                 "shift_target_l": fallback * net, "stations": [], "derived": False}
 
-    rates = pump_rates(fallback)
+    rates = rates_for(list(certified), fallback)
     down = _downtime_hours(on_date, shift_name)
 
     stations, expected_l, shift_target_l, rate_now = [], 0.0, 0.0, 0.0
     for st, cert_at in sorted(certified.items()):
-        rate = float(rates.get(st, fallback))
+        resolved = rates.get(st) or {"rate": fallback, "source": "plant"}
+        rate = float(resolved["rate"])
         # Clamped to the shift: certifying early does not buy hours, and a
         # late start is not charged for the time nobody was standing there.
         opened = max(start, min(cert_at, end))
@@ -198,6 +244,7 @@ def expected_for_shift(settings, shift_name, shift_start, now=None, on_date=None
         hours_all = max(0.0, rest - dt)
         exp = rate * hours_now
         stations.append({"station": st, "rate_lph": rate,
+                         "rate_source": resolved["source"],
                          "certified_at": opened.astimezone(PLANT_TZ),
                          "hours": hours_now, "downtime_h": dt,
                          "expected_l": exp})

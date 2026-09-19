@@ -54,10 +54,14 @@ export function SummaryTab() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className={tile}>
               <p className="text-lg font-semibold text-white">{data.units.toLocaleString()}</p>
               <p className={`text-xs ${fl.muted}`}>Units</p>
+            </div>
+            <div className={tile}>
+              <p className="text-lg font-semibold text-white">{data.litres.toLocaleString(undefined, { maximumFractionDigits: 1 })}</p>
+              <p className={`text-xs ${fl.muted}`}>Litres</p>
             </div>
             <div className={tile}>
               <p className="text-lg font-semibold text-white">{data.scrap.toLocaleString()}</p>
@@ -115,6 +119,28 @@ export function SummaryTab() {
                           <div className="h-full bg-violet-500" style={{ width: `${(r.units / total) * 100}%` }} />
                         </div>
                         <span className="w-10 shrink-0 text-right text-[#CBD5E1]">{r.units}</span>
+                        <span className={`w-16 shrink-0 text-right ${fl.muted}`}>{r.litres.toLocaleString(undefined, { maximumFractionDigits: 1 })} L</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <h4 className={`mb-1 text-xs font-semibold uppercase tracking-wide ${fl.muted}`}>
+                  🛢️ By Cartridge / Format
+                </h4>
+                <div className="flex flex-col gap-1">
+                  {data.by_cartridge.map((c) => {
+                    const total = data.by_cartridge.reduce((sum, p) => sum + p.units, 0) || 1
+                    return (
+                      <div key={c.cartridge_type} className="flex items-center gap-2 text-xs">
+                        <span className="w-32 shrink-0 truncate text-[#CBD5E1]">{c.cartridge_type}</span>
+                        <div className="h-3 flex-1 overflow-hidden rounded bg-[#0F172A]">
+                          <div className="h-full bg-sky-500" style={{ width: `${(c.units / total) * 100}%` }} />
+                        </div>
+                        <span className="w-10 shrink-0 text-right text-[#CBD5E1]">{c.units}</span>
+                        <span className={`w-16 shrink-0 text-right ${fl.muted}`}>{c.litres.toLocaleString(undefined, { maximumFractionDigits: 1 })} L</span>
                       </div>
                     )
                   })}

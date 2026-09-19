@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -24,6 +26,7 @@ class ReactorCard(BaseModel):
     svg: str
     batch: BatchInfo | None = None
     can_mark_empty: bool
+    can_manage: bool
 
 
 class VesselTypeOption(BaseModel):
@@ -97,3 +100,9 @@ class MarkFilledRequest(BaseModel):
     lot_number: str = ""
     filled_at: str | None = None   # ISO 8601; omitted means "now"
     note: str = ""
+
+
+class ReconcileRequest(BaseModel):
+    mode: Literal["percent", "liters"]
+    value: float = Field(ge=0)
+    notes: str = ""

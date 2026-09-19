@@ -8,9 +8,10 @@ import { CrashReportsTab } from './CrashReportsTab'
 import { DatabaseTab } from './DatabaseTab'
 import { SettingsTab } from './SettingsTab'
 import { SuggestionsTab } from './SuggestionsTab'
+import { UpdatesTab } from './UpdatesTab'
 import { UsersTab } from './UsersTab'
 
-type TabKey = 'users' | 'suggestions' | 'crashes' | 'database' | 'settings'
+type TabKey = 'users' | 'suggestions' | 'crashes' | 'database' | 'settings' | 'updates'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'users', label: '👥 User Management & Roster' },
@@ -18,6 +19,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'crashes', label: '🐞 Crash Reports' },
   { key: 'database', label: '📜 System & Database Utilities' },
   { key: 'settings', label: '⚙️ Plant Configuration' },
+  { key: 'updates', label: '🆙 Updates' },
 ]
 
 // IT Admin Console, ported from pages/Admin_Panel.py. Gated server-side by
@@ -73,6 +75,7 @@ export function AdminPanelPage() {
       {tab === 'crashes' && <CrashReportsTab />}
       {tab === 'database' && <DatabaseTab />}
       {tab === 'settings' && <SettingsTab />}
+      {tab === 'updates' && <UpdatesTab />}
     </div>
   )
 }

@@ -27,6 +27,8 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 import bulk_pour
+from datetime import timezone
+
 import crud
 import fill_weight
 from api import realtime
@@ -35,8 +37,7 @@ from api.deps import get_current_user, require_ability, resolve_operator_name
 from api.schemas.pouring import (
     BatchInfo, BulkPreviewOut, ChangeoverRequest, FastPathInfo, LinkVesselRequest,
     LotCheckOut, LotGateOut, MarkEmptyRequest, PourSubmitResponse, ReactorLookupOut,
-    UndoRequest, UndoResponse, VesselChoice, VesselRef,
-)
+    UndoRequest, UndoResponse, StationBenchmark, VesselChoice, VesselRef, LastEntryOut)
 from api.uploads import to_streamlit_like
 
 router = APIRouter(prefix="/pouring", tags=["pouring"])
@@ -79,6 +80,26 @@ def reactor_lookup(station: str, resin: str, user: dict = Depends(get_current_us
     )
 
 
+@router.get("/last-entry", response_model=LastEntryOut)
+def last_entry(user: dict = Depends(get_current_user), as_operator: str = ""):
+    """What this operator logged last, so the form can offer it back instead
+    of asking them to retype the same four fields every hour."""
+    row = crud.last_pour_for_operator(resolve_operator_name(user, as_operator))
+    if row is None:
+        return LastEntryOut(found=False)
+    logged = row["logged_at"]
+    if logged is not None and getattr(logged, "tzinfo", None) is None:
+        logged = logged.replace(tzinfo=timezone.utc)
+    return LastEntryOut(found=True, pump_station=row["pump_station"], resin_type=row["resin_type"],
+                        cartridge_type=row["cartridge_type"], lot_number=row["lot_number"],
+                        bottles=row["bottles"], logged_at=logged.isoformat() if logged else None)
+
+
+@router.get("/station-benchmark", response_model=StationBenchmark)
+def station_benchmark(station: str, user: dict = Depends(get_current_user)):
+    return crud.station_benchmark(station)
+
+
 @router.post("/changeover")
 def changeover(body: ChangeoverRequest, user: dict = Depends(get_current_user)):
     ok = crud.record_changeover(body.reactor_name, body.new_resin,
@@ -99,7 +120,7 @@ def link_vessel(body: LinkVesselRequest, user: dict = Depends(get_current_user))
 
 @router.post("/mark-empty")
 def mark_empty(body: MarkEmptyRequest, user: dict = Depends(require_ability("mark_reactor_empty"))):
-    ok = crud.close_batch(body.reactor_name, by=resolve_operator_name(user, body.as_operator))
+    ok = crud.mark_reactor_empty(body.reactor_name, by=resolve_operator_name(user, body.as_operator))
     if not ok:
         raise HTTPException(status_code=400, detail="No open filling on that vessel.")
     return {"ok": True}

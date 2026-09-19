@@ -105,7 +105,7 @@ export function ProductionOutputFields({
                 type="number"
                 min={1}
                 max={999}
-                value={bulk.containers}
+                value={bulk.containers || ''}
                 onChange={(e) => onBulkChange({ containers: Number(e.target.value) })}
               />
             </div>
@@ -153,7 +153,7 @@ export function ProductionOutputFields({
             type="number"
             min={0}
             step={10}
-            value={bottlesFilled}
+            value={bottlesFilled || ''}
             onChange={(e) => onBottlesFilledChange(Number(e.target.value))}
           />
         </div>
@@ -166,7 +166,7 @@ export function ProductionOutputFields({
             className={input}
             type="number"
             min={0}
-            value={scrapEmpty}
+            value={scrapEmpty || ''}
             onChange={(e) => onScrapEmptyChange(Number(e.target.value))}
           />
         </div>
@@ -176,7 +176,7 @@ export function ProductionOutputFields({
             className={input}
             type="number"
             min={0}
-            value={scrapFilled}
+            value={scrapFilled || ''}
             onChange={(e) => onScrapFilledChange(Number(e.target.value))}
           />
         </div>

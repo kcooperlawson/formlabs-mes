@@ -49,6 +49,7 @@ from api.routers import scada as scada_router
 from api.routers import scrap as scrap_router
 from api.routers import summary as summary_router
 from api.routers import tv as tv_router
+from api.routers import updates as updates_router
 
 app = FastAPI(title="Formlabs MES API")
 app.add_middleware(CSRFHeaderMiddleware)
@@ -116,7 +117,8 @@ for _router in (auth_router, reference_router, checklist_router, pouring_router,
                 scada_router, floor_comms_router, reactors_router, cleanliness_router, roster_router,
                 scrap_router, lot_verification_router, batch_history_router, historical_router,
                 resin_canvas_router, assigned_runs_router, log_management_router, google_sync_router,
-                analytics_router, admin_router, tv_router, devices_router, account_router):
+                analytics_router, admin_router, tv_router, devices_router, account_router,
+                updates_router):
     app.include_router(_router.router, prefix="/api")
 
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"

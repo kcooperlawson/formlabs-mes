@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, type ReactNode, useContext } from 'react'
+import { createContext, type ReactNode, useContext, useState } from 'react'
 import { ApiError } from '../api/client'
 import { authApi, type LoginRequest, type User } from '../api/auth'
 
@@ -10,6 +10,12 @@ interface AuthContextValue {
   loginError: string | null
   isLoggingIn: boolean
   logout: () => void
+  /** True for the rest of this browser session's life after a real sign-in
+   * (never after a page-reload session restore) - LoginRecap reads this
+   * once to decide whether to show, then clears it, so it never asks
+   * again until the next actual login. */
+  justLoggedIn: boolean
+  clearJustLoggedIn: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -20,6 +26,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 // an error worth retrying or surfacing.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
+  const [justLoggedIn, setJustLoggedIn] = useState(false)
 
   const meQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -29,7 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: authApi.login,
-    onSuccess: (user) => queryClient.setQueryData(['auth', 'me'], user),
+    onSuccess: (user) => {
+      queryClient.setQueryData(['auth', 'me'], user)
+      setJustLoggedIn(true)
+    },
   })
 
   const logoutMutation = useMutation({
@@ -47,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginMutation.error instanceof ApiError ? loginMutation.error.message : null,
     isLoggingIn: loginMutation.isPending,
     logout: () => logoutMutation.mutate(),
+    justLoggedIn,
+    clearJustLoggedIn: () => setJustLoggedIn(false),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

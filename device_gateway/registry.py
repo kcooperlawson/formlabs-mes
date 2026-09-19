@@ -69,9 +69,13 @@ def build_adapter_from_device(device, tag_map_rows) -> "DeviceAdapter":
     every worker, on every reconnect) fails before it ever reaches the
     adapter, with a JSONDecodeError that looks like nothing more specific
     than "the machine is unreachable" in the admin page's last_error.
+
+    The strict variant raises a readable KeyMismatchError when this PC's
+    GATEWAY_ENCRYPTION_KEY can't open the row, rather than handing the
+    adapter an empty connection that fails as KeyError: 'host'.
     """
-    from gateway_crypto import decrypt_connection
-    connection = decrypt_connection(device.connection_json)
+    from gateway_crypto import decrypt_connection_strict
+    connection = decrypt_connection_strict(device.connection_json)
     tag_map = [
         {
             "raw_tag": t.raw_tag,

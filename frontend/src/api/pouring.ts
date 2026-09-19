@@ -72,7 +72,31 @@ export interface UndoResponse {
   message: string
 }
 
+export interface StationBenchmark {
+  /** The median hourly count on this pump - what an ordinary hour looks like. */
+  typical: number
+  /** The best single hourly count on record for it. */
+  best: number
+  samples: number
+}
+
+export interface LastEntry {
+  found: boolean
+  pump_station: string
+  resin_type: string
+  cartridge_type: string
+  lot_number: string
+  bottles: number
+  logged_at: string | null
+}
+
 export const pouringApi = {
+  lastEntry: (asOperator?: string) =>
+    api.get<LastEntry>(asOperator
+      ? `/pouring/last-entry?as_operator=${encodeURIComponent(asOperator)}`
+      : '/pouring/last-entry'),
+  stationBenchmark: (station: string) =>
+    api.get<StationBenchmark>(`/pouring/station-benchmark?station=${encodeURIComponent(station)}`),
   reactorLookup: (station: string, resin: string) =>
     api.get<ReactorLookup>(
       `/pouring/reactor-lookup?${new URLSearchParams({ station, resin })}`,

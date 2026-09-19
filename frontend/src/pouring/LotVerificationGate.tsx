@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useLotGate } from '../hooks/useLotGate'
 import { pouringApi } from '../api/pouring'
+import { playAlert } from '../sound/chimes'
 import { fl } from '../theme'
 
 export interface LotFieldsState {
@@ -84,6 +85,26 @@ export function LotVerificationGate({ station, resin, cartCode, value, onChange,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ok, blockers.join('|')])
 
+  // Fires once per transition into 'mismatch', not on every render while
+  // it stays that way - result is the effect's only dependency, so React
+  // only re-runs this when the verdict itself actually changes. The catch
+  // is worth its own sound: the lot check doing exactly its job, not an
+  // ordinary log landing.
+  useEffect(() => {
+    if (result === 'mismatch') playAlert()
+  }, [result])
+
+  // A tick counter rather than a boolean so each fresh mismatch/verified
+  // verdict gets its own key and the CSS animation replays - a boolean
+  // would only fire the very first time, since the class name itself
+  // wouldn't change on a later render that lands on the same result.
+  const [shakeTick, setShakeTick] = useState(0)
+  const [pulseTick, setPulseTick] = useState(0)
+  useEffect(() => {
+    if (result === 'mismatch') setShakeTick((t) => t + 1)
+    if (result === 'verified') setPulseTick((t) => t + 1)
+  }, [result])
+
   if (!gate) return null
 
   if (!gate.gate_applies) {
@@ -147,13 +168,13 @@ export function LotVerificationGate({ station, resin, cartCode, value, onChange,
       />
 
       {result === 'verified' && (
-        <p className="text-sm font-medium text-emerald-400">✅ Lot matches this run.</p>
+        <p key={pulseTick} className="fl-pulse-good rounded text-sm font-medium text-emerald-400">✅ Lot matches this run.</p>
       )}
       {result === 'recorded' && (
         <p className="text-sm text-[#CBD5E1]">📝 Lot recorded against this log.</p>
       )}
       {result === 'mismatch' && (
-        <div className="flex flex-col gap-2 rounded-lg border border-red-800 bg-red-950 p-3">
+        <div key={shakeTick} className="fl-shake flex flex-col gap-2 rounded-lg border border-red-800 bg-red-950 p-3">
           <p className="text-sm font-semibold text-red-300">
             ⛔ STOP — DO NOT POUR. This {gate.noun} is not from the lot assigned to your run.
           </p>
@@ -181,7 +202,6 @@ export function LotVerificationGate({ station, resin, cartCode, value, onChange,
               className="mt-1 block text-sm text-[#CBD5E1]"
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={(e) => onChange({ photo: e.target.files?.[0] ?? null })}
             />
           </label>

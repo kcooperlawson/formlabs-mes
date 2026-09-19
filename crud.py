@@ -357,6 +357,19 @@ def reactor_draw_litres(resin_name: str, pump_station: str = "") -> tuple[float,
     in either mode - a plant that does dispatch runs puts the same lot on the
     run and on the log, so the answer does not change.
 
+    A resin coming BACK onto a pump it already held once is the one case the
+    lot walk cannot see on its own: with nothing new logged yet under it,
+    "the newest lot anywhere in this resin/pump's history" is still whatever
+    the tank last held months ago, and the walk drags that entire old
+    occupancy's draw-down along with it. Every path that starts a fresh
+    occupancy (record_changeover, mark_reactor_filled) already opens a
+    ReactorBatch the moment it happens, so when one is open for the vessel
+    this resolves to, its filled_at is used as a hard floor on the log query
+    - a resin's own history before its current fill started is never even
+    read. A vessel with no open batch (never linked through those paths, or
+    set up through the raw manage-fleet edit) falls back to the old
+    unbounded read, unchanged.
+
     Returns (litres_drawn, current_lot). No logs means a full tank.
     """
     session = ScopedSession()
@@ -366,9 +379,34 @@ def reactor_draw_litres(resin_name: str, pump_station: str = "") -> tuple[float,
         if not t_name:
             return 0.0, ""
 
-        rows = session.query(ProductionLog).filter(
-            ProductionLog.log_type.in_(["Hourly Bottle Count", "System Calibration"])
-        ).order_by(ProductionLog.timestamp.asc(), ProductionLog.id.asc()).all()
+        batch_start = None
+        if t_pump:
+            reactor = session.query(Reactor).filter(
+                func.lower(Reactor.current_resin) == t_name,
+                func.lower(Reactor.assigned_pump) == t_pump).first()
+            if reactor is not None:
+                open_batch_row = session.query(ReactorBatch).filter(
+                    ReactorBatch.reactor_name == reactor.reactor_name,
+                    ReactorBatch.emptied_at.is_(None)
+                ).order_by(ReactorBatch.filled_at.desc()).first()
+                if open_batch_row is not None and open_batch_row.filled_at is not None:
+                    # reactor_batches.filled_at is naive PLANT_TZ (see
+                    # backfill_batches's own note on this); production_logs.
+                    # timestamp is naive UTC. Compared unconverted, a batch
+                    # opened a few hours ago could look like it started
+                    # before logs that actually predate it, or after ones
+                    # that came right after it.
+                    from shift_clock import PLANT_TZ
+                    batch_start = (open_batch_row.filled_at
+                                   .replace(tzinfo=PLANT_TZ)
+                                   .astimezone(timezone.utc)
+                                   .replace(tzinfo=None))
+
+        query = session.query(ProductionLog).filter(
+            ProductionLog.log_type.in_(["Hourly Bottle Count", "System Calibration"]))
+        if batch_start is not None:
+            query = query.filter(ProductionLog.timestamp >= batch_start)
+        rows = query.order_by(ProductionLog.timestamp.asc(), ProductionLog.id.asc()).all()
 
         # Pours the operator marked as not coming off the tank are dropped
         # here and nowhere else. They are production and they count everywhere
@@ -702,12 +740,35 @@ def get_all_pumps_df() -> pd.DataFrame:
         session.close()
 
 
-def add_pump_station(station_name: str, notes: str = ""):
+PUMP_TYPES = ("piston_diaphragm", "electric_motor")
+PUMP_TYPE_LABELS = {"piston_diaphragm": "Piston diaphragm", "electric_motor": "Electric motor"}
+
+
+def add_pump_station(station_name: str, notes: str = "", pump_type: str = ""):
     session = ScopedSession()
     try:
         if not session.query(PumpStation).filter(PumpStation.station_name == station_name.strip()).first():
-            session.add(PumpStation(station_name=station_name.strip(), status="Active", notes=notes))
+            session.add(PumpStation(station_name=station_name.strip(), status="Active", notes=notes,
+                                    pump_type=pump_type if pump_type in PUMP_TYPES else None))
             session.commit()
+    finally:
+        session.close()
+
+
+def set_pump_type(pump_id: int, pump_type: str) -> bool:
+    """Blank (or anything unrecognised) puts it back to unlabelled rather
+    than storing a type nothing else understands."""
+    session = ScopedSession()
+    try:
+        pump = session.query(PumpStation).filter(PumpStation.id == int(pump_id)).first()
+        if pump is None:
+            return False
+        pump.pump_type = pump_type if pump_type in PUMP_TYPES else None
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
     finally:
         session.close()
 
@@ -1413,6 +1474,16 @@ def abilities_of(user_id, role) -> dict:
     return out
 
 
+def effective_abilities(user_id, role) -> list:
+    """Just the doors this person can actually open right now - role or
+    granted, the same union user_can() itself checks - as a plain list. The
+    one thing the frontend needs to decide what to draw (a nav link, a
+    "Manager Cockpit" button on the operator's own screen): abilities_of()'s
+    role-vs-granted distinction only matters to the admin screen that hands
+    abilities out, not to a page deciding whether to show a door at all."""
+    return sorted(role_abilities(role) | granted_abilities(user_id))
+
+
 def grant_ability(user_id, ability, by_name="", by_user_id=None, by_role="") -> tuple:
     """Give one account one ability. Returns (ok, message).
 
@@ -1700,6 +1771,187 @@ def get_lot_verifications_df(days: int = 30, result: str = None) -> pd.DataFrame
         if result:
             q = q.filter(LotVerification.result == result)
         return pd.read_sql(q.order_by(desc(LotVerification.timestamp)).statement, session.bind)
+    finally:
+        session.close()
+
+
+def last_pour_for_operator(operator_name: str) -> dict | None:
+    """The last hourly count this operator logged, for the form to offer back.
+
+    An hourly entry is nearly always the one before it with a different
+    count - same pump, same resin, same lot, same cartridge - so retyping all
+    of it every hour is work the application can simply do. Only today's
+    logs, and only this operator's: yesterday's lot is the wrong thing to
+    hand somebody, and so is the person's who used this terminal last.
+    """
+    session = ScopedSession()
+    try:
+        row = (session.query(ProductionLog)
+               .filter(ProductionLog.operator_name == operator_name,
+                       ProductionLog.log_type == "Hourly Bottle Count",
+                       ProductionLog.date == date.today())
+               .order_by(desc(ProductionLog.id)).first())
+        if row is None:
+            return None
+        return {
+            "pump_station": row.pump_station or "",
+            "resin_type": row.resin_type or "",
+            "cartridge_type": row.cartridge_type or "",
+            "lot_number": row.lot_number or "",
+            "bottles": int(row.bottles_filled or 0),
+            "logged_at": row.timestamp,
+        }
+    finally:
+        session.close()
+
+
+# The photo audits an operator is expected to have done, in the order a shift
+# actually happens. Kept here rather than in the router so the compliance view
+# and the audit form cannot drift apart about what the names are.
+AUDIT_START = "Start Of Shift (Cleanliness Check)"
+AUDIT_TRANSFER = "Station / Pump Transfer Check"
+AUDIT_END = "End Of Shift (Cleanliness Check)"
+
+
+def checklist_compliance(on_date=None, shift: str = "", operator_name: str = "") -> list:
+    """Who has done their checks, and which ones are still outstanding.
+
+    One row per operator and pump they actually worked, built from what is
+    already written down: the startup checklist certifies the pump, the
+    start-of-shift photo audit records its condition, a transfer check covers
+    moving to another pump, and the end-of-shift audit closes it out. Nothing
+    new is recorded to make this screen work - it reads the same rows the
+    floor has always produced, which is why it can be trusted as a record of
+    what happened rather than of what someone remembered to tick.
+
+    A pump an operator poured on without a checklist shows as outstanding;
+    that is the case worth catching, so stations are taken from the pours as
+    well as from the checklists.
+    """
+    on_date = on_date or date.today()
+    session = ScopedSession()
+    try:
+        pours = session.query(ProductionLog.operator_name, ProductionLog.pump_station,
+                              ProductionLog.shift, ProductionLog.timestamp).filter(
+            ProductionLog.date == on_date,
+            ProductionLog.log_type == "Hourly Bottle Count").all()
+        checklists = session.query(DailyChecklist).filter(DailyChecklist.date == on_date).all()
+        audits = session.query(CleanlinessAudit.operator_name, CleanlinessAudit.pump_station,
+                               CleanlinessAudit.shift, CleanlinessAudit.audit_type,
+                               CleanlinessAudit.timestamp).filter(
+            CleanlinessAudit.date == on_date).all()
+    finally:
+        session.close()
+
+    def matches(row_shift, row_operator):
+        if shift and (row_shift or "") != shift:
+            return False
+        if operator_name and (row_operator or "") != operator_name:
+            return False
+        return True
+
+    pairs = {}  # (operator, station, shift) -> what we know about it
+    def slot(op, station, sh):
+        key = (op or "", station or "", sh or "")
+        if key not in pairs:
+            pairs[key] = {"operator_name": key[0], "pump_station": key[1], "shift": key[2],
+                          "poured": 0, "first_pour_at": None, "checklist_at": None,
+                          "start_audit_at": None, "transfer_audit_at": None, "end_audit_at": None}
+        return pairs[key]
+
+    for op, station, sh, ts in pours:
+        if not matches(sh, op):
+            continue
+        entry = slot(op, station, sh)
+        entry["poured"] += 1
+        if entry["first_pour_at"] is None or (ts and ts < entry["first_pour_at"]):
+            entry["first_pour_at"] = ts
+
+    for row in checklists:
+        if not matches(row.shift, row.operator_name):
+            continue
+        entry = slot(row.operator_name, row.pump_station or "", row.shift)
+        if entry["checklist_at"] is None or (row.timestamp and row.timestamp < entry["checklist_at"]):
+            entry["checklist_at"] = row.timestamp
+
+    field_for = {AUDIT_START: "start_audit_at", AUDIT_TRANSFER: "transfer_audit_at",
+                 AUDIT_END: "end_audit_at"}
+    for op, station, sh, audit_type, ts in audits:
+        if not matches(sh, op):
+            continue
+        field = field_for.get(audit_type)
+        if field is None:
+            continue  # a spill report is not one of the expected checks
+        entry = slot(op, station, sh)
+        if entry[field] is None or (ts and ts > entry[field]):
+            entry[field] = ts
+
+    rows = []
+    for entry in pairs.values():
+        # The end-of-shift check belongs to the LAST pump somebody worked, not
+        # to every pump they touched - asking for one per station would mark
+        # a normal shift as incomplete.
+        rows.append(entry)
+    rows.sort(key=lambda r: (r["operator_name"], r["shift"], r["pump_station"]))
+
+    last_station = {}
+    for row in rows:
+        key = (row["operator_name"], row["shift"])
+        current = last_station.get(key)
+        if current is None or (row["first_pour_at"] and current["first_pour_at"]
+                               and row["first_pour_at"] > current["first_pour_at"]):
+            last_station[key] = row
+    for row in rows:
+        row["end_expected"] = last_station.get((row["operator_name"], row["shift"])) is row
+        # Moving to a second pump is what a transfer check is for; the first
+        # pump of a shift has nothing to transfer from.
+        same = [r for r in rows if r["operator_name"] == row["operator_name"] and r["shift"] == row["shift"]]
+        earliest = min((r["first_pour_at"] for r in same if r["first_pour_at"]), default=None)
+        row["transfer_expected"] = bool(row["first_pour_at"] and earliest and row["first_pour_at"] > earliest)
+        # The start-of-shift photo belongs to the pump the shift began on -
+        # which is exactly the pump nothing was transferred from. Asking for
+        # one on a pump somebody moved to at noon would mark a correctly run
+        # shift as incomplete and teach everyone to ignore the column.
+        row["start_expected"] = not row["transfer_expected"]
+        row["complete"] = (row["checklist_at"] is not None
+                           and (not row["start_expected"] or row["start_audit_at"] is not None)
+                           and (not row["transfer_expected"] or row["transfer_audit_at"] is not None)
+                           and (not row["end_expected"] or row["end_audit_at"] is not None))
+    return rows
+
+
+def station_benchmark(station: str, days: int = 30) -> dict:
+    """What a good hour looks like ON THIS PUMP, from this pump's own logs.
+
+    A hundred bottles is a strong hour on an old pump and a slow one on a
+    new one, and the plant's own rate figures are in litres per hour on the
+    equipment - useful for pace, useless for answering "was that a good
+    count?" in the moment. This answers it the only way that needs no
+    configuration and can't be wrong about a pump nobody has characterised
+    yet: compare it with what that same pump has actually been doing.
+
+    typical is the median hourly count rather than the mean, so one 2,500
+    typo or one 3-bottle end-of-shift entry doesn't move it. best is the
+    highest single hourly count on record for the pump. Returns zeros until
+    there are at least MIN_SAMPLES of them, and the caller then simply
+    doesn't scale anything - a brand new pump shouldn't be told its first
+    hour is a record.
+    """
+    MIN_SAMPLES = 5
+    session = ScopedSession()
+    try:
+        since = datetime.utcnow() - timedelta(days=days)
+        counts = [row[0] for row in session.query(ProductionLog.bottles_filled)
+                  .filter(ProductionLog.pump_station == station,
+                          ProductionLog.log_type == "Hourly Bottle Count",
+                          ProductionLog.timestamp >= since,
+                          ProductionLog.bottles_filled > 0).all()]
+        if len(counts) < MIN_SAMPLES:
+            return {"typical": 0.0, "best": 0, "samples": len(counts)}
+        counts.sort()
+        middle = len(counts) // 2
+        typical = float(counts[middle] if len(counts) % 2 else (counts[middle - 1] + counts[middle]) / 2)
+        return {"typical": typical, "best": int(counts[-1]), "samples": len(counts)}
     finally:
         session.close()
 
@@ -3276,6 +3528,42 @@ def close_batch(reactor_name, emptied_at=None, by="") -> bool:
         session.close()
 
 
+def mark_reactor_empty(reactor_name: str, emptied_at=None, by: str = "") -> bool:
+    """The floor's "mark empty" action: ends the open filling AND clears what
+    the vessel is on record as holding, so the two agree with each other.
+
+    close_batch alone only stops the QC/dwell-time clock on the ReactorBatch
+    row - it never touched Reactor.current_resin, which is the field
+    reactor_for() matches pours against and the fleet page reads for its own
+    idle/fill-percent. Leaving it set after "marking empty" was the actual
+    bug: the vessel still looked full on the wall and a pour at the same
+    station/resin was still silently credited to it. record_changeover and
+    mark_reactor_filled already clear/set this same field as part of their
+    own event - this is the third and last place that needed to.
+
+    Refuses the same way close_batch does when nothing is open, so marking
+    an already-empty vessel empty again is still a no-op, not a second
+    silent clear of a field that's already null.
+    """
+    name = str(reactor_name or "").strip()
+    if not name or not close_batch(name, emptied_at=emptied_at, by=by):
+        return False
+    session = ScopedSession()
+    try:
+        r = session.query(Reactor).filter(Reactor.reactor_name == name).first()
+        if r is None:
+            return False
+        r.current_resin = None
+        r.current_resin_id = None
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
 def mark_reactor_filled(reactor_name: str, resin_type: str, lot_number: str = "",
                         filled_at=None, by: str = "", note: str = "") -> bool:
     """Management's own counterpart to "mark empty" - a vessel is filled
@@ -3306,6 +3594,7 @@ def mark_reactor_filled(reactor_name: str, resin_type: str, lot_number: str = ""
             return False
         old = str(r.current_resin or "").strip() or "nothing recorded"
         pump = str(r.assigned_pump or "")
+        capacity = float(r.max_capacity_l)
         r.current_resin = resin
         r.current_resin_id = _resolve_resin_id(session, resin)
         session.commit()
@@ -3316,7 +3605,8 @@ def mark_reactor_filled(reactor_name: str, resin_type: str, lot_number: str = ""
         session.close()
 
     stamp = filled_at or datetime.now()
-    lot_note = f", lot {lot_number.strip()}" if lot_number and lot_number.strip() else ""
+    clean_lot = lot_number.strip() if lot_number and lot_number.strip() else ""
+    lot_note = f", lot {clean_lot}" if clean_lot else ""
     try:
         add_hourly_log(
             by or "System", pump, "", "", resin, "",
@@ -3328,8 +3618,85 @@ def mark_reactor_filled(reactor_name: str, resin_type: str, lot_number: str = ""
         pass
 
     close_batch(name, emptied_at=stamp, by=by or "System")
-    return bool(open_batch(name, resin, lot_number=lot_number, pump_station=pump,
-                           filled_at=stamp, by=by or "System", note=note))
+    opened = bool(open_batch(name, resin, lot_number=lot_number, pump_station=pump,
+                             filled_at=stamp, by=by or "System", note=note))
+
+    # reactor_draw_litres derives the tank's displayed level from the logs
+    # themselves, not from this ReactorBatch row - it sums everything logged
+    # since the newest real lot it can find for this resin/pump. Without
+    # this, a vessel topped off with the SAME resin (the exact case this
+    # function exists for) kept summing the OLD fill's pours right through
+    # the refill: the record above said "filled", the tank wall kept
+    # counting down from before. A real new lot anchors a fresh batch at
+    # zero drawn outright; with no lot to anchor to, a calibration adjustment
+    # nets the running total back to a full tank the same way a manager
+    # correcting a drifted gauge reading already does (see _calibrate_reactor).
+    try:
+        if clean_lot:
+            add_hourly_log(
+                by or "System", pump, "", "V2", resin, clean_lot,
+                0, 0, 0,
+                notes=f"{name} marked filled - fresh batch starts at zero drawn.",
+                log_type="System Calibration")
+        else:
+            _calibrate_reactor(name, capacity, by or "System",
+                               f"{name} marked filled - reset to full ({resin}).")
+    except Exception:
+        pass
+
+    return opened
+
+
+def reassign_reactor_resin(reactor_name: str, new_resin: str, by: str = "", pump: str = "") -> None:
+    """The consequences of a resin change made through the raw fleet-
+    management edit (a plain dropdown-and-Save on the reactor's own record),
+    rather than an operator's changeover at the pump or management's own
+    mark_reactor_filled: closes whatever filling was open, starts a fresh one
+    for the new resin, and resets the level - the same close-then-open-then-
+    reset shape those two already use, because from the vessel's own point of
+    view this is that same event, just made from a third door.
+
+    Left alone, that edit only ever changed the label on the Reactor row
+    itself: the old batch's QC/dwell tracking kept running against a resin no
+    longer in the tank, and reactor_draw_litres kept summing whatever the OLD
+    resin had drawn down, even after the record said something else was in
+    it now.
+
+    Deliberately not folded into update_reactor_config, which callers
+    (including this file's own tests) use directly, with no side effects, as
+    a plain field setter - a caller that wants only the label changed should
+    still have that. The API route is the one place a manager can reach this
+    edit, and it calls both.
+    """
+    name = str(reactor_name or "").strip()
+    resin = str(new_resin or "").strip()
+    if not name:
+        return
+    session = ScopedSession()
+    try:
+        r = session.query(Reactor).filter(Reactor.reactor_name == name).first()
+        capacity = float(r.max_capacity_l) if r else 0.0
+    finally:
+        session.close()
+
+    stamp = datetime.now()
+    try:
+        add_hourly_log(
+            by or "System", pump or "", "", "", resin or "nothing", "",
+            0, 0, 0,
+            notes=f"{name} set to {resin or 'nothing'} via fleet management by {by or 'System'}.",
+            log_type="Resin Changeover")
+    except Exception:
+        pass
+
+    close_batch(name, emptied_at=stamp, by=by or "System")
+    if resin:
+        open_batch(name, resin, pump_station=pump, filled_at=stamp, by=by or "System")
+        try:
+            _calibrate_reactor(name, capacity, by or "System",
+                               f"{name} set to {resin} via fleet management - reset to full.")
+        except Exception:
+            pass
 
 
 def set_batch_qc(batch_id, sent_at=None, result_at=None, result="", note="",

@@ -387,7 +387,7 @@ def _port_facts(port=APP_PORT):
     # No dedicated health endpoint - any HTTP response at all (even a 401 from
     # an auth-gated route) means it's a web server on this port, and nothing
     # else on a plant PC has a reason to be listening on 8000. Try HTTPS too:
-    # run_mes_api.bat serves TLS whenever certs\ has a certificate, and a
+    # START_HERE.bat (option 3) serves TLS whenever certs\ has a certificate, and a
     # plain-HTTP request to a TLS port gets no response at all, not an error
     # status - which would otherwise misreport a healthy app as "something
     # else is using this port".

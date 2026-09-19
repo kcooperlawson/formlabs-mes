@@ -14,8 +14,8 @@ rem  install. First run creates that database and seeds the default
 rem  admin account; every run after that just starts it back up.
 rem
 rem  This does NOT touch .env or any real PostgreSQL install on this PC -
-rem  run_mes.bat and run_mes_api.bat are completely unaffected by this
-rem  file existing, and this file ignores DB_URL entirely.
+rem  START_HERE.bat's own launch (option 3) is completely unaffected by
+rem  this file existing, and this file ignores DB_URL entirely.
 rem ===================================================================
 
 echo.
@@ -76,8 +76,40 @@ exit /b 1
 :launch
 echo     Ready.
 echo.
+
+rem START_HERE.bat option 1 (install) runs everything above and stops here:
+rem the install and the launch need exactly the same things in place, so
+rem there is only one copy of them.
+if /i "%~1"=="--install-only" (
+    echo  ===================================================
+    echo   DONE - this PC is set up.
+    echo  ===================================================
+    echo.
+    echo   The database is bundled with the app; there is nothing else to
+    echo   install. Start it with START_HERE.bat, option 3 - the first start
+    echo   creates the database and asks you for an administrator login.
+    echo.
+    goto :eof
+)
+
+rem The app restarts itself after applying an update, and in portable mode
+rem that has to mean restarting the DATABASE too - it runs inside the same
+rem process. So the app is asked to stop and THIS loop starts it again,
+rem rather than anything trying to relaunch a server on its own. See
+rem setup\self_restart.py. MES_SUPERVISED tells it this loop is here.
+set "MES_SUPERVISED=1"
+
+:portable_loop
+if exist "updates\.restart-requested" del /q "updates\.restart-requested" >nul 2>&1
 "%VPY%" -m api.portable_launcher
-goto :eof
+if not exist "updates\.restart-requested" goto :eof
+echo.
+echo  ===================================================
+echo   Update applied - restarting the app and database...
+echo  ===================================================
+echo.
+timeout /t 3 /nobreak >nul
+goto :portable_loop
 
 :fail_quiet
 pause

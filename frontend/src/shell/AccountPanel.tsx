@@ -4,6 +4,8 @@ import { accountApi, FEEDBACK_CATEGORIES, type MyFeedback } from '../api/account
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
 import { PALETTES, paletteByName } from '../palettes'
+import { isMuted, setMuted } from '../sound/chimes'
+import { flourishesDisabled, setFlourishesDisabled } from './ThemeFlourish'
 import { useToast } from '../toast/ToastProvider'
 import { fl } from '../theme'
 
@@ -105,6 +107,51 @@ function ThemePicker() {
         Saved to your account, so it follows you to any terminal you sign into. A light theme or a
         high-contrast one can read better under bright floor lighting or from further away than this
         one does.
+      </p>
+      <FlourishToggle />
+      <SoundToggle />
+    </div>
+  )
+}
+
+function FlourishToggle() {
+  const [disabled, setDisabled] = useState(flourishesDisabled)
+  return (
+    <div className="mt-3">
+      <label className="flex items-center gap-2 text-sm text-[var(--fl-body)]">
+        <input
+          type="checkbox"
+          checked={!disabled}
+          onChange={(e) => { const on = e.target.checked; setDisabled(!on); setFlourishesDisabled(!on) }}
+        />
+        Background animation
+      </label>
+      <p className={`mt-1 text-xs ${fl.muted}`}>
+        The moving grid, scanlines or falling glyphs behind the page on Vaporwave 1984, Synthwave
+        Sunrise, Neon Cyberpunk, The Matrix and Amber CRT. Off already turns this off on its own
+        under your device's reduced-motion setting; this is for turning it off just because you'd
+        rather not, on a device you don't control that setting on. Saved to this device only.
+      </p>
+    </div>
+  )
+}
+
+function SoundToggle() {
+  const [muted, setMutedState] = useState(isMuted)
+  return (
+    <div className="mt-3">
+      <label className="flex items-center gap-2 text-sm text-[var(--fl-body)]">
+        <input
+          type="checkbox"
+          checked={!muted}
+          onChange={(e) => { const on = e.target.checked; setMutedState(!on); setMuted(!on) }}
+        />
+        Sound effects
+      </label>
+      <p className={`mt-1 text-xs ${fl.muted}`}>
+        A chime when a log lands, a different one when a lot check catches a mismatch. Saved to
+        this device only, not your account - whether a terminal makes noise depends on where it
+        sits, not who's signed into it.
       </p>
     </div>
   )

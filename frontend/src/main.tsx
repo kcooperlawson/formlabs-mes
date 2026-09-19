@@ -13,8 +13,20 @@ import { AuthProvider } from './auth/AuthProvider.tsx'
 import { ThemeRoot } from './ThemeRoot.tsx'
 import { ToastProvider } from './toast/ToastProvider.tsx'
 import './index.css'
+// Side-effect import: registers the beforeinstallprompt listener the
+// instant this bundle evaluates, so it's guaranteed to be in place before
+// Chrome could ever fire the (once-only) event - see pwa/installPrompt.ts.
+import './pwa/installPrompt.ts'
+import { primeAudio } from './sound/chimes.ts'
 
 registerSW({ immediate: true })
+
+// Unlocks the shared AudioContext on the very first real interaction
+// anywhere in the app - Safari refuses to start audio at all unless that
+// happens inside a genuine user gesture, and by the time a sound cue is
+// actually due (a log landing, a lot mismatch) the gesture that triggered
+// it has usually already ended. Removes itself after firing once.
+window.addEventListener('pointerdown', primeAudio, { once: true })
 
 const queryClient = new QueryClient()
 

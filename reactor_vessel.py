@@ -262,15 +262,23 @@ def _fill_keyframes(uid: str, floor_y: float, surface_y: float, reveal: bool) ->
     arrival and never again, because a wall that re-runs every ten seconds
     would otherwise refill every tank all shift.
 
-    A browser that will not animate an SVG geometry property just draws the
-    level, which is the right answer anyway - the attributes already carry it,
-    so nothing depends on the animation running.
+    Real liquid does not stop dead the instant it reaches its mark - it
+    carries a little past it and settles back. The rise overshoots by a
+    fraction of its own height, capped small enough to still read as a tank
+    rather than a wave machine, then eases onto the exact level. A browser
+    that will not animate an SVG geometry property just draws the level,
+    which is the right answer anyway - the attributes already carry it, so
+    nothing depends on the animation running.
     """
     if not reveal:
         return ""
+    height = max(0.0, floor_y - surface_y)
+    overshoot = min(height * 0.12, 10.0)
     return (f'<style>@keyframes fill{uid}{{'
             f'0%{{y:{floor_y:.1f}px; height:0px;}}'
-            f'100%{{y:{surface_y:.1f}px; height:{max(0.0, floor_y - surface_y):.1f}px;}}'
+            f'72%{{y:{surface_y - overshoot:.1f}px; height:{height + overshoot:.1f}px;}}'
+            f'86%{{y:{surface_y + overshoot * 0.35:.1f}px; height:{height - overshoot * 0.35:.1f}px;}}'
+            f'100%{{y:{surface_y:.1f}px; height:{height:.1f}px;}}'
             f'}}</style>')
 
 

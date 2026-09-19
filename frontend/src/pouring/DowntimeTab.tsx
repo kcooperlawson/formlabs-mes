@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { downtimeApi } from '../api/downtime'
 import { referenceApi } from '../api/reference'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { enqueue, isConnectivityError } from '../offline/queue'
+import { playLogged } from '../sound/chimes'
 import { useToast } from '../toast/ToastProvider'
 import { fl } from '../theme'
 
@@ -27,12 +28,28 @@ export function DowntimeTab({ myStation }: { myStation: string }) {
   const [reason, setReason] = useState('')
   const [duration, setDuration] = useState(15)
   const [notes, setNotes] = useState('')
+  // A running downtime. Kept as the moment it started rather than as a
+  // counter, so the number stays right if the screen sleeps, the tab is
+  // backgrounded, or the phone is in a pocket for twenty minutes - which is
+  // exactly when downtime happens.
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [, forceTick] = useState(0)
+
+  useEffect(() => {
+    if (startedAt === null) return
+    const id = window.setInterval(() => forceTick((n) => n + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [startedAt])
+
+  const runningSeconds = startedAt === null ? 0 : Math.floor((Date.now() - startedAt) / 1000)
+  const runningLabel = `${String(Math.floor(runningSeconds / 60)).padStart(2, '0')}:${String(runningSeconds % 60).padStart(2, '0')}`
 
   const submitMutation = useMutation({
     mutationFn: () => downtimeApi.submit({ station, reason, duration_min: duration, notes, as_operator: asOperator }),
     onSuccess: (resp) => {
       setNotes('')
       toast.show(resp.message)
+      playLogged()
     },
     onError: (err) => {
       if (!isConnectivityError(err)) return
@@ -42,6 +59,7 @@ export function DowntimeTab({ myStation }: { myStation: string }) {
       setNotes('')
       toast.show('Recorded offline — queued to send.')
       submitMutation.reset()
+      setStartedAt(null)
     },
   })
 
@@ -69,6 +87,41 @@ export function DowntimeTab({ myStation }: { myStation: string }) {
             ))}
           </select>
         </div>
+        <div className="sm:col-span-2">
+          <label className={label}>Time it as it happens</label>
+          {startedAt === null ? (
+            <button
+              className={`${fl.btnSecondary} mt-1 w-full`}
+              disabled={!station || !reason}
+              onClick={() => setStartedAt(Date.now())}
+            >
+              ▶️ Start timing {reason ? `“${reason}”` : '(pick a reason first)'}
+            </button>
+          ) : (
+            <div className="mt-1 flex items-center gap-2">
+              <span className="flex-1 rounded border border-[var(--fl-accent)] bg-[var(--fl-surface)] px-3 py-2 text-lg font-extrabold tabular-nums text-[var(--fl-accent)]">
+                ⏱️ {runningLabel}
+              </span>
+              <button
+                className={fl.btn}
+                onClick={() => {
+                  // Always at least a minute: a stop two seconds after a
+                  // start is a mis-tap, and a zero would quietly buy back
+                  // pace credit for time that was really lost.
+                  setDuration(Math.max(1, Math.round(runningSeconds / 60)))
+                  setStartedAt(null)
+                }}
+              >
+                ⏹️ Stop
+              </button>
+              <button className={fl.btnSecondary} onClick={() => setStartedAt(null)}>✕</button>
+            </div>
+          )}
+          <p className={`mt-1 text-xs ${fl.muted}`}>
+            Or just type the minutes below. The timer only fills that box in — nothing is recorded until you submit.
+          </p>
+        </div>
+
         <div>
           <label className={label}>Downtime Duration (Minutes)</label>
           <input
@@ -77,7 +130,7 @@ export function DowntimeTab({ myStation }: { myStation: string }) {
             min={1}
             max={240}
             step={5}
-            value={duration}
+            value={duration || ''}
             onChange={(e) => setDuration(Number(e.target.value))}
           />
         </div>

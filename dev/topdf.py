@@ -24,6 +24,7 @@ DOCUMENTS = {
     "operator_guide": ("operator_guide.html", "Formlabs_MES_Operator_Guide.pdf"),
     "onepager": ("onepager.html", "Resin_Pouring_One_Page.pdf"),
     "update_guide": ("update_guide.html", "Formlabs_MES_Update_Guide.pdf"),
+    "history": ("history.html", "Formlabs_MES_History.pdf"),
 }
 
 # Accepts "operator_guide", "operator_guide.html" or "docs/operator_guide.html".

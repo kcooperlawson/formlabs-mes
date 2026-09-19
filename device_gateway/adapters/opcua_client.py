@@ -38,13 +38,23 @@ class OPCUAAdapter(DeviceAdapter):
 
     def _read_raw(self) -> dict:
         raw = {}
+        failure = None
         for entry in self.tag_map:
             node_id = entry.get("raw_tag")
             try:
                 node = self.client.get_node(node_id)
                 raw[node_id] = node.get_value()
-            except Exception:
+            except Exception as exc:
+                failure = exc
                 continue
+        # Every node failing is a lost session or a wrong map, not a quiet
+        # poll - see modbus_tcp.raise_all_registers_failed for why this
+        # can't just return an empty reading.
+        if self.tag_map and not raw:
+            detail = (str(failure).strip() or type(failure).__name__)[:160] if failure else "no values"
+            raise ConnectionError(
+                f"OPC-UA: none of the {len(self.tag_map)} mapped node(s) could be read from "
+                f"{self.connection.get('endpoint')} ({detail})")
         return raw
 
     def close(self) -> None:

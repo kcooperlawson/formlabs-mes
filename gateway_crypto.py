@@ -94,3 +94,52 @@ def decrypt_connection(stored: str) -> dict:
         return json.loads(stored)
     except Exception:
         return {}
+
+
+class KeyMismatchError(RuntimeError):
+    """Raised by decrypt_connection_strict when stored connection details are
+    encrypted and this PC's key cannot open them."""
+
+
+KEY_MISMATCH_HELP = (
+    "This PC can't read the device's saved connection details: its "
+    "GATEWAY_ENCRYPTION_KEY {problem} the one the MES PC saved them with. "
+    "Copy the GATEWAY_ENCRYPTION_KEY line from the MES PC's .env into this "
+    "PC's .env, then restart the gateway."
+)
+
+
+def _looks_encrypted(stored: str) -> bool:
+    # Every Fernet token starts with version byte 0x80, which is "gAAAAA" in
+    # URL-safe base64. Plain JSON starts with "{".
+    return stored.lstrip().startswith("gAAAAA")
+
+
+def decrypt_connection_strict(stored: str) -> dict:
+    """decrypt_connection for the gateway's own use, where a wrong key must
+    not be quietly turned into an empty dict.
+
+    decrypt_connection's lenient fallback is right for the admin page, but on
+    a gateway PC it turned "this PC's .env has a different key" into a device
+    with no host or port, which then failed with nothing more than KeyError:
+    'host'. The key is created on the MES PC the first time a device is saved,
+    so a gateway PC set up before that has no key at all - an easy state to
+    be in, and one that deserves a sentence, not a key name.
+    """
+    if not stored:
+        return {}
+    if not _looks_encrypted(stored):
+        try:
+            return json.loads(stored)
+        except Exception:
+            return {}
+
+    key = os.getenv("GATEWAY_ENCRYPTION_KEY")
+    if not key:
+        raise KeyMismatchError(KEY_MISMATCH_HELP.format(problem="is missing, so it can't match"))
+    try:
+        from cryptography.fernet import Fernet
+        plaintext = Fernet(key.encode("ascii")).decrypt(stored.encode("ascii"))
+    except Exception:
+        raise KeyMismatchError(KEY_MISMATCH_HELP.format(problem="doesn't match"))
+    return json.loads(plaintext.decode("utf-8"))

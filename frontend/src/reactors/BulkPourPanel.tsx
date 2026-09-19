@@ -68,7 +68,7 @@ export function BulkPourPanel() {
             )}
 
             <div className="grid grid-cols-3 gap-2">
-              <input className={input} type="number" min={1} max={99} value={containers} onChange={(e) => setContainers(Number(e.target.value))} placeholder="Containers" />
+              <input className={input} type="number" min={1} max={99} value={containers || ''} onChange={(e) => setContainers(Number(e.target.value))} placeholder="Containers" />
               <input className={input} type="number" min={0} step="0.01" value={amountEach || ''} onChange={(e) => setAmountEach(Number(e.target.value))} placeholder="Amount each" />
               <select className={input} value={unit} onChange={(e) => setUnit(e.target.value as 'L' | 'kg')}>
                 <option value="L">L</option>

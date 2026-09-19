@@ -9,6 +9,7 @@ export interface User {
   shift: string | null
   preferred_theme: string | null
   avatar_filename: string | null
+  abilities: string[]
 }
 
 export interface LoginRequest {

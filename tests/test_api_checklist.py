@@ -138,6 +138,79 @@ r = client.post("/api/checklist/mark-already-done",
 check(r.status_code == 400, f"the override requires an actual name (got {r.status_code})")
 
 # --- everything here requires a session -------------------------------------
+# --- who has done their checks, and for any day ----------------------------
+# Built from rows the floor already produces, so it reports what happened
+# rather than what somebody remembered to tick.
+from datetime import date as _date, timedelta as _timedelta  # noqa: E402
+
+import crud  # noqa: E402
+
+TODAY = _date.today().isoformat()
+r = client.get(f"/api/checklist/compliance?on_date={TODAY}")
+check(r.status_code == 200, f"the compliance view answers (got {r.status_code})")
+body = r.json()
+check(body["date"] == TODAY, f"...for the day asked for (got {body['date']})")
+check(body["scope"] == "self", f"an operator sees their own row only (got {body['scope']})")
+
+crud.add_hourly_log(operator_name="Demo Operator", pump_station="New Pump #1", shift="Shift 1",
+                    cartridge_type="V2", resin_type="Grey", lot_number="LOT-C1",
+                    bottles=30, scrap_empty=0, scrap_filled=0)
+rows = client.get(f"/api/checklist/compliance?on_date={TODAY}").json()["rows"]
+mine = [row for row in rows if row["pump_station"] == "New Pump #1"]
+check(len(mine) == 1, f"a pump that was poured on appears (got {[r['pump_station'] for r in rows]})")
+# This operator did their startup checklist and start-of-shift photo earlier
+# in this file, so those read as done and the end-of-shift one is what's
+# still outstanding - which is the distinction the screen exists to make.
+check(mine[0]["checklist_at"] and mine[0]["start_audit_at"],
+      f"...with the checks they did already on record (got {mine[0]})")
+check(mine[0]["end_expected"] is True and mine[0]["end_audit_at"] is None,
+      f"...the end-of-shift check is expected on their last pump and not done yet (got {mine[0]})")
+check(mine[0]["complete"] is False,
+      "...so the row is not complete, which is the thing worth chasing before they leave")
+check(mine[0]["poured"] >= 1, "...showing it was actually poured on, which is what makes it worth chasing")
+
+# Moving to a second pump later in the shift: that pump wants a transfer
+# check, NOT a second start-of-shift photo. Demanding one would mark a
+# correctly run shift as incomplete, and a column that cries wolf gets
+# ignored by everybody.
+check(mine[0]["start_expected"] is True,
+      f"the pump a shift began on does want its start-of-shift photo (got {mine[0]})")
+crud.add_hourly_log(operator_name="Demo Operator", pump_station="Moved-To Pump", shift="Shift 1",
+                    cartridge_type="V2", resin_type="Grey", lot_number="LOT-C2",
+                    bottles=30, scrap_empty=0, scrap_filled=0)
+rows = client.get(f"/api/checklist/compliance?on_date={TODAY}").json()["rows"]
+moved = [row for row in rows if row["pump_station"] == "Moved-To Pump"]
+check(len(moved) == 1, f"the pump they moved to appears too (got {[r['pump_station'] for r in rows]})")
+check(moved[0]["transfer_expected"] is True and moved[0]["start_expected"] is False,
+      f"...wanting a transfer check instead of a second start-of-shift photo (got {moved[0]})")
+first = [row for row in rows if row["pump_station"] == "New Pump #1"][0]
+check(first["end_expected"] is False and moved[0]["end_expected"] is True,
+      f"...and the end-of-shift photo moves with them to the last pump worked (got {first}, {moved[0]})")
+
+old_day = (_date.today() - _timedelta(days=9)).isoformat()
+history = client.get(f"/api/checklist/compliance?on_date={old_day}")
+check(history.status_code == 200 and history.json()["date"] == old_day,
+      f"any past day can be asked for, which is what makes this a history (got {history.status_code})")
+
+bad = client.get("/api/checklist/compliance?on_date=last-tuesday")
+check(bad.status_code == 400, f"a date that isn't one is refused plainly (got {bad.status_code})")
+
+# Management sees the whole floor from the same endpoint - and standing in
+# for one operator narrows it back to that operator, so the card on their
+# form shows what they would see rather than a plant-wide table.
+client.post("/api/auth/logout", headers=CSRF)
+client.post("/api/auth/login", json={"username": "manager", "pin": "admin123"}, headers=CSRF)
+boss = client.get(f"/api/checklist/compliance?on_date={TODAY}").json()
+check(boss["scope"] == "everyone", f"a manager sees everyone (got {boss['scope']})")
+check(len(boss["rows"]) >= len(rows), "...which is at least what one operator could see")
+stand_in = client.get(
+    f"/api/checklist/compliance?on_date={TODAY}&as_operator=Demo+Operator").json()
+check(stand_in["scope"] == "self", f"standing in for an operator narrows it (got {stand_in['scope']})")
+check(stand_in["rows"] and all(r["operator_name"] == "Demo Operator" for r in stand_in["rows"]),
+      f"...to that operator's rows only (got {[r['operator_name'] for r in stand_in['rows']]})")
+client.post("/api/auth/logout", headers=CSRF)
+client.post("/api/auth/login", json={"username": "operator", "pin": "1234"}, headers=CSRF)
+
 client.post("/api/auth/logout", headers=CSRF)
 r = checklist_status(STATION, SHIFT)
 check(r.status_code == 401, f"checklist status refuses an anonymous request (got {r.status_code})")

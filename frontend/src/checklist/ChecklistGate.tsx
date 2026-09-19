@@ -58,6 +58,11 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
   const [qrChecked, setQrChecked] = useState(false)
   const [materialsChecked, setMaterialsChecked] = useState(false)
   const [alreadyWho, setAlreadyWho] = useState('')
+  // Reopened on purpose after it was already completed. The checklist screen
+  // carries the pump startup form link, and an operator moving to a second
+  // pump needs that link again - the screen itself won't come back on its
+  // own, because as far as the shift is concerned the checklist is done.
+  const [reopened, setReopened] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['checklist', 'status', effectiveStation, shift] })
@@ -117,11 +122,21 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
     )
   }
   if (!statusQuery.data) return null
-  if (statusQuery.data.checklist_done) {
+  if (statusQuery.data.checklist_done && !reopened) {
     return (
       <>
         {showUnlock && <ScreenSweep />}
-        {children}
+        {/* Plays once, only for the terminal that just unlocked - a
+            returning terminal whose checklist was already done stays a
+            plain mount, so nobody sees a fade-in replay on every reload. */}
+        <div style={showUnlock ? { animation: 'fl-fade-up 420ms cubic-bezier(0.22,0.61,0.36,1) both' } : undefined}>
+          <div className="mb-2 flex justify-end">
+            <button className={fl.btnSecondary} onClick={() => { setShowUnlock(false); setReopened(true) }}>
+              📋 Startup checklist
+            </button>
+          </div>
+          {children}
+        </div>
       </>
     )
   }
@@ -130,13 +145,23 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-300">
-        <p className="font-semibold">🛑 TERMINAL LOCKED: PRE-SHIFT VALIDATION REQUIRED</p>
-        <p>
-          Complete the startup checklist for <strong>{effectiveStation}</strong> on{' '}
-          <strong>{shift}</strong> before the production modules unlock.
-        </p>
-      </div>
+      {reopened ? (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--fl-border)] bg-[var(--fl-surface)] p-3 text-sm">
+          <p className="text-[var(--fl-body)]">
+            📋 Startup checklist for <strong className="text-white">{effectiveStation}</strong> — already done this
+            shift. Open it for the pump startup form, or to redo it after moving to another pump.
+          </p>
+          <button className={fl.btnSecondary} onClick={() => setReopened(false)}>← Back to the form</button>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-300">
+          <p className="font-semibold">🛑 TERMINAL LOCKED: PRE-SHIFT VALIDATION REQUIRED</p>
+          <p>
+            Complete the startup checklist for <strong>{effectiveStation}</strong> on{' '}
+            <strong>{shift}</strong> before the production modules unlock.
+          </p>
+        </div>
+      )}
 
       {!isPacker && (
         <div>
@@ -184,9 +209,14 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
 
       <h3 className="text-sm font-semibold text-[var(--fl-ink)]">📋 Daily Startup Checklist</h3>
 
-      {!cleanlinessDone ? (
+      {!cleanlinessDone || reopened ? (
         <div className={panel}>
           <p className="mb-2 text-sm font-medium text-[var(--fl-ink)]">Step 1: Morning Cleanliness Check</p>
+          {cleanlinessDone && (
+            <p className="mb-2 text-xs text-emerald-400">
+              ✅ Already logged today — this logs a separate entry, e.g. for a second operator taking over this pump.
+            </p>
+          )}
           <textarea
             className={input}
             rows={2}
@@ -207,7 +237,6 @@ export function ChecklistGate({ role, shift, station, onStationChange, children 
               className="mt-2 block text-sm text-[var(--fl-body)]"
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
             />
           )}

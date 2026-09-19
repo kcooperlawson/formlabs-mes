@@ -108,6 +108,30 @@ r = client.post("/api/auth/register", json={
 }, headers=CSRF)
 check(r.status_code == 409, f"a duplicate username is refused (got {r.status_code})")
 
+# --- abilities: exposed on login/me, and a fresh grant shows up right away -
+# The frontend has no other way to know what a specific person can reach -
+# ManagerShell filters its own sidebar from exactly this list (see
+# ManagerShell.tsx's canSeeManagerTab).
+r = client.post("/api/auth/login", json={"username": "newguy", "pin": "4444"}, headers=CSRF)
+newguy_id = r.json()["id"]
+check(set(r.json()["abilities"]) == {"mark_reactor_empty", "view_resin_lookup"},
+      f"a fresh operator's abilities are exactly their role's own defaults (got {r.json()['abilities']})")
+client.post("/api/auth/logout", headers=CSRF)
+
+r = client.post("/api/auth/login", json={"username": "manager", "pin": "admin123"}, headers=CSRF)
+check(r.status_code == 200, f"the seeded admin can sign in to grant an ability (got {r.status_code})")
+check("view_scada" in r.json()["abilities"], "an admin's own abilities already include everything, view_scada included")
+r = client.post(f"/api/admin/users/{newguy_id}/abilities/view_scada", headers=CSRF)
+check(r.status_code == 200, f"granting view_scada to the operator succeeds (got {r.status_code})")
+client.post("/api/auth/logout", headers=CSRF)
+
+r = client.post("/api/auth/login", json={"username": "newguy", "pin": "4444"}, headers=CSRF)
+check("view_scada" in r.json()["abilities"],
+      f"the grant shows up in the operator's own abilities on their very next login (got {r.json()['abilities']})")
+r = client.get("/api/auth/me")
+check("view_scada" in r.json()["abilities"], f"...and on /me too, not just the login response (got {r.json()['abilities']})")
+client.post("/api/auth/logout", headers=CSRF)
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} API AUTH CHECKS FAILED:")

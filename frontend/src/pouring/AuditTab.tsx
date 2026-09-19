@@ -4,6 +4,7 @@ import { referenceApi } from '../api/reference'
 import { AUDIT_TYPES, auditApi } from '../api/audit'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { useToast } from '../toast/ToastProvider'
+import { ChecklistStatus } from '../checklist/ChecklistStatus'
 import { fl } from '../theme'
 
 const input = `${fl.input} py-3 text-base font-normal text-[var(--fl-ink)]`
@@ -45,6 +46,11 @@ export function AuditTab({ myStation }: { myStation: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Whether their own checks are on record, with any past day
+          reachable - the photo audits live on this tab, so the question
+          "have I done them" belongs here too. */}
+      <ChecklistStatus compact />
+
       <h3 className="text-sm font-semibold text-[#CBD5E1]">
         📸 Cleanliness, Changeover & Spill Photo Audit
       </h3>
@@ -103,7 +109,6 @@ export function AuditTab({ myStation }: { myStation: string }) {
           type="file"
           accept="image/*"
           multiple
-          capture="environment"
           onChange={(e) => setPhotos(Array.from(e.target.files ?? []))}
         />
         {photos.length > 1 && (

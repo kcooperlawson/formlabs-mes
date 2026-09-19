@@ -73,3 +73,6 @@ _to_delete/
 # The desktop app drops a copy of anything sent into the chat here. The
 # deliverables already live at the repo root; this folder is duplicates.
 Claude outputs/
+
+# built update packages - shipped by hand or the update server, not git
+dist/

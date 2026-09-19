@@ -15,7 +15,7 @@ running the gateway process sees the adapter as.)
 
 Requires: pymodbus>=3.0, pyserial (see requirements-device-gateway.txt)
 """
-from .modbus_tcp import _resolve_address
+from .modbus_tcp import _resolve_address, raise_all_registers_failed
 from .base import DeviceAdapter
 import struct
 
@@ -41,19 +41,28 @@ class ModbusRTUAdapter(DeviceAdapter):
 
     def _read_raw(self) -> dict:
         raw = {}
+        failure = None
+        bad_addresses = []
         for entry in self.tag_map:
             raw_tag = entry.get("raw_tag")
             data_type = entry.get("data_type", "int16")
             count = 2 if data_type in ("int32", "float") else 1
             try:
                 address = _resolve_address(raw_tag)
+            except ValueError:
+                bad_addresses.append(raw_tag)
+                continue
+            try:
                 result = self.client.read_holding_registers(
                     address=address, count=count, slave=self.unit_id)
                 if result is None or result.isError():
                     continue
                 raw[raw_tag] = self._decode_registers(result.registers, data_type)
-            except Exception:
+            except Exception as exc:
+                failure = exc
                 continue
+        if self.tag_map and not raw:
+            raise_all_registers_failed("Modbus RTU", str(self.connection.get("port")), len(self.tag_map), failure, bad_addresses)
         return raw
 
     @staticmethod

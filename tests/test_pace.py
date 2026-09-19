@@ -163,6 +163,40 @@ check("one with four shifts behind it is measured", m["Old Pump"]["samples"], 4)
 check("and the median is what it actually ran at",
       m["Old Pump"]["median_lph"], 200.0, tol=1.0)
 
+# --- the plant figure is a figure for the PLANT ------------------------------
+# Every unset pump used to claim the whole plant rate for itself, so a floor
+# with three uncharacterised pumps expected three times the plant's own
+# target and every pace reading came out high.
+import crud  # noqa: E402
+
+for name in ("Shared A", "Shared B", "Shared C"):
+    crud.add_pump_station(name)
+pumps_now = {r["station_name"]: int(r["id"]) for _, r in crud.get_all_pumps_df().iterrows()}
+
+shared = pace.rates_for(["Shared A", "Shared B", "Shared C"], 400.0)
+check("three pumps with no rate and no history share the plant figure",
+      sum(v["rate"] for v in shared.values()), 400.0)
+check("...and each says where its number came from",
+      all(v["source"] == "plant" for v in shared.values()), True)
+
+check("a rate somebody typed is used as typed",
+      pace.set_pump_rate(pumps_now["Shared A"], 320.0), True)
+mixed = pace.rates_for(["Shared A", "Shared B", "Shared C"], 400.0)
+check("the set pump keeps its own rate", mixed["Shared A"]["rate"], 320.0)
+check("...marked as set", mixed["Shared A"]["source"] == "set", True)
+check("and the two without one split the plant figure between them",
+      mixed["Shared B"]["rate"] + mixed["Shared C"]["rate"], 400.0)
+
+# A pump with real history should be judged on it rather than on a share.
+# A set rate always wins; this is about the pump BEHIND it, so clear it
+# first and watch the number come from the pump's own shifts instead.
+measured = pace.measured_rates()
+if measured.get("Old Pump"):
+    pace.set_pump_rate(_pumps["Old Pump"], 0)
+    resolved = pace.rates_for(["Old Pump"], 400.0)["Old Pump"]
+    check("a pump with history is measured, not guessed", resolved["source"], "measured", tol=0)
+    check("...at what it actually pours", resolved["rate"], measured["Old Pump"]["median_lph"], tol=1.0)
+
 print("\n" + "=" * 66)
 if FAILS:
     print(f"{len(FAILS)} of {CHECKS} PACE CHECKS FAILED:\n" + "\n".join("  " + f for f in FAILS))

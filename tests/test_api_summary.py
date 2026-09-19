@@ -5,6 +5,7 @@ downtime-only day), and a real day with output to summarize.
 """
 import pathlib
 import sys
+from datetime import date
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -16,6 +17,15 @@ boot(fresh=True)
 from starlette.testclient import TestClient  # noqa: E402
 
 import api.main  # noqa: E402
+import crud  # noqa: E402
+
+
+def _ordinal(n):
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
 
 FAILS, CHECKS = [], 0
 
@@ -76,16 +86,57 @@ check({p["resin"] for p in body["by_resin"]} == {"Standard Clear V5", "Standard 
       f"both resins show up in the breakdown (got {body['by_resin']})")
 check(len(body["hourly_timeline"]) >= 1, "at least one hour bucket exists")
 
+# --- litres: Pigment is 0.124 L/unit (crud.CONTAINER_LITRES) -----------------
+check(abs(body["litres"] - 150 * 0.124) < 0.01, f"litres follow the cartridge format, not just a unit count (got {body['litres']})")
+by_resin_litres = {p["resin"]: p["litres"] for p in body["by_resin"]}
+check(abs(by_resin_litres["Standard Clear V5"] - 100 * 0.124) < 0.01,
+      f"each resin's own litres reflect its own units (got {by_resin_litres})")
+check(abs(by_resin_litres["Standard Black V5"] - 50 * 0.124) < 0.01,
+      f"each resin's own litres reflect its own units (got {by_resin_litres})")
+check({p["cartridge_type"] for p in body["by_cartridge"]} == {"Pigment"},
+      f"both pours were Pigment format, so the cartridge breakdown has one entry (got {body['by_cartridge']})")
+by_cartridge_units = {p["cartridge_type"]: p["units"] for p in body["by_cartridge"]}
+check(by_cartridge_units["Pigment"] == 150, f"the cartridge breakdown's units sum across both pours (got {by_cartridge_units})")
+
+# --- the login recap: same day's pours, rolled up for the whole month -------
+r = client.get("/api/summary/monthly")
+check(r.status_code == 200, f"monthly recap loads (got {r.status_code})")
+body = r.json()
+today_ordinal = _ordinal(date.today().day)
+check(body["has_data"] is True, "today's pours count as this month's data")
+check(body["units"] == 150, f"monthly units match today's, since today is the only day so far (got {body['units']})")
+check(body["best_day_ordinal"] == today_ordinal,
+      f"the only day logged is naturally the best one (got {body['best_day_ordinal']!r}, wanted {today_ordinal!r})")
+check(body["best_day_units"] == 150, f"best day's units match the day total (got {body['best_day_units']})")
+check(body["mismatches"] == 0, "no flagged pours yet, so the recap says so")
+
+# A mismatch this month should show up in the count, attributed by
+# operator_id rather than the name string, the same way the rest of this
+# operator's data is scoped.
+crud.add_lot_verification({
+    "operator_name": "Demo Operator", "pump_station": "New Pump #1", "cartridge_type": "V2",
+    "resin_type": "Standard Clear V5", "expected_lot": "L1", "entered_lot": "L9",
+    "result": "mismatch", "check_level": "full", "reason": "Grabbed the nearest box.",
+})
+r = client.get("/api/summary/monthly")
+check(r.json()["mismatches"] == 1, f"the mismatch is counted (got {r.json()['mismatches']})")
+
 # --- a packer only sees Packing Count, not another role's pours -------------
 r = client.post("/api/auth/login", json={"username": "sasha", "pin": "1234"}, headers=CSRF)
 check(r.status_code == 200, "a second operator can log in")
 r = client.get("/api/summary/today")
 check(r.json()["has_logs_today"] is False, "a different operator's summary is scoped to their own logs only")
+r = client.get("/api/summary/monthly")
+body = r.json()
+check(body["has_data"] is False, "a different operator's recap is scoped to their own logs too")
+check(body["mismatches"] == 0, "and does not pick up the first operator's flagged pour")
 
 # --- everything here requires a session -------------------------------------
 client.post("/api/auth/logout", headers=CSRF)
 r = client.get("/api/summary/today")
 check(r.status_code == 401, f"summary refuses an anonymous request (got {r.status_code})")
+r = client.get("/api/summary/monthly")
+check(r.status_code == 401, f"the monthly recap refuses an anonymous request too (got {r.status_code})")
 
 print("\n" + "=" * 66)
 if FAILS:

@@ -262,6 +262,12 @@ class PumpStation(Base):
     # shift. NULL means nobody has set this one yet and it falls back to the
     # plant's global figure.
     target_lph = Column(Float, nullable=True)
+    # "piston_diaphragm" | "electric_motor" | NULL for one nobody has
+    # labelled yet. What the pump IS, rather than what it happens to be
+    # doing: an old piston pump and a new motor pump are different machines
+    # with different expectations, and every reading about a pump is easier
+    # to judge when the application knows which kind it is looking at.
+    pump_type = Column(String(30), nullable=True)
 
 class DowntimeReason(Base):
     __tablename__ = "downtime_reasons"

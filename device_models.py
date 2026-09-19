@@ -49,7 +49,10 @@ class Device(Base):
     pump_station_id = Column(Integer, ForeignKey("pump_stations.id", ondelete="SET NULL"), nullable=True, index=True)
     reactor_id = Column(Integer, ForeignKey("reactors.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    status = Column(String(20), default="Unknown")  # Online | Offline | Error | Unknown
+    # Written by the gateway: Online | No data | Error | Unknown. The API can
+    # also report "Not reporting" on top of this (never stored) when the
+    # gateway itself has gone quiet - see device_crud.effective_status().
+    status = Column(String(20), default="Unknown")
     last_seen_at = Column(DateTime, nullable=True)
     last_error = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
@@ -92,3 +95,44 @@ class DeviceReading(Base):
     metric = Column(String(50), nullable=False, index=True)
     value_numeric = Column(Float, nullable=True)
     value_text = Column(String(255), nullable=True)
+
+
+class GatewayNode(Base):
+    """One PC running run_gateway.py. It checks in every few seconds, which
+    is the only way the MES side can tell "the gateway is running and every
+    device really is Online" apart from "the gateway PC was switched off an
+    hour ago and nothing has updated the devices table since". Keyed by
+    hostname, so a restart updates the same row instead of adding one.
+    """
+    __tablename__ = "gateway_nodes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hostname = Column(String(255), unique=True, nullable=False)
+    ip_address = Column(String(64), nullable=True)
+    app_version = Column(String(30), nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat_at = Column(DateTime, nullable=True, index=True)
+
+
+class GatewayJob(Base):
+    """A Find Devices or Test Connection request that has to run ON a
+    gateway PC. The admin page is usually open on a PC that has no cable to
+    the machines at all - a scan run there looks at the wrong network and
+    the wrong COM ports - so the page leaves a job here and the gateway
+    named in target_host picks it up, runs it where the hardware actually
+    is, and writes the answer back.
+
+    request_json is encrypted for test_connection (it can carry a broker or
+    OPC-UA password) and cleared once the job finishes.
+    """
+    __tablename__ = "gateway_jobs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    target_host = Column(String(255), nullable=False, index=True)
+    kind = Column(String(30), nullable=False)  # serial_ports | subnet | scan | test_connection
+    request_json = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="pending", index=True)  # pending | running | done | error
+    result_json = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)

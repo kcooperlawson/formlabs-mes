@@ -22,6 +22,10 @@ from starlette.testclient import TestClient  # noqa: E402
 
 import api.main  # noqa: E402
 import crud  # noqa: E402
+from urllib.parse import quote  # noqa: E402
+
+# "New Pump #1" has a # in it, which ends a URL - encoded here the way the
+# frontend's own encodeURIComponent does it.
 
 FAILS, CHECKS = [], 0
 
@@ -136,12 +140,57 @@ r = client.post("/api/pouring/mark-empty", json={"reactor_name": "Tank A"}, head
 check(r.status_code == 200, f"an operator (granted mark_reactor_empty by role) can mark it empty (got {r.status_code})")
 r = lookup(STATION, "Draft Grey V5")
 check(r.json()["batch"] is None, "after marking empty, the lookup shows no open filling")
+check(r.json()["status"] == "blank",
+      f"and the vessel itself reads blank, not still matched on the resin it just emptied (got {r.json()})")
 
 r = client.post("/api/pouring/mark-empty", json={"reactor_name": "Tank A"}, headers=CSRF)
 check(r.status_code == 400, f"marking an already-empty vessel empty again is refused (got {r.status_code})")
 
 # --- everything here requires a session -------------------------------------
+# --- the form offering back what they logged last --------------------------
+import crud  # noqa: E402
+
+# Logged under the signed-in operator's own name: offering somebody else's
+# last lot back would be worse than offering nothing.
+crud.add_hourly_log(operator_name="Demo Operator", pump_station=STATION, shift="Shift 1",
+                    cartridge_type="V2", resin_type="Draft Grey V5", lot_number="LOT-LAST",
+                    bottles=33, scrap_empty=0, scrap_filled=0)
+last = client.get("/api/pouring/last-entry").json()
+check(last["found"] is True, f"the last entry of the day comes back (got {last})")
+check(last["pump_station"] == STATION and last["lot_number"],
+      f"...with the fields worth not retyping (got {last})")
+check(last["logged_at"] and last["logged_at"].endswith("+00:00"),
+      f"...and its time carries a UTC offset (got {last['logged_at']})")
+
+# --- what a good hour looks like ON THIS PUMP -------------------------------
+# The operator form scales its celebration against this, so that 60 bottles
+# reads as a strong hour on an old pump and an ordinary one on a new pump,
+# with nothing for anybody to configure per pump.
+
+r = client.get(f"/api/pouring/station-benchmark?station={quote(STATION)}")
+check(r.status_code == 200, f"the benchmark endpoint answers (got {r.status_code})")
+fresh = r.json()
+check(fresh["typical"] == 0 and fresh["best"] == 0,
+      f"a pump with almost no history claims no benchmark, rather than calling hour one a record (got {fresh})")
+
+for count in (40, 100, 60, 55, 70, 2500):
+    crud.add_hourly_log(operator_name="operator", pump_station=STATION, shift="Shift 1",
+                        cartridge_type="V2", resin_type="Draft Grey V5", lot_number="LOT-BENCH",
+                        bottles=count, scrap_empty=0, scrap_filled=0, notes="benchmark sample")
+
+mark = client.get(f"/api/pouring/station-benchmark?station={quote(STATION)}").json()
+check(mark["samples"] >= 6, f"it counts this pump's own hourly logs (got {mark})")
+check(55 <= mark["typical"] <= 100,
+      f"the typical hour is the median, so one 2,500 typo doesn't define the pump (got {mark['typical']})")
+check(mark["best"] == 2500, f"best is the highest single count on record (got {mark['best']})")
+
+other = client.get("/api/pouring/station-benchmark?station=New%20Pump%20%232").json()
+check(other["samples"] == 0,
+      f"another pump's history is its own - benchmarks don't leak between pumps (got {other})")
+
 client.post("/api/auth/logout", headers=CSRF)
+r = client.get(f"/api/pouring/station-benchmark?station={quote(STATION)}")
+check(r.status_code == 401, f"the benchmark refuses an anonymous request (got {r.status_code})")
 r = lookup(STATION, "Draft Grey V5")
 check(r.status_code == 401, f"reactor-lookup refuses an anonymous request (got {r.status_code})")
 

@@ -30,7 +30,15 @@ config = context.config
 # typed directly into the .ini file. A URL-encoded password — e.g. '!'
 # becoming '%21' — trips this up with "invalid interpolation syntax" unless
 # every literal '%' is escaped as '%%' first.
-db_url = os.getenv("DB_URL")
+#
+# resolve_database_url, not os.getenv: on a portable install there is no
+# DB_URL at all (the bundled database picks its port at run time), and
+# without this Alembic fell back to alembic.ini's own empty sqlalchemy.url
+# and died on "Could not parse SQLAlchemy URL" - which is what made an
+# update's own "does it still boot" check fail on a portable PC.
+from db_options import resolve_database_url  # noqa: E402
+
+db_url = resolve_database_url()
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 

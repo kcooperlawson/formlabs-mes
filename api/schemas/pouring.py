@@ -108,3 +108,23 @@ class UndoRequest(BaseModel):
 class UndoResponse(BaseModel):
     ok: bool
     message: str
+
+
+class StationBenchmark(BaseModel):
+    """What this pump normally does, so the form can tell a good count from
+    an ordinary one without anybody typing a target in."""
+    typical: float
+    best: int
+    samples: int
+
+
+class LastEntryOut(BaseModel):
+    """The last hourly count this operator logged today, for the form to
+    offer back. found is False on the first entry of their day."""
+    found: bool
+    pump_station: str = ""
+    resin_type: str = ""
+    cartridge_type: str = ""
+    lot_number: str = ""
+    bottles: int = 0
+    logged_at: str | None = None

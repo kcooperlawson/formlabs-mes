@@ -28,3 +28,4 @@ class UserOut(BaseModel):
     shift: str | None = None
     preferred_theme: str | None = None
     avatar_filename: str | None = None
+    abilities: list[str] = []

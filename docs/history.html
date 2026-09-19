@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Formlabs MES — How This Got Built</title>
+<style>
+@page { size: Letter; margin: 0; }
+:root{
+  /* Light print palette. This document is printed and read on paper, so the
+     page is white: a dark ground looks right on screen and comes out of a
+     printer as a solid block of toner that bleeds through the sheet. */
+  --ground:#FFFFFF; --surface:#F1F5F9; --surface-2:#F8FAFC; --raised:#E2E8F0;
+  --line:#CBD5E1; --line-soft:#E2E8F0;
+  --ink:#0F172A; --body:#334155; --muted:#475569; --faint:#64748B;
+  --accent:#C2410C; --accent-2:#EA580C; --accent-dim:#FED7AA;
+  --good:#15803D; --warn:#B45309; --bad:#B91C1C;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --disp:"Inter Display","Inter",Arial,sans-serif;
+  --mono:"DejaVu Sans Mono",monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:var(--sans); color:var(--body); font-size:10pt; line-height:1.55;
+     background:var(--ground); -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+.page{width:8.5in; height:11in; padding:0.7in 0.78in 0.55in; position:relative;
+      page-break-after:always; overflow:hidden; background:var(--ground);}
+.page:last-child{page-break-after:auto;}
+
+h1,h2,h3,h4{font-family:var(--disp); color:var(--ink); margin:0; font-weight:700; letter-spacing:-.018em;}
+h2{font-size:19pt; line-height:1.12; letter-spacing:-.025em;}
+h3{font-size:11.5pt; margin-bottom:4pt;}
+h4{font-size:9.4pt;}
+p{margin:0 0 7pt;}
+strong{color:var(--ink); font-weight:600;}
+code,.mono{font-family:var(--mono); font-size:8.2pt; background:var(--surface);
+           padding:.5pt 3pt; border-radius:2pt; color:#9A3412;
+           border:.4pt solid var(--line-soft);}
+
+.eyebrow{font-family:var(--mono); font-size:7pt; letter-spacing:.15em;
+         text-transform:uppercase; color:var(--accent);}
+.sec-head{border-bottom:1pt solid var(--line); padding-bottom:7pt; margin-bottom:12pt;}
+.sec-head .eyebrow{display:block; margin-bottom:5pt;}
+.lead{font-size:10.6pt; color:var(--body);}
+.lead strong{color:var(--ink);}
+
+.folio{position:absolute; left:0.78in; right:0.78in; bottom:0.32in; display:flex;
+       justify-content:space-between; font-family:var(--mono); font-size:6.8pt;
+       color:var(--faint); letter-spacing:.08em; text-transform:uppercase;
+       border-top:.5pt solid var(--line-soft); padding-top:6pt;}
+
+/* cover */
+.cover{padding:0.85in 0.8in; background:var(--ground);}
+.cover::before{content:""; position:absolute; left:0; top:0; bottom:0; width:.16in; background:var(--accent);}
+.cover .logo{height:.4in; margin-bottom:.7in;}
+.cover h1{color:var(--ink); font-size:36pt; line-height:1.04; letter-spacing:-.03em; max-width:6.3in;}
+.cover .sub{font-size:11.5pt; color:var(--accent-2); margin-top:13pt;}
+.cover .rule{height:1pt; background:var(--line); margin:24pt 0 18pt; width:2.2in;}
+.cover .blurb{font-size:10.6pt; line-height:1.6; color:var(--muted); max-width:5in;}
+.cover .meta{position:absolute; left:0.8in; right:0.8in; bottom:0.7in; display:flex; gap:0.42in;
+             font-family:var(--mono); font-size:7pt; color:var(--faint); text-transform:uppercase; letter-spacing:.08em;}
+.cover .meta b{display:block; font-family:var(--sans); color:var(--ink); font-size:9pt;
+               font-weight:600; letter-spacing:-.01em; margin-top:3pt; text-transform:none;}
+
+/* figures */
+figure{margin:0;}
+figure img{width:100%; display:block; border:.6pt solid var(--line); border-radius:3pt;
+           background:var(--surface-2); object-fit:contain; object-position:top center;}
+figcaption{font-size:7.6pt; color:var(--muted); margin-top:5pt; line-height:1.42;}
+figcaption b{color:var(--ink); font-weight:600;}
+
+.note{background:var(--surface-2); border-left:2pt solid var(--line); padding:9pt 12pt; margin:9pt 0;}
+.note p{margin:0; font-size:9.2pt;}
+.note .eyebrow{display:block; margin-bottom:4pt; color:var(--muted);}
+.note.pivot{border-left-color:var(--accent);}
+.note.pivot .eyebrow{color:var(--accent);}
+
+.stat-band{display:flex; gap:0; border:.6pt solid var(--line); border-radius:3pt; overflow:hidden;}
+.stat-band div{flex:1; padding:9pt 12pt; border-right:.6pt solid var(--line);}
+.stat-band div:last-child{border-right:none;}
+.stat-band .n{font-family:var(--disp); font-size:17pt; font-weight:800; color:var(--accent-2);
+              letter-spacing:-.02em; line-height:1; display:block;}
+.stat-band .l{font-size:7.2pt; color:var(--muted); text-transform:uppercase; letter-spacing:.06em;
+              margin-top:4pt; display:block;}
+
+/* the expand/summary pattern - real <details> so this reads and works the
+   same whether it's opened as a page in a browser or printed to the PDF;
+   "open" is set on every one so nothing is missing from the printed copy,
+   and clicking a summary in a browser still genuinely collapses it. */
+details.expand{margin-top:2pt;}
+details.expand > summary{cursor:pointer; font-family:var(--disp); font-weight:700; font-size:9pt;
+  color:var(--accent-2); list-style:none; display:flex; align-items:center; gap:6pt;
+  padding:6pt 0 5pt; border-top:1pt solid var(--line-soft); user-select:none;}
+details.expand > summary::-webkit-details-marker{display:none;}
+details.expand > summary::before{content:"▸"; display:inline-block; font-size:8pt; color:var(--accent);}
+details.expand[open] > summary::before{content:"▾";}
+details.expand .body{padding-top:2pt;}
+
+.shots{display:grid; grid-template-columns:1fr 1fr; gap:10pt 12pt; margin:8pt 0;}
+.shots.three{grid-template-columns:1fr 1fr 1fr; gap:9pt 10pt;}
+.shots .wide img{max-height:2.35in;}
+.shots .tall{display:flex; flex-direction:column;}
+.shots .tall img{max-height:2.7in; width:auto; margin:0 auto;}
+.shots .tall figcaption{text-align:center;}
+</style>
+</head><body>
+
+<!-- ============================================================ -->
+<section class="page cover">
+  <img class="logo" src="assets/formlabs_logo.png" alt="Formlabs">
+  <h1>How This Got Built</h1>
+  <div class="sub">Three tries at a resin-pouring production record, in about two months</div>
+  <div class="rule"></div>
+  <div class="blurb">This one's for the record, not for a customer: how a Google Form turned into a
+  spreadsheet nobody should have asked a spreadsheet to do, then into a real Python app, then into
+  the thing running the floor today. Every screenshot in here is a real one, pulled from the same
+  folder they landed in the day they were taken.</div>
+  <div class="meta">
+    <div>Tries<b>3</b></div>
+    <div>Elapsed<b>~8 weeks</b></div>
+    <div>Now running<b>FastAPI &middot; React &middot; PostgreSQL</b></div>
+    <div>Version<b>PT&#8209;V4.02</b></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="page">
+  <div class="sec-head"><span class="eyebrow">Try one &middot; roughly three weeks</span>
+    <h2>A Google Form, and then a lot more than that</h2></div>
+  <p class="lead">It started the way most of these do: a Google Form so operators could stop writing
+  bottle counts on paper, feeding a spreadsheet nobody had to open unless they wanted the numbers.
+  That much worked fine. What happened next is the part worth writing down &mdash; the sheet didn't
+  stay a sheet. It grew pivot tables, then charts, then a second and third linked tab, then something
+  that was doing its level best to look like a real manufacturing dashboard, built entirely out of
+  cell formatting and conditional rules.</p>
+
+  <details class="expand" open>
+    <summary>The fuller story</summary>
+    <div class="body">
+      <p>The earliest surviving screenshot is from August 13 &mdash; the raw form responses, a
+      timestamp and a bottle count per row, with a couple of running totals bolted on the side.
+      Two days later there's a pivot table breaking downtime reasons into a pie chart. By the 19th
+      it's a full pivot-plus-chart view of volume by resin and by pump. None of this was asked for;
+      it's just what happens when the only tool you have is a spreadsheet and the questions keep
+      being real ones.</p>
+      <div class="shots">
+        <figure class="wide">
+          <img src="figs_history/sheets_form_responses.png" alt="The original Google Form responses sheet">
+          <figcaption><b>Aug 13</b> &mdash; where it actually starts: raw form submissions, a running
+          daily total in the corner.</figcaption>
+        </figure>
+        <figure class="wide">
+          <img src="figs_history/sheets_downtime_pie.png" alt="A pivot table and pie chart breaking down downtime reasons">
+          <figcaption><b>Aug 15</b> &mdash; the first real analysis: downtime reasons, pivoted and
+          charted straight out of the form data.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </details>
+
+  <div class="folio"><span>Formlabs MES &middot; How This Got Built</span><span>2</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="page">
+  <div class="sec-head"><span class="eyebrow">Try one, continued</span>
+    <h2>The moment a spreadsheet stops being one</h2></div>
+  <p class="lead">By the third week this wasn't a tracker anymore. It was a genuine multi-tab system
+  &mdash; a Master Validation Manager, a Resin Weight Specification Dashboard, a Cleanliness &amp;
+  Station Photo Gallery, an Analytics tab &mdash; each one a real spreadsheet doing a real job, wired
+  together with lookups and named ranges. The centerpiece was a "Live Dashboard" tab styled to look
+  exactly like a web app: a navigation bar, KPI cards, a shift pace tracker, a leaderboard.</p>
+
+  <details class="expand" open>
+    <summary>The fuller story</summary>
+    <div class="body">
+      <div class="shots">
+        <figure class="wide">
+          <img src="figs_history/sheets_pivot_by_resin.png" alt="A pivot table and combo chart of volume by resin type">
+          <figcaption><b>Aug 19</b> &mdash; volume and adjusted units by resin, a combo bar-and-line
+          chart driven off a pivot.</figcaption>
+        </figure>
+        <figure class="wide">
+          <img src="figs_history/sheets_live_dashboard.png" alt="A Google Sheet styled to look like a live manufacturing dashboard, with a navigation bar and KPI cards">
+          <figcaption>The "Live Dashboard" tab &mdash; a nav bar, live OEE, resin mass, run velocity,
+          a leaderboard, all of it cell formatting and formulas made to look like an app.</figcaption>
+        </figure>
+      </div>
+      <div class="shots" style="margin-top:2pt;">
+        <figure class="wide" style="grid-column:1 / -1;">
+          <img src="figs_history/sheets_analytics_tab.png" alt="The Analytics tab, one of several linked sheets, with statistics tables and operator analytics">
+          <figcaption>One of several linked sheets behind it &mdash; the Analytics tab, its own
+          statistics table, operator breakdown and shift pace trackers, feeding the dashboard above.</figcaption>
+        </figure>
+      </div>
+      <div class="note pivot">
+        <span class="eyebrow">Why this was the wrong tool</span>
+        <p>Tank levels were part of that same system &mdash; reactor fill state, tracked and drawn
+        with the same formulas and conditional formatting as everything else on the dashboard. That
+        was the actual realization: recalculating a "live" view of the floor, across a dozen linked
+        tabs, every time anyone touched a cell, is exactly the kind of thing Sheets was never built to
+        do quickly. The question "how full is that tank right now" needed to be answered by software,
+        not a spreadsheet asked to imitate one.</p>
+      </div>
+    </div>
+  </details>
+
+  <div class="folio"><span>Formlabs MES &middot; How This Got Built</span><span>3</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="page">
+  <div class="sec-head"><span class="eyebrow">Try two &middot; roughly four weeks</span>
+    <h2>Real code, running as Streamlit</h2></div>
+  <p class="lead">The rebuild started in Python, with the form data pulled over as a one-time CSV
+  import and a real relational schema underneath it &mdash; the same shape of tables (production
+  logs, downtime, reactors, resin specs) this app still uses today. Streamlit was the obvious choice
+  for the front end: it turns a Python script into a working UI with almost no separate frontend
+  work, which is exactly what a solo rebuild needs in its first days.</p>
+
+  <details class="expand" open>
+    <summary>The fuller story</summary>
+    <div class="body">
+      <p>The import and the first schema both land on August 22nd, within about an hour of each other
+      going by the file timestamps &mdash; <code>load_csv.py</code> pulling the old sheet's rows in,
+      then <code>database.py</code> taking shape with a <code>seed_initial_data()</code> function
+      whose name is still exactly what it's called in this codebase today.</p>
+      <div class="shots">
+        <figure class="wide">
+          <img src="figs_history/transition_load_csv.png" alt="A terminal running load_csv.py, importing the old spreadsheet's data">
+          <figcaption><b>Aug 22, evening</b> &mdash; the one-time migration off the spreadsheet:
+          <code>python load_csv.py</code>, pulling the old rows into a real database.</figcaption>
+        </figure>
+        <figure class="wide">
+          <img src="figs_history/transition_vscode_seed.png" alt="VS Code showing database.py, with a seed_initial_data function">
+          <figcaption>The same evening &mdash; <code>database.py</code> taking shape, including a
+          <code>seed_initial_data()</code> that survives, by name, into today's codebase.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </details>
+
+  <div class="folio"><span>Formlabs MES &middot; How This Got Built</span><span>4</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="page">
+  <div class="sec-head"><span class="eyebrow">Try two, continued</span>
+    <h2>From a bare login screen to a real SCADA feel</h2></div>
+  <p class="lead">The first working dashboard was up that same night &mdash; a login screen, live
+  production stats, shift pace tracking. Within a day the reactor tanks had a real visual (simple
+  rounded rectangles at first), and within two weeks the whole thing had a proper "SCADA Terminal"
+  login screen with the Formlabs mark on it. This is where the project stopped being a rebuild and
+  became genuinely capable software: real lot verification, real downtime tracking, real QC.</p>
+
+  <details class="expand" open>
+    <summary>The fuller story</summary>
+    <div class="body">
+      <div class="shots three">
+        <figure class="wide">
+          <img src="figs_history/streamlit_first_dashboard.png" alt="The first working Streamlit dashboard, with a login form and live production stats">
+          <figcaption><b>Aug 22, night</b> &mdash; the first working dashboard, hours after the
+          migration.</figcaption>
+        </figure>
+        <figure class="wide">
+          <img src="figs_history/streamlit_reactor_tanks.png" alt="Two early reactor tank visuals in Streamlit, showing percentage full">
+          <figcaption><b>Aug 23</b> &mdash; the reactor tanks, in code instead of spreadsheet
+          cells, for the first time.</figcaption>
+        </figure>
+        <figure class="wide">
+          <img src="figs_history/streamlit_scada_login.png" alt="A polished SCADA Terminal login screen">
+          <figcaption><b>Aug 31</b> &mdash; the "SCADA Terminal" login, about a week and a half
+          into the rebuild.</figcaption>
+        </figure>
+      </div>
+      <div class="note">
+        <span class="eyebrow">What it cost</span>
+        <p>Streamlit's whole model is rerunning the entire page script on every interaction. That's
+        why it's fast to build in and exactly why it hurt on the floor: every tap, every keystroke on
+        an operator's phone, caused the full page to redraw &mdash; a visible flash and a felt lag,
+        worst on the single busiest screen in the app, the hourly pouring log. Four weeks of real
+        features landed on top of an interaction model that was never going to feel instant.</p>
+      </div>
+    </div>
+  </details>
+
+  <div class="folio"><span>Formlabs MES &middot; How This Got Built</span><span>5</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="page">
+  <div class="sec-head"><span class="eyebrow">Try three &middot; about a week &middot; where it stands now</span>
+    <h2>FastAPI and React</h2></div>
+  <p class="lead">The business logic didn't get rewritten &mdash; four weeks of Streamlit-era rules
+  around lot verification, changeovers and reactor levels ported over intact, because none of that
+  was ever the problem. What changed is everything around it: a real API, a real frontend, no
+  full-page reruns. A tap responds like a tap. Streamlit came off the machine entirely once this
+  reached parity, rather than running the two side by side indefinitely.</p>
+
+  <details class="expand" open>
+    <summary>The fuller story</summary>
+    <div class="body">
+      <div class="shots">
+        <figure class="wide">
+          <img src="figs_history/manager_cockpit.png" alt="The current Manager Cockpit, a menu of production record sections">
+          <figcaption>Manager Cockpit, today &mdash; the same categories of information the
+          spreadsheet was reaching for, actually built for it.</figcaption>
+        </figure>
+        <figure class="wide">
+          <img src="figs_history/live_reactors.png" alt="The current Live Reactors page, showing two tanks with real percentages and litres remaining">
+          <figcaption>The reactor tanks now &mdash; the same question ("how full is it") the sheet's
+          fake dashboard was built to answer, drawn for real and updating live.</figcaption>
+        </figure>
+      </div>
+      <div class="shots" style="margin-top:9pt;">
+        <figure class="tall">
+          <img src="figs_history/pouring_phone.png" alt="The current pouring log on a phone-sized screen">
+          <figcaption>The hourly pouring log, on a phone &mdash; the direct descendant of the
+          original Google Form, six weeks and two rewrites later.</figcaption>
+        </figure>
+        <figure class="tall">
+          <img src="figs_history/login_recap.png" alt="A personal recap card shown once after signing in, showing units poured this month">
+          <figcaption>One of the newer touches &mdash; a personal recap shown once at sign-in,
+          nothing a spreadsheet or a Streamlit rerun could have done this cheaply.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </details>
+
+  <div class="folio"><span>Formlabs MES &middot; How This Got Built</span><span>6</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="page">
+  <div class="sec-head"><span class="eyebrow">Where it stands</span>
+    <h2>Two months, three tries, one working record</h2></div>
+  <p class="lead">None of the three tries were wasted. The spreadsheet proved the questions were real
+  before a line of Python existed. Streamlit proved the business rules &mdash; lot verification,
+  changeovers, downtime, QC &mdash; were right, at the cost of the floor feeling every rerun. What's
+  running now inherited both: the rules, and the reason to finally stop asking the wrong tool to
+  carry them.</p>
+
+  <div class="stat-band">
+    <div><span class="n">3</span><span class="l">tools tried</span></div>
+    <div><span class="n">~8</span><span class="l">weeks, start to now</span></div>
+    <div><span class="n">50</span><span class="l">automated test scripts today</span></div>
+    <div><span class="n">PT&#8209;V4.02</span><span class="l">current version</span></div>
+  </div>
+
+  <div class="note" style="margin-top:14pt;">
+    <span class="eyebrow">A note on the screenshots</span>
+    <p>Every image in this document is real, pulled from the actual folders and the actual running
+    app on the dates given &mdash; nothing staged for this write-up except the three screenshots of
+    the current app, taken against a scratch copy of the database rather than the real production
+    data, and the three re-opened spreadsheet screenshots taken today of the old Sheets system to
+    show what it still looks like.</p>
+  </div>
+
+  <div class="folio"><span>Formlabs MES &middot; How This Got Built</span><span>7</span></div>
+</section>
+
+</body></html>

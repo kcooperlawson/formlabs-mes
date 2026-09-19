@@ -6,6 +6,9 @@ import { useLotGate } from '../hooks/useLotGate'
 import { useSubmitLock } from '../hooks/useSubmitLock'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { enqueue, isConnectivityError } from '../offline/queue'
+import { playLogged } from '../sound/chimes'
+import { celebrate } from '../shell/Celebrate'
+import { ShiftProgress } from './ShiftProgress'
 import { useToast } from '../toast/ToastProvider'
 import { ChangeoverBanner } from './ChangeoverBanner'
 import { EMPTY_BULK, ProductionOutputFields, type BulkState } from './ProductionOutputFields'
@@ -55,6 +58,7 @@ export function PouringTab({ shift, myStation }: { shift: string; myStation: str
   const [bulkBlocked, setBulkBlocked] = useState(false)
   const [undo, setUndo] = useState<UndoState | null>(null)
   const [result, setResult] = useState<{ landed: string; messages: string[] } | null>(null)
+  const [pourTick, setPourTick] = useState(0)
 
   const pumpsQuery = useQuery({ queryKey: ['reference', 'pumps'], queryFn: referenceApi.pumps })
   const resinsQuery = useQuery({ queryKey: ['reference', 'resins'], queryFn: referenceApi.resins })
@@ -111,6 +115,23 @@ export function PouringTab({ shift, myStation }: { shift: string; myStation: str
     queryClient.invalidateQueries({ queryKey: ['pouring', 'lot-gate', station, resin, cartCode] })
   }
 
+  // What they logged last, so the same four fields don't get retyped every
+  // hour. Today's only, and their own only (see crud.last_pour_for_operator).
+  const lastEntryQuery = useQuery({
+    queryKey: ['pouring', 'last-entry', asOperator],
+    queryFn: () => pouringApi.lastEntry(asOperator),
+    staleTime: 30_000,
+  })
+
+  // What this pump usually does, so a count can be judged against its own
+  // history rather than a number that means something different per pump.
+  const benchmarkQuery = useQuery({
+    queryKey: ['pouring', 'benchmark', station],
+    queryFn: () => pouringApi.stationBenchmark(station),
+    enabled: !!station,
+    staleTime: 5 * 60_000,
+  })
+
   const submitMutation = useMutation({
     mutationFn: (formData: FormData) => pouringApi.submit(formData),
     onSuccess: (resp) => {
@@ -123,6 +144,23 @@ export function PouringTab({ shift, myStation }: { shift: string; myStation: str
       submitLock.lock()
       invalidateAfterWrite()
       toast.show(resp.landed || 'Logged.')
+      playLogged()
+      // The pour actually landed. Sized against what THIS pump normally
+      // does, not against the raw number: 60 bottles is a great hour on an
+      // old pump and a slow one on a new one.
+      const logged = isBulk ? bulk.containers : bottlesFilled
+      const mark = benchmarkQuery.data
+      const beatsRecord = !!mark && mark.samples > 0 && logged > mark.best
+      celebrate({
+        strength: mark && mark.typical > 0 ? logged / mark.typical : 1,
+        label: beatsRecord ? `New best on ${station} — ${logged} 🏆` : undefined,
+      })
+      if (beatsRecord) queryClient.invalidateQueries({ queryKey: ['pouring', 'benchmark', station] })
+      // The shift counter at the top of this tab reads the same summary the
+      // Summary tab does, so it has to be told the number just moved.
+      queryClient.invalidateQueries({ queryKey: ['summary', 'today'] })
+      queryClient.invalidateQueries({ queryKey: ['pouring', 'last-entry'] })
+      if (!isOffTank) setPourTick((t) => t + 1)
     },
     onError: (err, formData) => {
       // A dropped connection, not a rejection - see offline/queue.ts. Queue
@@ -178,6 +216,29 @@ export function PouringTab({ shift, myStation }: { shift: string; myStation: str
 
   return (
     <div className="flex flex-col gap-4">
+      {/* What they've done so far, on the screen they actually work on. */}
+      <ShiftProgress />
+
+      {/* An hourly entry is nearly always the last one with a different
+          count. This fills the rest of it back in; the count is still typed,
+          because that is the one thing nobody should ever be handed. */}
+      {lastEntryQuery.data?.found && (
+        <button
+          className={`${fl.btnSecondary} self-start`}
+          onClick={() => {
+            const last = lastEntryQuery.data
+            setStation(last.pump_station || station)
+            setResin(last.resin_type || resin)
+            if (last.cartridge_type) setCartLabel(last.cartridge_type)
+            // Deliberately NOT the lot number. Lot verification exists to make
+            // somebody read the container in front of them, and handing them
+            // the last one back is exactly the check being skipped.
+            toast.show("Station, resin and cartridge filled in. Read the lot off the container as usual.")
+          }}
+        >
+          ↩️ Same as last hour ({lastEntryQuery.data.pump_station} · {lastEntryQuery.data.resin_type})
+        </button>
+      )}
       <h3 className="text-sm font-semibold text-[#CBD5E1]">
         1. Station & Material Setup
       </h3>
@@ -220,7 +281,7 @@ export function PouringTab({ shift, myStation }: { shift: string; myStation: str
       )}
 
       {station && resin && !isOffTank && (
-        <ChangeoverBanner station={station} resin={resin} shift={shift} />
+        <ChangeoverBanner station={station} resin={resin} shift={shift} pourTick={pourTick} />
       )}
       {isOffTank && (
         <p className={`text-sm ${fl.muted}`}>

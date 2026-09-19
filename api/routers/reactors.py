@@ -36,7 +36,7 @@ from api.deps import require_ability
 from api.schemas.reactors import (
     AddReactorRequest, BatchInfo, BulkCandidate, BulkPourRequest, DrawInfo,
     ManageOptionsOut, ManageReactorRow, MarkEmptyOut, MarkFilledRequest, ReactorCard,
-    UpdateReactorRequest, VesselTypeOption,
+    ReconcileRequest, UpdateReactorRequest, VesselTypeOption,
 )
 
 router = APIRouter(prefix="/reactors", tags=["reactors"])
@@ -106,6 +106,7 @@ def fleet(user: dict = Depends(require_ability("view_scada"))):
             current_resin=r_resin or None, assigned_pump=r_pump or None,
             is_idle=is_idle, remaining_l=remaining_l, remaining_kg=remaining_kg, fill_pct=fill_pct,
             lot=lot or "", svg=svg, batch=batch, can_mark_empty=can_mark_empty and batch is not None,
+            can_manage=can_mark_empty,
         ))
     return out
 
@@ -150,9 +151,28 @@ def remove(reactor_id: int, user: dict = Depends(require_ability("manage_reactor
 
 @router.put("/{reactor_id}")
 def update(reactor_id: int, body: UpdateReactorRequest, user: dict = Depends(require_ability("manage_reactors"))):
+    df = crud.get_all_reactors_df()
+    row = df[df["id"] == reactor_id]
+    if row.empty:
+        raise HTTPException(status_code=404, detail="No such reactor.")
+    name = row.iloc[0]["reactor_name"]
+    old_resin = _s(row.iloc[0].get("current_resin"))
+    new_resin = "" if body.current_resin == "None" else body.current_resin.strip()
+
     crud.update_reactor_identity(reactor_id, vessel_type=body.vessel_type, asset_tag=body.asset_tag,
                                  bay_marker=body.bay_marker)
     crud.update_reactor_config(reactor_id, body.current_resin, body.assigned_pump)
+
+    # A resin picked from this dropdown is the same event as a confirmed
+    # changeover or a management "mark filled" - see reassign_reactor_resin's
+    # own docstring for what got left behind when this edit only ever
+    # touched the label. Pump-only edits skip it: which physical station
+    # feeds a vessel doesn't change what's already sitting in it, and
+    # link_vessel_to_pump (the operator-side equivalent) has never treated
+    # it as one either.
+    if new_resin.lower() != old_resin.lower():
+        crud.reassign_reactor_resin(name, new_resin, by=user["full_name"], pump=body.assigned_pump)
+
     return {"ok": True}
 
 
@@ -223,7 +243,7 @@ def mark_empty(reactor_id: int, user: dict = Depends(require_ability("manage_rea
     row = df[df["id"] == reactor_id]
     if row.empty:
         raise HTTPException(status_code=404, detail="No such reactor.")
-    ok = crud.close_batch(row.iloc[0]["reactor_name"], by=user["full_name"])
+    ok = crud.mark_reactor_empty(row.iloc[0]["reactor_name"], by=user["full_name"])
     return MarkEmptyOut(ok=ok)
 
 
@@ -247,4 +267,32 @@ def mark_filled(reactor_id: int, body: MarkFilledRequest, user: dict = Depends(r
     )
     if not ok:
         raise HTTPException(status_code=400, detail="Could not mark that reactor filled.")
+    return MarkEmptyOut(ok=ok)
+
+
+@router.post("/{reactor_id}/reconcile", response_model=MarkEmptyOut)
+def reconcile(reactor_id: int, body: ReconcileRequest, user: dict = Depends(require_ability("manage_reactors"))):
+    """Correct a tank to what somebody actually read off it - a real feature
+    of the Streamlit-era app (see CHANGELOG 3.x's "Real tank reconciliation")
+    that never got an API route or a screen in this rewrite, leaving no way
+    to fix a level that's drifted short of a developer editing the database
+    directly. The level is derived from logged production (see
+    reactor_draw_litres), not stored, so this can't just overwrite a number -
+    it writes the difference in as its own System Calibration row, the same
+    mechanism a level walk already treats as an adjustment rather than a
+    refill (see crud._calibrate_reactor).
+    """
+    if body.mode == "percent" and body.value > 100:
+        raise HTTPException(status_code=400, detail="A percentage can't be over 100.")
+    df = crud.get_all_reactors_df()
+    row = df[df["id"] == reactor_id]
+    if row.empty:
+        raise HTTPException(status_code=404, detail="No such reactor.")
+    name = row.iloc[0]["reactor_name"]
+    if body.mode == "percent":
+        ok = crud.reconcile_reactor_level(name, body.value, user["full_name"], notes=body.notes)
+    else:
+        ok = crud.reconcile_reactor_liters(name, body.value, user["full_name"], notes=body.notes)
+    if not ok:
+        raise HTTPException(status_code=400, detail="That reactor has no resin assigned yet.")
     return MarkEmptyOut(ok=ok)

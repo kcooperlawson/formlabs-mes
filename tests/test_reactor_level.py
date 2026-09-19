@@ -289,6 +289,21 @@ check("and the changeover added no units of its own",
       calculate_logged_units_for_resin("Op Set B V1", "", "Pump 11", ""), 0)
 print("  operator-led setup OK")
 
+# --- a resin coming back onto a pump it already held is a fresh tank -------
+# The lot walk alone cannot tell this from the tank still running on Op Set
+# A V1 all along: nothing new has been logged under it since the swap away
+# and back, so "the newest lot anywhere in this resin/pump's history" is
+# still L-OPSET01 from the 60 L stint above, and the walk would drag that
+# whole old occupancy along with it. record_changeover already opens a fresh
+# ReactorBatch the moment this happens - reactor_draw_litres has to actually
+# use it as the floor on what it reads, not just let it sit there unread.
+record_changeover("Operator Tank", "Op Set A V1", operator="Op",
+                  shift="Shift 1", pump_station="Pump 11")
+drawn, lot = reactor_draw_litres("Op Set A V1", "Pump 11")
+check("nothing poured yet under the resin's return reads as a fresh fill, not the old 60 L", drawn, 0.0)
+check("and no stale lot carries over either", lot, "")
+print("  a resin returning to a pump reads fresh, not stale OK")
+
 # --- nothing about this needs a manager ------------------------------------
 # The three ways the operator used to get stuck and have to go and find one.
 

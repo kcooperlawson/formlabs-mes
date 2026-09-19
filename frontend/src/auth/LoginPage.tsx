@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { authApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { brandTitle } from '../brandTitle'
+import { InstallButton } from '../pwa/InstallButton'
+import { IosInstallHint } from '../pwa/IosInstallHint'
 import { LaserSweep } from '../tv/PrintBuild'
 import { useAuth } from './AuthProvider'
 
@@ -168,6 +170,9 @@ export function LoginPage() {
 
           {tab === 'signin' ? <SignInForm /> : <RegisterForm />}
         </div>
+
+        <InstallButton className="mt-4 w-full rounded border border-[#334155] bg-[#1E293B] py-2.5 text-sm font-bold text-[#00D2FF] transition hover:border-[#00D2FF]/50" />
+        <IosInstallHint />
       </div>
     </div>
   )
