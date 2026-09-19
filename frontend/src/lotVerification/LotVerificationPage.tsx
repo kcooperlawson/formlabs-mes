@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { lotVerificationApi, type LotCheck } from '../api/lotVerification'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const tile = fl.tile
 const card = fl.card
@@ -147,7 +148,7 @@ export function LotVerificationPage() {
                       <span className={`text-xs ${fl.muted}`}>{new Date(c.timestamp).toLocaleString()}</span>
                     </div>
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-[#CBD5E1]">
-                      <span>{c.operator_name} · {c.pump_station} · {c.cartridge_type} ·</span>
+                      <span><Drill f={{ operator: c.operator_name }}>{c.operator_name}</Drill> · <Drill f={{ pump: c.pump_station }}>{c.pump_station}</Drill> · {c.cartridge_type} ·</span>
                       {c.resin_type && c.resin_color ? (
                         <ResinChip name={c.resin_type} color={c.resin_color} />
                       ) : (
@@ -155,8 +156,8 @@ export function LotVerificationPage() {
                       )}
                     </div>
                     <p className="text-sm text-[#F8FAFC]">
-                      <b>Run expected:</b> <code>{c.expected_lot ?? '—'}</code><br />
-                      <b>Cartridge read:</b> <code>{c.entered_lot ?? '—'}</code>
+                      <b>Run expected:</b> <code>{c.expected_lot ? <Drill f={{ lot: c.expected_lot }}>{c.expected_lot}</Drill> : '—'}</code><br />
+                      <b>Cartridge read:</b> <code>{c.entered_lot ? <Drill f={{ lot: c.entered_lot }}>{c.entered_lot}</Drill> : '—'}</code>
                     </p>
                     <p className="mt-1 text-sm italic text-[#CBD5E1]">
                       {c.reason || 'No reason recorded.'}
@@ -195,7 +196,7 @@ export function LotVerificationPage() {
                     <tbody>
                       {data.by_operator.map((o) => (
                         <tr key={o.operator_name} className={fl.tableRow}>
-                          <td className="py-1 pr-2">{o.operator_name}</td>
+                          <td className="py-1 pr-2"><Drill f={{ operator: o.operator_name }}>{o.operator_name}</Drill></td>
                           <td className="py-1 pr-2">{o.checks}</td>
                           <td className="py-1 pr-2">{o.full}</td>
                           <td className="py-1 pr-2">{o.fast}</td>
@@ -216,7 +217,7 @@ export function LotVerificationPage() {
                     <tbody>
                       {data.by_station.map((s) => (
                         <tr key={s.pump_station} className={fl.tableRow}>
-                          <td className="py-1 pr-2">{s.pump_station}</td>
+                          <td className="py-1 pr-2"><Drill f={{ pump: s.pump_station }}>{s.pump_station}</Drill></td>
                           <td className="py-1 pr-2">{s.checks}</td>
                           <td className="py-1 pr-2">{s.flags}</td>
                         </tr>
@@ -252,14 +253,14 @@ export function LotVerificationPage() {
                     {data.checks.map((c) => (
                       <tr key={c.id} className={fl.tableRow}>
                         <td className="py-1 pr-2 whitespace-nowrap">{new Date(c.timestamp).toLocaleString()}</td>
-                        <td className="py-1 pr-2">{c.operator_name}</td>
-                        <td className="py-1 pr-2">{c.pump_station}</td>
+                        <td className="py-1 pr-2"><Drill f={{ operator: c.operator_name }}>{c.operator_name}</Drill></td>
+                        <td className="py-1 pr-2"><Drill f={{ pump: c.pump_station }}>{c.pump_station}</Drill></td>
                         <td className="py-1 pr-2">{c.cartridge_type}</td>
                         <td className="py-1 pr-2">
                           {c.resin_type && c.resin_color ? <ResinChip name={c.resin_type} color={c.resin_color} /> : '—'}
                         </td>
-                        <td className="py-1 pr-2">{c.expected_lot ?? '—'}</td>
-                        <td className="py-1 pr-2">{c.entered_lot ?? '—'}</td>
+                        <td className="py-1 pr-2">{c.expected_lot ? <Drill f={{ lot: c.expected_lot }}>{c.expected_lot}</Drill> : '—'}</td>
+                        <td className="py-1 pr-2">{c.entered_lot ? <Drill f={{ lot: c.entered_lot }}>{c.entered_lot}</Drill> : '—'}</td>
                         <td className="py-1 pr-2">{c.result}</td>
                         <td className="py-1 pr-2">{c.check_level}</td>
                         <td className="py-1 pr-2">{c.reason ?? ''}</td>

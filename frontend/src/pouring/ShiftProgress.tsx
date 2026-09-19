@@ -4,6 +4,7 @@ import { summaryApi } from '../api/summary'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { celebrate } from '../shell/Celebrate'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 // What an operator has actually done so far, where they can see it without
 // leaving the pouring form. Until now the number lived on the Summary tab,
@@ -81,8 +82,11 @@ export function ShiftProgress() {
   const nextBadge = (Math.floor(units / MILESTONE) + 1) * MILESTONE
   const pct = ((units % MILESTONE) / MILESTONE) * 100
   const circumference = 2 * Math.PI * 26
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   return (
+    <Drill f={{ date_from: today, date_to: today }} block className="rounded-lg" title="Every log you've made today">
     <div className={`${fl.card} flex items-center gap-3`}>
       <div
         key={popped}
@@ -111,5 +115,6 @@ export function ShiftProgress() {
         </p>
       </div>
     </div>
+    </Drill>
   )
 }

@@ -3,6 +3,13 @@ import { useState } from 'react'
 import { summaryApi } from '../api/summary'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
+
+
+function todayIso(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const btn = `w-full ${fl.btn}`
 const tile = fl.tile
@@ -54,6 +61,7 @@ export function SummaryTab() {
         </p>
       ) : (
         <>
+          <Drill f={{ date_from: todayIso(), date_to: todayIso() }} block className="rounded-lg" title="Every log behind today's numbers">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className={tile}>
               <p className="text-lg font-semibold text-white">{data.units.toLocaleString()}</p>
@@ -76,6 +84,7 @@ export function SummaryTab() {
               <p className={`text-xs ${fl.muted}`}>Logs</p>
             </div>
           </div>
+          </Drill>
 
           {!data.has_output_logs ? (
             <p className={`${fl.card} text-center text-sm ${fl.muted}`}>
@@ -113,7 +122,8 @@ export function SummaryTab() {
                   {data.by_resin.map((r) => {
                     const total = data.by_resin.reduce((sum, p) => sum + p.units, 0) || 1
                     return (
-                      <div key={r.resin} className="flex items-center gap-2 text-xs">
+                      <Drill key={r.resin} f={{ resin: r.resin, date_from: todayIso(), date_to: todayIso() }} block className="rounded">
+                      <div className="flex items-center gap-2 text-xs">
                         <span className="w-32 shrink-0 truncate text-[#CBD5E1]">{r.resin}</span>
                         <div className="h-3 flex-1 overflow-hidden rounded bg-[#0F172A]">
                           <div className="h-full bg-violet-500" style={{ width: `${(r.units / total) * 100}%` }} />
@@ -121,6 +131,7 @@ export function SummaryTab() {
                         <span className="w-10 shrink-0 text-right text-[#CBD5E1]">{r.units}</span>
                         <span className={`w-16 shrink-0 text-right ${fl.muted}`}>{r.litres.toLocaleString(undefined, { maximumFractionDigits: 1 })} L</span>
                       </div>
+                      </Drill>
                     )
                   })}
                 </div>

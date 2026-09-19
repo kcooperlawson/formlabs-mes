@@ -66,6 +66,7 @@ export interface LogRow {
   pump_station: string
   cartridge_type: string
   resin_type: string
+  lot_number?: string
   bottles_filled: number
   scrap_empty: number
   scrap_filled: number

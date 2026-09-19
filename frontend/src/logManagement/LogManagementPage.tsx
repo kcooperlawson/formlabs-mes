@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { logManagementApi } from '../api/logManagement'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const card = fl.card
 const input = fl.input
@@ -120,16 +121,16 @@ function ProductionLogsTab() {
                     <tr key={r.id} className={fl.tableRow}>
                       <td className="py-1 pr-2 whitespace-nowrap text-[#CBD5E1]">{fmt(r.timestamp)}</td>
                       <td className="py-1 pr-2 text-[#CBD5E1]">{r.log_type}</td>
-                      <td className="py-1 pr-2 text-[#CBD5E1]">{r.pump_station}</td>
+                      <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ pump: r.pump_station }}>{r.pump_station}</Drill></td>
                       <td className="py-1 pr-2 text-[#CBD5E1]">
                         {r.resin_type && (
                           <span className="inline-flex items-center gap-1.5">
                             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: r.resin_color ?? '#9AA3AE' }} />
-                            {r.resin_type}
+                            <Drill f={{ resin: r.resin_type }}>{r.resin_type}</Drill>
                           </span>
                         )}
                       </td>
-                      <td className="py-1 pr-2 text-[#CBD5E1]">{r.operator_name}</td>
+                      <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ operator: r.operator_name }}>{r.operator_name}</Drill></td>
                       <td className="py-1 pr-2 text-right text-[#CBD5E1]">{r.bottles_filled.toLocaleString()}</td>
                       <td className="py-1 pr-2">
                         <button
@@ -234,10 +235,10 @@ function DowntimeLogsTab() {
                   {data.rows.map((r) => (
                     <tr key={r.id} className={fl.tableRow}>
                       <td className="py-1 pr-2 whitespace-nowrap text-[#CBD5E1]">{fmt(r.timestamp)}</td>
-                      <td className="py-1 pr-2 text-[#CBD5E1]">{r.pump_station}</td>
+                      <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ pump: r.pump_station }}>{r.pump_station}</Drill></td>
                       <td className="py-1 pr-2 text-[#CBD5E1]">{r.reason}</td>
                       <td className="py-1 pr-2 text-right text-[#CBD5E1]">{r.duration_min}</td>
-                      <td className="py-1 pr-2 text-[#CBD5E1]">{r.operator_name}</td>
+                      <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ operator: r.operator_name }}>{r.operator_name}</Drill></td>
                       <td className="py-1 pr-2">
                         <button
                           className={fl.btnSecondary}

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { analyticsApi, type DowntimeReason, type HeatmapCell, type PumpDeviation, type ResinOutput, type TrendPoint, type WeightReading } from '../api/analytics'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const card = fl.card
 const tile = fl.tile
@@ -93,7 +94,7 @@ function Donut({ data, total }: { data: ResinOutput[]; total: number }) {
         {data.map((d) => (
           <span key={d.resin} className="flex items-center gap-1">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
-            <span className={fl.muted}>{d.resin}</span>
+            <span className={fl.muted}><Drill f={{ resin: d.resin }}>{d.resin}</Drill></span>
           </span>
         ))}
       </div>
@@ -139,15 +140,16 @@ function Heatmap({ cells, operators }: { cells: HeatmapCell[]; operators: string
         <tbody>
           {operators.map((op) => (
             <tr key={op}>
-              <td className={`whitespace-nowrap pr-2 text-xs ${fl.muted}`}>{op}</td>
+              <td className={`whitespace-nowrap pr-2 text-xs ${fl.muted}`}><Drill f={{ operator: op }}>{op}</Drill></td>
               {dates.map((d) => {
                 const v = lookup.get(`${op}|${d}`) ?? 0
                 const t = v / max
                 return (
-                  <td
-                    key={d} title={`${op} · ${d}: ${v}`}
-                    style={{ width: 28, height: 28, borderRadius: 4, background: `rgba(45, 212, 191, ${0.08 + t * 0.85})` }}
-                  />
+                  <td key={d} title={`${op} · ${d}: ${v}`} style={{ width: 28, height: 28, padding: 0 }}>
+                    <Drill f={{ operator: op, date_from: d, date_to: d }} block className="rounded" title={`${op} · ${d}: ${v} - see the logs`}>
+                      <div style={{ width: 28, height: 28, borderRadius: 4, background: `rgba(45, 212, 191, ${0.08 + t * 0.85})` }} />
+                    </Drill>
+                  </td>
                 )
               })}
             </tr>
@@ -217,7 +219,7 @@ function PumpDeviationBars({ data }: { data: PumpDeviation[] }) {
         const widthPct = (Math.abs(d.mean_deviation) / maxAbs) * 50
         return (
           <div key={d.pump_station} className="flex items-center gap-2 text-xs">
-            <span className={`w-28 shrink-0 truncate ${fl.muted}`}>{d.pump_station}</span>
+            <span className={`w-28 shrink-0 truncate ${fl.muted}`}><Drill f={{ pump: d.pump_station }}>{d.pump_station}</Drill></span>
             <div className="relative h-4 flex-1 overflow-hidden rounded bg-[#0F172A]">
               <div className="absolute inset-y-0 left-1/2 w-px bg-[#64748B]" />
               <div

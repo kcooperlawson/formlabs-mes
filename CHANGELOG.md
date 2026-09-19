@@ -8,6 +8,15 @@ Anything before August 31 is written up from the short notes I made at the time.
 
 ---
 
+## 4.11 — Friday, September 18, 2026
+**Click any number and see what it's made of.**
+
+**Every lot, run, pump, operator, resin, vessel and total is now clickable.** A panel slides in from the right with everything behind it: the totals (units, litres, scrap, downtime), a breakdown by operator, pump, lot, resin, day and shift, every log with its weight and lot-check results, the runs it counts toward, the vessel batches it came out of, the cartridge lot checks, and - for a pump, a person or a day - the downtime and photo audits. Every name inside the panel is clickable too, so it goes as deep as you want; Back comes out again, Esc closes it, and a filter chip's × widens the view. The logs export to CSV.
+
+It works on Live SCADA (every card, the leaderboard, the packing list and the log stream - a card shows exactly the rows it was added up from, under the same time horizon and filters), Assigned Runs, Live Reactors, Batch History, Lot Verification, Log Management, Historical, the Analytics Hub (including each heatmap square), Scrap Intelligence, Checklist & Audit Status, and the operator's own shift ring and summary.
+
+A run's panel counts its logs by the same rule the run's own progress counter uses, so the two can never disagree. Lots match however they were typed ("lot-9001 " is LOT-9001). An operator can click anything but only ever sees their own entries; a manager standing in for an operator sees what that operator would.
+
 ## 4.10 — Friday, September 18, 2026
 **The resin list can be carried to another PC, and a reopened startup checklist behaves like a reopened checklist.**
 

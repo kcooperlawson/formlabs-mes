@@ -7,6 +7,7 @@ import {
 import { batchHistoryApi, type BatchRow } from '../api/batchHistory'
 import { StatCardSkeleton } from '../shell/Skeleton'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const tile = fl.tile
 const card = fl.card
@@ -306,7 +307,7 @@ export function BatchHistoryPage() {
                   const tone = o.hours_at_qc > 48 ? C_BAD : o.hours_at_qc > 24 ? C_WARN : C_QC
                   return (
                     <div key={o.id} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm" style={{ borderLeft: `4px solid ${tone}` }}>
-                      <span className="text-[#F8FAFC]"><b>{o.reactor_name}</b> <span className={fl.muted}>· {o.resin_type}</span></span>
+                      <span className="text-[#F8FAFC]"><b><Drill f={{ reactor: o.reactor_name }}>{o.reactor_name}</Drill></b> <span className={fl.muted}>· <Drill f={{ resin: o.resin_type }}>{o.resin_type}</Drill></span></span>
                       <span style={{ color: tone }} className="font-bold">{o.hours_at_qc} h at QC</span>
                     </div>
                   )
@@ -345,9 +346,9 @@ export function BatchHistoryPage() {
                 <tbody>
                   {data.batches.map((b) => (
                     <tr key={b.id} className={fl.tableRow}>
-                      <td className="py-1 pr-2">{b.reactor_name}</td>
-                      <td className="py-1 pr-2">{b.resin_type}</td>
-                      <td className="py-1 pr-2">{b.lot_number || '—'}</td>
+                      <td className="py-1 pr-2"><Drill f={{ reactor: b.reactor_name }}>{b.reactor_name}</Drill></td>
+                      <td className="py-1 pr-2"><Drill f={{ resin: b.resin_type }}>{b.resin_type}</Drill></td>
+                      <td className="py-1 pr-2">{b.lot_number ? <Drill f={{ lot: b.lot_number }}>{b.lot_number}</Drill> : '—'}</td>
                       <td className="py-1 pr-2 whitespace-nowrap">{fmt(b.filled_at)}</td>
                       <td className="py-1 pr-2 whitespace-nowrap">{b.emptied_at ? fmt(b.emptied_at) : 'still in use'}</td>
                       <td className="py-1 pr-2">{b.hours_in_reactor ?? ''}</td>

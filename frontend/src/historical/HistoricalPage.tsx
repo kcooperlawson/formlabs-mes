@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { historicalApi } from '../api/historical'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const tile = fl.tile
 const card = fl.card
@@ -48,7 +49,7 @@ function BarList({ data }: { data: { operator: string; bottles_filled: number }[
     <div className="flex flex-col gap-2">
       {data.map((d) => (
         <div key={d.operator} className="flex items-center gap-2 text-xs">
-          <span className="w-28 shrink-0 truncate text-[#CBD5E1]">{d.operator}</span>
+          <span className="w-28 shrink-0 truncate text-[#CBD5E1]"><Drill f={{ operator: d.operator }}>{d.operator}</Drill></span>
           <div className="h-4 flex-1 overflow-hidden rounded bg-[#0F172A]">
             <div className="h-full rounded bg-[#EA580C]" style={{ width: `${(d.bottles_filled / max) * 100}%` }} />
           </div>

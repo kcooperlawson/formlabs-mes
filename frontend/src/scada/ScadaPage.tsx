@@ -7,6 +7,38 @@ import { useRealtimeInvalidate } from '../hooks/useRealtimeInvalidate'
 import { Skeleton, StatCardSkeleton } from '../shell/Skeleton'
 import { Odometer } from '../tv/PrintBuild'
 import { fl } from '../theme'
+import type { DrillFilter } from '../api/drill'
+import { Drill } from '../drill/DrillContext'
+
+function isoDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** The dashboard's own filters, as a drill filter - so clicking a card shows
+ *  exactly the rows that card was added up from. */
+function scadaDrill(q: ScadaQuery, activeShift?: string): DrillFilter {
+  const today = new Date()
+  const back = (days: number) => isoDay(new Date(today.getFullYear(), today.getMonth(), today.getDate() - days))
+  const f: DrillFilter = {}
+  if (q.horizon === 'live') {
+    f.date_from = f.date_to = isoDay(today)
+    if (activeShift) f.shift = activeShift
+  } else if (q.horizon === 'specific') {
+    f.date_from = f.date_to = q.date || isoDay(today)
+  } else if (q.horizon === 'week') {
+    f.date_from = back(7)
+  } else if (q.horizon === 'month') {
+    f.date_from = back(30)
+  }
+  if (q.pump && q.pump !== 'All Pumps') f.pump = q.pump
+  if (q.resin && q.resin !== 'All Resins') f.resin = q.resin
+  if (q.operator && q.operator !== 'All Operators') f.operator = q.operator
+  if (q.shift && q.shift !== 'All Shifts') f.shift = q.shift
+  // "All Time, every pump" is still a real question; the server just needs
+  // one field to know it was asked on purpose.
+  if (!f.date_from && !f.pump && !f.resin && !f.operator) f.date_from = '2000-01-01'
+  return f
+}
 
 const card = fl.card
 const select = fl.select
@@ -52,6 +84,7 @@ export function ScadaPage() {
   // isn't visually "new" to them.
   const newestTimestamp = query.sort === 'newest' ? data?.log_stream[0]?.timestamp : undefined
   const newestFlash = useFlashOnChange(newestTimestamp)
+  const base = scadaDrill(query, data?.pouring?.trajectory?.is_live ? data.pouring.trajectory.active_shift_name : undefined)
 
   return (
     <div className="flex flex-col gap-4">
@@ -136,6 +169,7 @@ export function ScadaPage() {
           </>
         ) : (
           <>
+            <Drill f={base} block className="rounded-lg" title="Every log behind this total">
             <div className={card} style={{ borderLeft: `4px solid ${data.headline_is_live ? '#10B981' : '#64748B'}` }}>
               <p className="text-2xl font-bold text-white">
                 <Odometer value={data.headline_liters} uid="hl" /> L
@@ -147,16 +181,17 @@ export function ScadaPage() {
                 )}
               </p>
             </div>
+            </Drill>
 
             {data.pouring && (
               <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <StatCard label="Volume Output" value={<><Odometer value={data.pouring.liters_output} uid="vo" /> L</>}
                             sub={data.pouring.cart_type_counts.map((c) => `${c.units} ${c.cartridge_type}`).join(' | ') || 'No cartridges logged'}
-                            flashKey={data.pouring.liters_output} />
-                  <StatCard label="Resin Mass Poured" value={<><Odometer value={data.pouring.resin_mass_kg} decimals={1} uid="rm" /> kg</>} flashKey={data.pouring.resin_mass_kg} />
-                  <StatCard label="Run Velocity" value={<><Odometer value={data.pouring.run_velocity_lh} decimals={1} uid="rv" /> L/h</>} sub={`Target: ${data.pouring.target_rate_lh.toFixed(0)} L/h`} flashKey={data.pouring.run_velocity_lh} />
-                  <StatCard label="Pouring Yield" value={<><Odometer value={data.pouring.yield_pct} decimals={1} uid="py" />%</>} sub={`${data.pouring.total_scrap} scrap units`} flashKey={data.pouring.yield_pct} />
+                            flashKey={data.pouring.liters_output} drill={base} />
+                  <StatCard label="Resin Mass Poured" value={<><Odometer value={data.pouring.resin_mass_kg} decimals={1} uid="rm" /> kg</>} flashKey={data.pouring.resin_mass_kg} drill={base} />
+                  <StatCard label="Run Velocity" value={<><Odometer value={data.pouring.run_velocity_lh} decimals={1} uid="rv" /> L/h</>} sub={`Target: ${data.pouring.target_rate_lh.toFixed(0)} L/h`} flashKey={data.pouring.run_velocity_lh} drill={base} />
+                  <StatCard label="Pouring Yield" value={<><Odometer value={data.pouring.yield_pct} decimals={1} uid="py" />%</>} sub={`${data.pouring.total_scrap} scrap units`} flashKey={data.pouring.yield_pct} drill={base} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -192,10 +227,12 @@ export function ScadaPage() {
                       <p className={`text-sm ${fl.muted}`}>No pouring logged.</p>
                     ) : (
                       data.pouring.leaderboard.map((e, i) => (
-                        <div key={e.operator} className="flex justify-between border-b border-[#334155] py-1 text-sm text-[#CBD5E1] last:border-0">
-                          <span>#{i + 1} <strong className="text-white">{e.operator}</strong></span>
-                          <span className="font-semibold text-sky-400">{e.velocity_lh.toFixed(0)} L/h</span>
-                        </div>
+                        <Drill key={e.operator} f={{ ...base, operator: e.operator }} block className="rounded">
+                          <div className="flex justify-between border-b border-[#334155] py-1 text-sm text-[#CBD5E1] last:border-0">
+                            <span>#{i + 1} <strong className="text-white">{e.operator}</strong></span>
+                            <span className="font-semibold text-sky-400">{e.velocity_lh.toFixed(0)} L/h</span>
+                          </div>
+                        </Drill>
                       ))
                     )}
                   </div>
@@ -218,7 +255,7 @@ export function ScadaPage() {
                   ) : (
                     data.packing.by_resin_lot.map((r) => (
                       <div key={`${r.resin}-${r.lot_number}`} className="flex justify-between border-b border-[#334155] py-1 text-sm text-[#CBD5E1] last:border-0">
-                        <span><strong className="text-white">{r.resin}</strong> <span className={fl.muted}>({r.lot_number})</span></span>
+                        <span><strong className="text-white"><Drill f={{ resin: r.resin }}>{r.resin}</Drill></strong> <span className={fl.muted}>(<Drill f={{ lot: r.lot_number }}>{r.lot_number}</Drill>)</span></span>
                         <span><strong className="text-violet-400">{r.units.toLocaleString()} units</strong> <span className={fl.muted}>({r.skids.toFixed(1)} skids)</span></span>
                       </div>
                     ))
@@ -259,10 +296,13 @@ export function ScadaPage() {
                       <tr key={i} className={`${fl.tableRow} ${i === 0 && newestFlash ? 'fl-flash' : ''}`}>
                         <td className="py-1 pr-2 whitespace-nowrap text-[#CBD5E1]">{new Date(row.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
                         <td className="py-1 pr-2 text-[#CBD5E1]">{row.log_type}</td>
-                        <td className="py-1 pr-2 text-[#CBD5E1]">{row.operator_name}</td>
-                        <td className="py-1 pr-2 text-[#CBD5E1]">{row.pump_station}</td>
+                        <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ operator: row.operator_name, date_from: row.date, date_to: row.date }}>{row.operator_name}</Drill></td>
+                        <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ pump: row.pump_station, date_from: row.date, date_to: row.date }}>{row.pump_station}</Drill></td>
                         <td className="py-1 pr-2 text-[#CBD5E1]">{row.cartridge_type}</td>
-                        <td className="py-1 pr-2 text-[#CBD5E1]">{row.resin_type}</td>
+                        <td className="py-1 pr-2 text-[#CBD5E1]">
+                          <Drill f={{ resin: row.resin_type }}>{row.resin_type}</Drill>
+                          {row.lot_number && <> <span className={fl.muted}>·</span> <Drill f={{ lot: row.lot_number }} className={fl.muted}>{row.lot_number}</Drill></>}
+                        </td>
                         <td className="py-1 pr-2 text-right text-[#CBD5E1]">{row.bottles_filled}</td>
                         <td className="py-1 pr-2 text-right text-[#CBD5E1]">{row.scrap_empty + row.scrap_filled}</td>
                       </tr>
@@ -283,15 +323,16 @@ export function ScadaPage() {
 // flashKey is a plain comparable primitive (the raw number), separate from
 // `value` (which is JSX - an Odometer plus a unit suffix) - useFlashOnChange
 // needs something it can actually compare across renders.
-function StatCard({ label, value, sub, flashKey }: { label: string; value: ReactNode; sub?: string; flashKey?: number }) {
+function StatCard({ label, value, sub, flashKey, drill }: { label: string; value: ReactNode; sub?: string; flashKey?: number; drill?: DrillFilter }) {
   const flashing = useFlashOnChange(flashKey)
-  return (
+  const body = (
     <div className={`${fl.cardHover} ${flashing ? 'fl-flash' : ''}`}>
       <p className={`text-xs font-semibold uppercase tracking-wide ${fl.muted}`}>{label}</p>
       <p className="text-xl font-bold text-white">{value}</p>
       {sub && <p className={`text-xs ${fl.muted}`}>{sub}</p>}
     </div>
   )
+  return drill ? <Drill f={drill} block className="rounded-lg" title="Every log behind this number">{body}</Drill> : body
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

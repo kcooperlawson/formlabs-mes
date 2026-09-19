@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { checklistApi, type ComplianceRow } from '../api/checklist'
 import { useDebugOperator } from '../operatorForm/DebugOperatorContext'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 // Whether the checks actually got done - startup checklist, the start-of-shift
 // photo, a transfer check when somebody moved pumps, and the end-of-shift
@@ -94,10 +95,10 @@ export function ChecklistStatus({ compact = false }: { compact?: boolean }) {
                 {rows.map((row) => (
                   <tr key={`${row.operator_name}|${row.pump_station}|${row.shift}`} className={fl.tableRow}>
                     {query.data?.scope === 'everyone' && (
-                      <td className="py-1 pr-2 whitespace-nowrap text-[var(--fl-ink)]">{row.operator_name}</td>
+                      <td className="py-1 pr-2 whitespace-nowrap text-[var(--fl-ink)]"><Drill f={{ operator: row.operator_name, date_from: day, date_to: day }}>{row.operator_name}</Drill></td>
                     )}
                     <td className="py-1 pr-2 whitespace-nowrap text-[var(--fl-ink)]">
-                      {row.pump_station}
+                      <Drill f={{ pump: row.pump_station, operator: row.operator_name, date_from: day, date_to: day }}>{row.pump_station}</Drill>
                       {row.poured > 0 && <span className={`ml-1 ${fl.muted}`}>· {row.poured} logs</span>}
                     </td>
                     {!compact && <td className={`py-1 pr-2 whitespace-nowrap ${fl.muted}`}>{row.shift}</td>}

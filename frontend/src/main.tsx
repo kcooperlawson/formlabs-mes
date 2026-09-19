@@ -12,6 +12,7 @@ import App from './App.tsx'
 import { AuthProvider } from './auth/AuthProvider.tsx'
 import { ThemeRoot } from './ThemeRoot.tsx'
 import { ToastProvider } from './toast/ToastProvider.tsx'
+import { DrillProvider } from './drill/DrillContext.tsx'
 import './index.css'
 // Side-effect import: registers the beforeinstallprompt listener the
 // instant this bundle evaluates, so it's guaranteed to be in place before
@@ -37,7 +38,9 @@ createRoot(document.getElementById('root')!).render(
         <ThemeRoot>
           <ToastProvider>
             <BrowserRouter>
-              <App />
+              <DrillProvider>
+                <App />
+              </DrillProvider>
             </BrowserRouter>
           </ToastProvider>
         </ThemeRoot>

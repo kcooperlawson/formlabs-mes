@@ -67,6 +67,7 @@ class LogRow(BaseModel):
     pump_station: str
     cartridge_type: str
     resin_type: str
+    lot_number: str = ""
     bottles_filled: int
     scrap_empty: int
     scrap_filled: int

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { scrapIntelApi } from '../api/scrapIntel'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const tile = fl.tile
 const card = fl.card
@@ -57,7 +58,7 @@ function BarList({ data }: { data: { resin_type: string; bottles_filled: number;
         .sort((a, b) => b.bottles_filled - a.bottles_filled)
         .map((d) => (
           <div key={d.resin_type} className="flex items-center gap-2 text-xs">
-            <span className="w-32 shrink-0 truncate text-[#CBD5E1]">{d.resin_type}</span>
+            <span className="w-32 shrink-0 truncate text-[#CBD5E1]"><Drill f={{ resin: d.resin_type }}>{d.resin_type}</Drill></span>
             <div className="h-4 flex-1 overflow-hidden rounded bg-[#0F172A]">
               <div
                 className="h-full rounded"

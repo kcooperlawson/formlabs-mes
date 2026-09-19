@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { assignedRunsApi, type AssignedRun } from '../api/assignedRuns'
 import { referenceApi } from '../api/reference'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 
 const tile = fl.tile
 const card = fl.card
@@ -222,17 +223,17 @@ function RunCard({ run }: { run: AssignedRun }) {
             className="rounded-full border px-2 py-0.5 text-sm font-semibold"
             style={{ backgroundColor: run.resin_color, borderColor: run.resin_color, color: '#111827' }}
           >
-            {run.resin_type}
+            <Drill f={{ resin: run.resin_type }}>{run.resin_type}</Drill>
           </span>
           <span className="text-xs font-bold text-[#F97316]">[{run.cartridge_type}]</span>
         </div>
         <div className={`text-xs ${fl.muted}`}>
-          🛢️ <b className="text-[#CBD5E1]">{run.reactor_id}</b> ({run.reactor_size_l.toLocaleString()} L) &nbsp;|&nbsp; 🏷️ <b className="text-[#CBD5E1]">{run.pump_station}</b> &nbsp;|&nbsp; 👤 <b className="text-[#CBD5E1]">{run.assigned_operator}</b>
+          🛢️ <b className="text-[#CBD5E1]"><Drill f={{ reactor: run.reactor_id }}>{run.reactor_id}</Drill></b> ({run.reactor_size_l.toLocaleString()} L) &nbsp;|&nbsp; 🏷️ <b className="text-[#CBD5E1]"><Drill f={{ pump: run.pump_station }}>{run.pump_station}</Drill></b> &nbsp;|&nbsp; 👤 <b className="text-[#CBD5E1]"><Drill f={{ operator: run.assigned_operator }}>{run.assigned_operator}</Drill></b>
         </div>
       </div>
 
       <p className={`mb-1 text-xs ${fl.muted}`}>
-        Output: <b className="text-[#F8FAFC]">{run.current_units.toLocaleString()} / {run.target_units.toLocaleString()}</b> Units ({pct.toFixed(1)}%) &nbsp;|&nbsp; Lot: {run.lot_number || 'N/A'}
+        Output: <b className="text-[#F8FAFC]"><Drill f={{ run_id: run.id }} title="Every log counted toward this run">{run.current_units.toLocaleString()} / {run.target_units.toLocaleString()}</Drill></b> Units ({pct.toFixed(1)}%) &nbsp;|&nbsp; Lot: {run.lot_number ? <Drill f={{ lot: run.lot_number }}>{run.lot_number}</Drill> : 'N/A'}
       </p>
       <LayerBar pct={pct} />
 
@@ -325,16 +326,16 @@ function CompletedTab({ runs }: { runs: AssignedRun[] }) {
               <tbody>
                 {filtered.map((r) => (
                   <tr key={r.id} className={fl.tableRow}>
-                    <td className="py-1 pr-2 text-[#CBD5E1]">{r.id}</td>
+                    <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ run_id: r.id }}>#{r.id}</Drill></td>
                     <td className="py-1 pr-2 whitespace-nowrap text-[#CBD5E1]">{new Date(r.created_at).toLocaleString()}</td>
                     <td className="py-1 pr-2 text-[#CBD5E1]">{r.run_type}</td>
                     <td className="py-1 pr-2" style={{ backgroundColor: r.resin_color, color: '#111827' }}>{r.resin_type}</td>
                     <td className="py-1 pr-2 text-[#CBD5E1]">{r.cartridge_type}</td>
-                    <td className="py-1 pr-2 text-[#CBD5E1]">{r.lot_number}</td>
+                    <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ lot: r.lot_number }}>{r.lot_number}</Drill></td>
                     <td className="py-1 pr-2 text-[#CBD5E1]">{r.target_units.toLocaleString()}</td>
-                    <td className="py-1 pr-2 text-[#CBD5E1]">{r.current_units.toLocaleString()}</td>
-                    <td className="py-1 pr-2 text-[#CBD5E1]">{r.assigned_operator}</td>
-                    <td className="py-1 pr-2 text-[#CBD5E1]">{r.pump_station}</td>
+                    <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ run_id: r.id }}>{r.current_units.toLocaleString()}</Drill></td>
+                    <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ operator: r.assigned_operator }}>{r.assigned_operator}</Drill></td>
+                    <td className="py-1 pr-2 text-[#CBD5E1]"><Drill f={{ pump: r.pump_station }}>{r.pump_station}</Drill></td>
                   </tr>
                 ))}
               </tbody>

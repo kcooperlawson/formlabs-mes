@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { reactorsApi } from '../api/reactors'
 import { fl } from '../theme'
+import { Drill } from '../drill/DrillContext'
 import { BulkPourPanel } from './BulkPourPanel'
 import { ManageFleetPanel } from './ManageFleetPanel'
 import { MarkFilledPanel } from './MarkFilledPanel'
@@ -45,7 +46,7 @@ export function ReactorFleetPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {fleet.map((r) => (
             <div key={r.id} className="flex flex-col items-center gap-2">
-              <p className="text-center text-sm font-bold text-white">{r.reactor_name}</p>
+              <p className="text-center text-sm font-bold text-white"><Drill f={{ reactor: r.reactor_name }} title="This vessel's batches and pours">{r.reactor_name}</Drill></p>
               <div
                 className="w-full [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
                 dangerouslySetInnerHTML={{ __html: r.svg }}
@@ -69,9 +70,9 @@ export function ReactorFleetPage() {
                   </>
                 ) : (
                   <>
-                    <p className="font-bold text-white">{r.current_resin}</p>
+                    <p className="font-bold text-white"><Drill f={{ resin: r.current_resin ?? '' }}>{r.current_resin}</Drill></p>
                     <p className={fl.muted}>
-                      Station: {r.assigned_pump ?? 'Any'} | Lot: {r.lot || '—'}
+                      Station: {r.assigned_pump ? <Drill f={{ pump: r.assigned_pump }}>{r.assigned_pump}</Drill> : 'Any'} | Lot: {r.lot ? <Drill f={{ lot: r.lot }}>{r.lot}</Drill> : '—'}
                     </p>
                   </>
                 )}

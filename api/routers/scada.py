@@ -256,6 +256,7 @@ def overview(
                 timestamp=ts.isoformat(), date=str(r["date_str"]), log_type=r["log_type"],
                 operator_name=r["operator_name"], pump_station=r["pump_station"],
                 cartridge_type=r["cartridge_type"], resin_type=r["resin_type"],
+                lot_number=str(r.get("lot_number")) if pd.notna(r.get("lot_number")) else "",
                 bottles_filled=int(r["bottles_filled"] or 0), scrap_empty=int(r["scrap_empty"] or 0),
                 scrap_filled=int(r["scrap_filled"] or 0), notes=str(r.get("notes") or ""),
             ))
